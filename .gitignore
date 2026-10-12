@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+rotation.db
+*.db
+*.db-*
+*.backup
+*.backup_*
+*.before_*
+rotation_backup*
+.env
