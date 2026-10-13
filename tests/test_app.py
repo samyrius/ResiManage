@@ -740,3 +740,56 @@ def test_official_super_admin_accounts_cannot_be_demoted_or_disabled(client):
         ).fetchone()
     assert account["role"] == "super_admin"
     assert account["active"] == 1
+
+
+def test_import_adds_only_explicitly_documented_stage_history(client):
+    import io
+    import re
+
+    authenticated(client)
+    page = client.get("/import")
+    response = client.post(
+        "/import",
+        data={
+            "_csrf_token": csrf_token(page),
+            "action": "preview",
+            "file": (
+                io.BytesIO(
+                    "Nom,Prénom,Année,Téléphone,Terrain,Année universitaire,Période,Date de réalisation\n"
+                    "Historique,Documenté,2,0550000000,Réanimation polyvalente,2024-2025,P1,2024-04-30\n"
+                    "Sans,Histoire,2,0550000001,,,,\n".encode("utf-8")
+                ),
+                "residents-with-history.csv",
+            ),
+        },
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200
+    assert b"Will import documented stage" in response.data
+    assert b"Incomplete history columns" in response.data
+    token_match = re.search(rb'name="token" value="([^"]+)"', response.data)
+    assert token_match
+    response = client.post(
+        "/import",
+        data={
+            "_csrf_token": csrf_token(response),
+            "action": "confirm",
+            "token": token_match.group(1).decode(),
+        },
+    )
+    assert response.status_code == 200
+    with rotation_app.db() as connection:
+        resident_count = connection.execute("SELECT COUNT(*) FROM residents").fetchone()[0]
+        history = connection.execute(
+            "SELECT r.surname,t.name,h.year_label,h.period,h.date_done FROM history h "
+            "JOIN residents r ON r.id=h.resident_id JOIN terrains t ON t.id=h.terrain_id"
+        ).fetchall()
+    assert resident_count == 2
+    assert len(history) == 1
+    assert tuple(history[0]) == (
+        "Historique",
+        "Réanimation polyvalente",
+        "2024-2025",
+        "P1",
+        "2024-04-30",
+    )
