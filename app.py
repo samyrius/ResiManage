@@ -117,7 +117,7 @@ def login():
     hashed=generate_password_hash(submitted)
     c.execute("INSERT INTO settings(key,value) VALUES('password',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(hashed,))
     c.execute("INSERT INTO admins(username,display_name,password_hash,role) VALUES(?,?,?,?)",(username,request.form.get("display_name","Initial administrator").strip() or username,hashed,"super_admin"))
-    c.commit(); c.close(); session.clear(); session["user"]=username; session["role"]="super_admin"; return redirect("/")
+    c.commit(); c.close(); selected_lang=session.get("lang","ar"); session.clear(); session["lang"]=selected_lang; session["user"]=username; session["role"]="super_admin"; return redirect("/")
   elif account:
    p=account["password_hash"]; modern_hash=p.startswith(("scrypt:","pbkdf2:"))
    valid=check_password_hash(p,submitted) if modern_hash else hmac.compare_digest(hashlib.sha256(submitted.encode()).hexdigest(),p)
@@ -127,7 +127,7 @@ def login():
      c.execute("UPDATE admins SET password_hash=? WHERE id=?",(upgraded,account["id"]))
      c.execute("UPDATE settings SET value=? WHERE key='password'",(upgraded,))
      c.commit()
-    c.close(); session.clear(); session["user"]=username; session["role"]=account["role"]; return redirect("/")
+    c.close(); selected_lang=session.get("lang","ar"); session.clear(); session["lang"]=selected_lang; session["user"]=username; session["role"]=account["role"]; return redirect("/")
    flash(tr("badpass"))
   else: flash(tr("badpass"))
  c.close()
