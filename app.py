@@ -59,6 +59,7 @@ def init():
  CREATE TABLE IF NOT EXISTS exam_records(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL,study_year INTEGER NOT NULL,module TEXT NOT NULL,theory REAL NOT NULL,practical REAL NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE IF NOT EXISTS objectives(id INTEGER PRIMARY KEY,terrain_id INTEGER NOT NULL,study_year INTEGER NOT NULL,objective TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS dems_archive(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL UNIQUE,success_date TEXT NOT NULL,profile_json TEXT NOT NULL,history_json TEXT NOT NULL,archived_at TEXT DEFAULT CURRENT_TIMESTAMP);
+ CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,username TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('super_admin','user')),active INTEGER NOT NULL DEFAULT 1,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  """)
  y=str(datetime.now().year)+"-"+str(datetime.now().year+1)
  c.execute("INSERT OR IGNORE INTO settings VALUES('year',?)",(y,))
@@ -78,13 +79,16 @@ def boot():
  if not getattr(app,"_ready",False): init(); app._ready=True
 def page(body,**kw):
  lang=session.get("lang","ar")
- shell="""<!doctype html><html lang="{{lang}}" dir="{{'rtl' if lang=='ar' else 'ltr'}}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{t('app')}}</title><style>body{font-family:Arial,sans-serif;background:#f1f5f9;margin:0;color:#182b3d}header{background:#164e83;color:white;padding:15px}main{max-width:1050px;margin:auto;padding:12px}nav{display:flex;gap:6px;overflow:auto;background:white;padding:10px}a,button{background:#164e83;color:white;padding:9px 12px;border:0;border-radius:7px;text-decoration:none;display:inline-block;white-space:nowrap}section{background:white;padding:13px;border:1px solid #d7e1eb;border-radius:10px;margin:10px 0}input,select{font:inherit;padding:9px;border:1px solid #bccada;border-radius:7px;width:100%;box-sizing:border-box;margin:4px 0 9px}label{display:block}table{border-collapse:collapse;width:100%;min-width:540px}td,th{text-align:start;border-bottom:1px solid #ddd;padding:8px}.wrap{overflow:auto}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}.msg{background:#fff0c2;padding:10px;border-radius:7px}.good{color:green}.bad{color:#b21d1d}.muted{color:#526274}@media(max-width:600px){main{padding:7px}header{font-size:14px}}</style><header><h2>{{t('app')}}</h2>{{t('year')}}: {{year}}</header>{% if user %}<nav><a href="/">{{t('home')}}</a><a href="/residents">{{t('residents')}}</a><a href="/terrains">{{t('terrains')}}</a><a href="/capacities">{{t('capacities')}}</a><a href="/assign">{{t('assign')}}</a><a href="/history">{{t('history')}}</a><a href="/summary">{{t('summary')}}</a><a href="/decisions">{{t('decisions')}}</a><a href="/objectives">Objectives</a><a href="/exams">Exams</a><a href="/dems">DEMS</a><a href="/audit">Audit</a><a href="/settings">{{t('settings')}}</a><a href="/export">{{t('export')}}</a><a href="/backup">{{t('backup')}}</a><a href="/logout">{{t('logout')}}</a></nav>{% endif %}<main>{% for m in get_flashed_messages() %}<p class="msg">{{m}}</p>{% endfor %}{{body|safe}}</main></html>"""
+ shell="""<!doctype html><html lang="{{lang}}" dir="{{'rtl' if lang=='ar' else 'ltr'}}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{t('app')}}</title><style>body{font-family:Arial,sans-serif;background:#f1f5f9;margin:0;color:#182b3d}header{background:#164e83;color:white;padding:15px}main{max-width:1050px;margin:auto;padding:12px}nav{display:flex;gap:6px;overflow:auto;background:white;padding:10px}a,button{background:#164e83;color:white;padding:9px 12px;border:0;border-radius:7px;text-decoration:none;display:inline-block;white-space:nowrap}section{background:white;padding:13px;border:1px solid #d7e1eb;border-radius:10px;margin:10px 0}input,select{font:inherit;padding:9px;border:1px solid #bccada;border-radius:7px;width:100%;box-sizing:border-box;margin:4px 0 9px}label{display:block}table{border-collapse:collapse;width:100%;min-width:540px}td,th{text-align:start;border-bottom:1px solid #ddd;padding:8px}.wrap{overflow:auto}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}.msg{background:#fff0c2;padding:10px;border-radius:7px}.good{color:green}.bad{color:#b21d1d}.muted{color:#526274}@media(max-width:600px){main{padding:7px}header{font-size:14px}}</style><header><h2>{{t('app')}}</h2>{{t('year')}}: {{year}}</header>{% if user %}<nav><a href="/">{{t('home')}}</a><a href="/residents">{{t('residents')}}</a><a href="/terrains">{{t('terrains')}}</a><a href="/capacities">{{t('capacities')}}</a><a href="/assign">{{t('assign')}}</a><a href="/history">{{t('history')}}</a><a href="/summary">{{t('summary')}}</a><a href="/decisions">{{t('decisions')}}</a><a href="/users">Users</a><a href="/objectives">Objectives</a><a href="/exams">Exams</a><a href="/dems">DEMS</a><a href="/audit">Audit</a><a href="/settings">{{t('settings')}}</a><a href="/export">{{t('export')}}</a><a href="/backup">{{t('backup')}}</a><a href="/logout">{{t('logout')}}</a></nav>{% endif %}<main>{% for m in get_flashed_messages() %}<p class="msg">{{m}}</p>{% endfor %}{{body|safe}}</main></html>"""
  context={"t":tr,"lang":lang,"year":setting(db(),"year")}
  context.update(kw)
  inner=render_template_string(body,**context)
  return render_template_string(shell,body=inner,lang=lang,t=tr,year=setting(db(),"year"),user=bool(session.get("user")))
 def guard():
  if not session.get("user"): return redirect("/login")
+def super_guard():
+ if not session.get("user"): return redirect("/login")
+ if session.get("role")!="super_admin": return ("Forbidden — Super Admin only",403)
 @app.get("/lang/<lang>")
 def lang(lang):
  if lang in LANGS: session["lang"]=lang
@@ -93,23 +97,30 @@ def lang(lang):
 def login():
  c=db(); p=setting(c,"password")
  if request.method=="POST":
+  username=request.form.get("username","admin").strip()
   password=request.form.get("password","")
+  account=c.execute("SELECT * FROM users WHERE username=? AND active=1",(username,)).fetchone()
   if not p:
    confirm=request.form.get("confirm_password","")
-   if len(password)<12 or password!=confirm:
-    c.close(); flash("Set matching password of at least 12 characters / Choisissez deux mots de passe identiques (12 caractères minimum) / أدخل كلمة مرور متطابقة من 12 حرفًا على الأقل")
+   if username!="admin" or len(password)<12 or password!=confirm:
+    c.close(); flash("First setup requires username admin and matching password of at least 12 characters.")
     return redirect("/login")
-   c.execute("INSERT INTO settings(key,value) VALUES('password',?)",(hash_password(password),))
-   c.commit(); c.close(); session.clear(); session["user"]="admin"; return redirect("/")
-  if verify_password(password,p):
-   if not p.startswith("pbkdf2_sha256$"):
-    c.execute("UPDATE settings SET value=? WHERE key='password'",(hash_password(password),)); c.commit()
-   c.close(); session.clear(); session["user"]="admin"; return redirect("/")
+   p=hash_password(password)
+   c.execute("INSERT INTO settings(key,value) VALUES('password',?)",(p,))
+   c.execute("INSERT OR IGNORE INTO users(username,password_hash,role) VALUES('admin',?,'super_admin')",(p,))
+   c.commit(); c.close(); session.clear(); session["user"]="admin"; session["role"]="super_admin"; return redirect("/")
+  if account and verify_password(password,account["password_hash"]):
+   c.close(); session.clear(); session["user"]=account["username"]; session["role"]=account["role"]; return redirect("/")
+  if username=="admin" and not account and verify_password(password,p):
+   secure_hash=hash_password(password)
+   c.execute("UPDATE settings SET value=? WHERE key='password'",(secure_hash,))
+   c.execute("INSERT OR IGNORE INTO users(username,password_hash,role) VALUES('admin',?,'super_admin')",(secure_hash,))
+   c.commit(); c.close(); session.clear(); session["user"]="admin"; session["role"]="super_admin"; return redirect("/")
   c.close(); flash(tr("badpass"))
  else:
   c.close()
  setup_required=not p
- return page("""<section><p><a href="/lang/ar">العربية</a> <a href="/lang/fr">Français</a> <a href="/lang/en">English</a></p><h3>{{t('login')}}</h3>{% if setup_required %}<p>First setup: create a private administrator password (12+ characters).</p><form method="post"><label>{{t('password')}}</label><input name="password" type="password" minlength="12" required><label>Confirm password</label><input name="confirm_password" type="password" minlength="12" required><button>Create administrator password</button></form>{% else %}<form method="post"><label>{{t('password')}}</label><input name="password" type="password" required><button>{{t('signin')}}</button></form>{% endif %}</section>""",setup_required=setup_required)
+ return page("""<section><p><a href="/lang/ar">العربية</a> <a href="/lang/fr">Français</a> <a href="/lang/en">English</a></p><h3>{{t('login')}}</h3><form method="post"><label>Username / Identifiant / اسم المستخدم</label><input name="username" value="admin" required><label>{{t('password')}}</label><input name="password" type="password" minlength="{{12 if setup_required else 1}}" required>{% if setup_required %}<label>Confirm password</label><input name="confirm_password" type="password" minlength="12" required><p>Create the first administrator password (12+ characters).</p>{% endif %}<button>{{'Create administrator / Créer l’administrateur / إنشاء المسؤول' if setup_required else t('signin')}}</button></form></section>""",setup_required=setup_required)
 @app.get("/logout")
 def logout(): session.clear(); return redirect("/login")
 @app.get("/")
@@ -243,7 +254,7 @@ def summary():
  return page("""<section><h3>{{t('summary')}} — {{year}}</h3><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('assign')}}</th><th>{{t('history')}}</th></tr>{% for r,a,h in rows %}<tr><td>{{r.surname}} {{r.firstname}}</td><td>{{r.year}}</td><td>{% for x in a %}<div>{{x.period}} — {{x.terrain}} ({{x.status}})</div>{% else %}—{% endfor %}</td><td>{% for x in h %}<div>{{x.terrain}} — {{x.year_label}} / {{x.period}} / {{x.date_done}}</div>{% else %}—{% endfor %}</td></tr>{% endfor %}</table></div></section>""",rows=rows,year=y)
 @app.route("/decisions",methods=["GET","POST"])
 def decisions():
- if guard():return redirect("/login")
+ if super_guard():return redirect("/login")
  c=db()
  if request.method=="POST":
   aid=int(request.form["aid"]); outcome=request.form["outcome"]; reason=request.form.get("reason","").strip()
@@ -266,7 +277,7 @@ def decisions():
  return page("""<section><h3>{{t('decisions')}}</h3>{% for a in pending %}<p><b>{{a.surname}} {{a.firstname}}</b> — {{a.terrain}} / {{a.period}}</p><form method="post"><input type="hidden" name="aid" value="{{a.id}}"><input name="reason" placeholder="{{t('reason')}}" required><button name="outcome" value="approve">{{t('approve')}}</button> <button name="outcome" value="reject">{{t('reject')}}</button></form>{% else %}<p>{{t('none')}}</p>{% endfor %}</section><section><div class="wrap"><table><tr><th>Date</th><th>{{t('assign')}}</th><th>{{t('status')}}</th><th>{{t('reason')}}</th></tr>{% for d in ds %}<tr><td>{{d.created_at}}</td><td>{{d.details}}</td><td>{{d.decision}}</td><td>{{d.reason}}</td></tr>{% endfor %}</table></div></section>""",pending=pending,ds=ds)
 @app.route("/settings",methods=["GET","POST"])
 def settings():
- if guard():return redirect("/login")
+ if super_guard():return redirect("/login")
  c=db()
  if request.method=="POST":
   lang=request.form.get("lang","ar")
@@ -304,7 +315,7 @@ def resident_profile(rid):
  return page("""<section><h3>{{r.surname}} {{r.firstname}} — Resident profile / Profil / الملف</h3><p>Year: {{r.year}} · Status: {{r.status}}</p>{% if r.photo_path %}<p><img src="{{r.photo_path}}" alt="Resident photo" style="max-width:140px;max-height:140px"></p>{% endif %}<form method="post"><label>Birth place / Lieu de naissance / مكان الميلاد</label><input name="birth_place" value="{{r.birth_place or ''}}"><label>Birth date / Date de naissance / تاريخ الميلاد</label><input type="date" name="birth_date" value="{{r.birth_date or ''}}"><label>Phone / Téléphone / الهاتف</label><input name="phone" value="{{r.phone or ''}}"><label>Photo URL/path / Photo / رابط الصورة</label><input name="photo_path" value="{{r.photo_path or ''}}"><button>Save / Enregistrer / حفظ</button></form><p><a href="/exams?resident={{r.id}}">Exams / Examens / الامتحانات</a> · <a href="/dems">DEMS archive</a></p></section><section><h3>Terrain progress / Avancement / تقدم التربصات</h3><div class="wrap"><table><tr><th>Terrain</th><th>Status</th></tr>{% for t in terrains %}<tr><td>{{t.name}}</td><td class="{{'bad' if t.id in done else 'good'}}">{{'Completed / Effectué / مكتمل' if t.id in done else 'Remaining / À faire / متبقٍ'}}</td></tr>{% endfor %}</table></div></section><section><h3>Assignments and history / Affectations et historique / التوزيعات والتاريخ</h3>{% for a in assignment_rows %}<p>{{a.year_label}} — {{a.period}} — {{a.terrain}} ({{a.status}})</p>{% endfor %}{% for h in history_rows %}<p>{{h.year_label}} — {{h.period}} — {{h.terrain}} — {{h.date_done}}</p>{% endfor %}</section><section><h3>Objectives / Objectifs / الأهداف</h3>{% for o in objectives %}<p>Year {{o.study_year}} — {{o.terrain}}: {{o.objective}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",r=r,terrains=terrains,done=done,assignment_rows=assignment_rows,history_rows=history_rows,objectives=objectives)
 @app.route("/objectives",methods=["GET","POST"])
 def manage_objectives():
- if guard(): return redirect("/login")
+ if super_guard(): return redirect("/login")
  c=db()
  if request.method=="POST":
   tid=int(request.form["terrain"]); sy=int(request.form["study_year"]); obj=request.form["objective"].strip()
@@ -360,7 +371,7 @@ def exams():
  return page("""<section><h3>Exams and progression / Examens et progression / الامتحانات والترقية</h3><form method="post"><input type="hidden" name="action" value="record"><label>Resident</label><select name="resident">{% for r in rs %}<option value="{{r.id}}" {% if selected==r.id %}selected{% endif %}>{{r.year}} — {{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>Study year</label><select name="study_year">{% for y in range(1,5) %}<option>{{y}}</option>{% endfor %}</select><label>Module / Matière / المادة</label><input name="module" required><div class="grid"><div><label>Theory / Théorie / نظري</label><input type="number" name="theory" min="0" max="20" step="0.01" required></div><div><label>Practical / Pratique / تطبيقي</label><input type="number" name="practical" min="0" max="20" step="0.01" required></div></div><button>Record exam / Enregistrer / تسجيل</button></form></section><section><h4>Evaluate first year / Évaluer la 1re année / تقييم السنة الأولى</h4><form method="post"><input type="hidden" name="action" value="evaluate_first_year"><label>Resident</label><select name="resident">{% for r in rs if r.year==1 %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}}</option>{% endfor %}</select><input type="hidden" name="study_year" value="1"><button>Evaluate and advance if eligible</button></form><h4>Approve progression (years 2–3)</h4><form method="post"><input type="hidden" name="action" value="approve_advance"><label>Resident</label><select name="resident">{% for r in rs if r.year in [2,3] %}<option value="{{r.id}}">{{r.year}} — {{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>Study year</label><select name="study_year"><option>2</option><option>3</option></select><button>Approve progression</button></form></section><section><div class="wrap"><table><tr><th>Resident</th><th>Year</th><th>Module</th><th>Theory</th><th>Practical</th></tr>{% for e in rows %}<tr><td>{{e.surname}} {{e.firstname}}</td><td>{{e.study_year}}</td><td>{{e.module}}</td><td>{{e.theory}}</td><td>{{e.practical}}</td></tr>{% else %}<tr><td colspan="5">{{t('none')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows,rs=rs,selected=selected)
 @app.route("/dems",methods=["GET","POST"])
 def dems():
- if guard(): return redirect("/login")
+ if super_guard(): return redirect("/login")
  c=db()
  if request.method=="POST":
   rid=int(request.form["resident"]); success_date=request.form.get("success_date","").strip()
