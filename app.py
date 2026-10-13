@@ -489,7 +489,7 @@ def backup():
   if os.path.isdir(UPLOAD_DIR):
    for root,_,files in os.walk(UPLOAD_DIR):
     for name in files:
-     full=os.path.join(root,name); archive.write(full,os.path.relpath(full,BASE))
+     full=os.path.join(root,name); archive.write(full,os.path.join("uploads","residents",name))
  return send_file(target,as_attachment=True,download_name="rotation_backup.zip")
 if __name__=="__main__":
  init(); app.run(host="127.0.0.1",port=int(os.environ.get("PORT","5000")),debug=False)
