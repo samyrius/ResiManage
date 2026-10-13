@@ -374,7 +374,12 @@ def resident_records(resident_id):
     d1=date.fromisoformat(start); d2=date.fromisoformat(end)
     if d2<d1 or yr<2000: raise ValueError
     days=(d2-d1).days+1
-    already=c.execute("SELECT COALESCE(SUM(days),0) FROM resident_leave WHERE resident_id=? AND leave_year=?",(resident_id,yr)).fetchone()[0]
+    overlaps=c.execute("SELECT start_date,end_date FROM resident_leave WHERE resident_id=? AND leave_year=?",(resident_id,yr)).fetchall()
+    already=0
+    for prior_leave in overlaps:
+     p1=date.fromisoformat(prior_leave["start_date"]); p2=date.fromisoformat(prior_leave["end_date"])
+     if d1<=p2 and d2>=p1: raise ValueError("leave_overlap")
+     already+=(p2-p1).days+1
     if already+days>31: raise ValueError("leave_limit")
     c.execute("INSERT INTO resident_leave(resident_id,leave_year,start_date,end_date,days,notes) VALUES(?,?,?,?,?,?)",(resident_id,yr,start,end,days,request.form.get("notes","").strip()))
     audit(c,"resident_leave_added",f"resident_id={resident_id};year={yr};start={start};end={end};days={days}")
@@ -388,7 +393,7 @@ def resident_records(resident_id):
     if action=="training_update":
      training_id=int(request.form["training_id"])
      c.execute("UPDATE foreign_training SET request_date=?,country=?,host_hospital=?,start_date=?,end_date=?,status=?,notes=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND resident_id=?",(request.form["request_date"],request.form["country"].strip(),request.form["host_hospital"].strip(),start,end,status,request.form.get("notes","").strip(),training_id,resident_id))
-     if c.total_changes<1: raise ValueError
+     if c.execute("SELECT changes()").fetchone()[0]<1: raise ValueError
      audit(c,"foreign_training_updated",f"resident_id={resident_id};training_id={training_id};status={status};start={start};end={end}")
     else:
      c.execute("INSERT INTO foreign_training(resident_id,request_date,country,host_hospital,start_date,end_date,status,notes) VALUES(?,?,?,?,?,?,?,?)",(resident_id,request.form["request_date"],request.form["country"].strip(),request.form["host_hospital"].strip(),start,end,status,request.form.get("notes","").strip()))
@@ -680,6 +685,14 @@ def import_residents():
      resident=c.execute("SELECT id FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=?",(row["surname"],row["firstname"],row["year"])).fetchone()
      if resident:
       resident_id=resident["id"]; duplicates+=1
+      existing=c.execute("SELECT phone,birth_place,birth_date FROM residents WHERE id=?",(resident_id,)).fetchone()
+      updates={}
+      for field in ("phone","birth_place","birth_date"):
+       incoming=(row.get(field) or "").strip()
+       if incoming and not (existing[field] or "").strip(): updates[field]=incoming
+      if updates:
+       c.execute("UPDATE residents SET "+", ".join(f"{field}=?" for field in updates)+" WHERE id=?",(*updates.values(),resident_id))
+       audit(c,"resident_import_filled_blank_fields",f"resident_id={resident_id};fields={','.join(updates)}")
      else:
       cur=c.execute("INSERT INTO residents(surname,firstname,year,phone,birth_place,birth_date,status) VALUES(?,?,?,?,?,?, 'active')",(row["surname"],row["firstname"],row["year"],row.get("phone",""),row.get("birth_place",""),row.get("birth_date","")))
       resident_id=cur.lastrowid; inserted+=1
