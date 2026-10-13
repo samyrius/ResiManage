@@ -532,6 +532,7 @@ def import_residents():
  if guard():return redirect("/login")
  if session.get("role")!="super_admin":return "Forbidden",403
  c=db(); preview=None
+ c.execute("DELETE FROM import_previews WHERE status='pending' AND created_at < datetime('now','-1 day')")
  if request.method=="POST":
   action=request.form.get("action","preview")
   if action=="preview":
@@ -559,7 +560,7 @@ def import_residents():
      if exists:duplicates+=1; continue
      c.execute("INSERT INTO residents(surname,firstname,year,phone,birth_place,birth_date,status) VALUES(?,?,?,?,?,?, 'active')",(row["surname"],row["firstname"],row["year"],row.get("phone",""),row.get("birth_place",""),row.get("birth_date","")))
      inserted+=1
-    c.execute("UPDATE import_previews SET status='imported' WHERE token=?",(token,))
+    c.execute("UPDATE import_previews SET status='imported',rows_json='{}' WHERE token=?",(token,))
     audit(c,"resident_import_confirmed",f"source={item['source_name']};inserted={inserted};duplicates={duplicates};errors={len(payload['errors'])}")
     c.commit(); flash(f"{tr('import_done')}: {inserted}. {tr('import_duplicates')}: {duplicates}. {tr('import_errors')}: {len(payload['errors'])}.")
  c.close()
