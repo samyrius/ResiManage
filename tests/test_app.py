@@ -254,14 +254,14 @@ def test_first_year_progression_requires_every_component_at_least_ten(tmp_path, 
         rid = conn.execute("SELECT id FROM residents WHERE surname='Pass'").fetchone()[0]
     for module, theory, practical in [("Module A", 12, 11), ("Module B", 10, 10)]:
         client.post("/exams", data={"action":"record","resident":str(rid),"study_year":"1","module":module,"theory":str(theory),"practical":str(practical)})
-    client.post("/exams", data={"action":"evaluate_first_year","resident":str(rid),"study_year":"1"})
+    client.post("/exams", data={"action":"evaluate_first_year","resident":str(rid),"study_year":"1","all_modules_confirmed":"yes"})
     with rotation_app.db() as conn:
         assert conn.execute("SELECT year FROM residents WHERE id=?", (rid,)).fetchone()[0] == 2
         conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,1)", ("Fail", "Resident"))
         fail_id = conn.execute("SELECT id FROM residents WHERE surname='Fail'").fetchone()[0]
     for module, theory, practical in [("Module A", 15, 15), ("Module B", 9, 16)]:
         client.post("/exams", data={"action":"record","resident":str(fail_id),"study_year":"1","module":module,"theory":str(theory),"practical":str(practical)})
-    client.post("/exams", data={"action":"evaluate_first_year","resident":str(fail_id),"study_year":"1"})
+    client.post("/exams", data={"action":"evaluate_first_year","resident":str(fail_id),"study_year":"1","all_modules_confirmed":"yes"})
     with rotation_app.db() as conn:
         assert conn.execute("SELECT year FROM residents WHERE id=?", (fail_id,)).fetchone()[0] == 1
 
