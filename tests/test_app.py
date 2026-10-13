@@ -1,3 +1,4 @@
+import io
 import sys
 from pathlib import Path
 
@@ -294,3 +295,24 @@ def test_standard_user_cannot_access_super_admin_pages(tmp_path, monkeypatch):
     assert client.get("/settings").status_code == 403
     assert client.get("/dems").status_code == 403
     assert client.get("/audit").status_code == 403
+
+def test_backup_and_restore_preserve_a_recoverable_database(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)", ("BeforeBackup", "Resident", 2))
+    backup_response = client.get("/backup")
+    assert backup_response.status_code == 200
+    backup_bytes = backup_response.get_data()
+    assert backup_bytes.startswith(b"SQLite format 3")
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)", ("AddedAfterBackup", "Resident", 1))
+    restored = client.post("/restore", data={
+        "backup_file": (io.BytesIO(backup_bytes), "rotation_backup.db")
+    }, content_type="multipart/form-data", follow_redirects=True)
+    assert restored.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM residents WHERE surname='BeforeBackup'").fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM residents WHERE surname='AddedAfterBackup'").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='database.restored'").fetchone()[0] == 1
+    assert list(tmp_path.glob("rotation_backup_before_restore_*.db"))
