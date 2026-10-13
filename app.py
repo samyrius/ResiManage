@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, request, redirect, session, render_template_string, flash, send_file
-import sqlite3, os, hashlib, io, csv, shutil
+import sqlite3, os, hashlib, hmac, io, csv, shutil
 from datetime import datetime
 
 BASE=os.path.dirname(os.path.abspath(__file__))
@@ -27,7 +27,7 @@ def verify_password(password, stored):
   try:
    _,salt,digest=stored.split("$",2)
    candidate=hashlib.pbkdf2_hmac("sha256",password.encode("utf-8"),bytes.fromhex(salt),310000).hex()
-   return hashlib.compare_digest(candidate,digest)
+   return hmac.compare_digest(candidate,digest)
   except (ValueError,TypeError):
    return False
  return hashlib.compare_digest(hashlib.sha256(password.encode("utf-8")).hexdigest(),stored)
