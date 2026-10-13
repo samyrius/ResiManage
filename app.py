@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, request, redirect, session, render_template_string, flash, send_file
-import sqlite3, os, hashlib, hmac, io, csv, shutil, json
+import sqlite3, os, hashlib, hmac, io, csv, shutil, json, tempfile
 from datetime import datetime
 
 BASE=os.path.dirname(os.path.abspath(__file__))
 DB=os.path.join(BASE,"rotation.db")
 app=Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"]=25*1024*1024
 app.secret_key=os.environ.get("ROTATION_SECRET") or os.urandom(32)
 LANGS=("ar","fr","en")
 D={
@@ -79,7 +80,7 @@ def boot():
  if not getattr(app,"_ready",False): init(); app._ready=True
 def page(body,**kw):
  lang=session.get("lang","ar")
- shell="""<!doctype html><html lang="{{lang}}" dir="{{'rtl' if lang=='ar' else 'ltr'}}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{t('app')}}</title><style>body{font-family:Arial,sans-serif;background:#f1f5f9;margin:0;color:#182b3d}header{background:#164e83;color:white;padding:15px}main{max-width:1050px;margin:auto;padding:12px}nav{display:flex;gap:6px;overflow:auto;background:white;padding:10px}a,button{background:#164e83;color:white;padding:9px 12px;border:0;border-radius:7px;text-decoration:none;display:inline-block;white-space:nowrap}section{background:white;padding:13px;border:1px solid #d7e1eb;border-radius:10px;margin:10px 0}input,select{font:inherit;padding:9px;border:1px solid #bccada;border-radius:7px;width:100%;box-sizing:border-box;margin:4px 0 9px}label{display:block}table{border-collapse:collapse;width:100%;min-width:540px}td,th{text-align:start;border-bottom:1px solid #ddd;padding:8px}.wrap{overflow:auto}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}.msg{background:#fff0c2;padding:10px;border-radius:7px}.good{color:green}.bad{color:#b21d1d}.muted{color:#526274}@media(max-width:600px){main{padding:7px}header{font-size:14px}}</style><header><h2>{{t('app')}}</h2>{{t('year')}}: {{year}}</header>{% if user %}<nav><a href="/">{{t('home')}}</a><a href="/residents">{{t('residents')}}</a><a href="/terrains">{{t('terrains')}}</a><a href="/capacities">{{t('capacities')}}</a><a href="/assign">{{t('assign')}}</a><a href="/history">{{t('history')}}</a><a href="/summary">{{t('summary')}}</a><a href="/decisions">{{t('decisions')}}</a><a href="/users">Users</a><a href="/objectives">Objectives</a><a href="/exams">Exams</a><a href="/dems">DEMS</a><a href="/audit">Audit</a><a href="/settings">{{t('settings')}}</a><a href="/export">{{t('export')}}</a><a href="/backup">{{t('backup')}}</a><a href="/logout">{{t('logout')}}</a></nav>{% endif %}<main>{% for m in get_flashed_messages() %}<p class="msg">{{m}}</p>{% endfor %}{{body|safe}}</main></html>"""
+ shell="""<!doctype html><html lang="{{lang}}" dir="{{'rtl' if lang=='ar' else 'ltr'}}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{t('app')}}</title><style>body{font-family:Arial,sans-serif;background:#f1f5f9;margin:0;color:#182b3d}header{background:#164e83;color:white;padding:15px}main{max-width:1050px;margin:auto;padding:12px}nav{display:flex;gap:6px;overflow:auto;background:white;padding:10px}a,button{background:#164e83;color:white;padding:9px 12px;border:0;border-radius:7px;text-decoration:none;display:inline-block;white-space:nowrap}section{background:white;padding:13px;border:1px solid #d7e1eb;border-radius:10px;margin:10px 0}input,select{font:inherit;padding:9px;border:1px solid #bccada;border-radius:7px;width:100%;box-sizing:border-box;margin:4px 0 9px}label{display:block}table{border-collapse:collapse;width:100%;min-width:540px}td,th{text-align:start;border-bottom:1px solid #ddd;padding:8px}.wrap{overflow:auto}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}.msg{background:#fff0c2;padding:10px;border-radius:7px}.good{color:green}.bad{color:#b21d1d}.muted{color:#526274}@media(max-width:600px){main{padding:7px}header{font-size:14px}}</style><header><h2>{{t('app')}}</h2>{{t('year')}}: {{year}}</header>{% if user %}<nav><a href="/">{{t('home')}}</a><a href="/residents">{{t('residents')}}</a><a href="/terrains">{{t('terrains')}}</a><a href="/capacities">{{t('capacities')}}</a><a href="/assign">{{t('assign')}}</a><a href="/history">{{t('history')}}</a><a href="/summary">{{t('summary')}}</a><a href="/decisions">{{t('decisions')}}</a><a href="/users">Users</a><a href="/objectives">Objectives</a><a href="/exams">Exams</a><a href="/dems">DEMS</a><a href="/audit">Audit</a><a href="/settings">{{t('settings')}}</a><a href="/export">{{t('export')}}</a><a href="/backup">{{t('backup')}}</a><a href="/restore">Restore</a><a href="/logout">{{t('logout')}}</a></nav>{% endif %}<main>{% for m in get_flashed_messages() %}<p class="msg">{{m}}</p>{% endfor %}{{body|safe}}</main></html>"""
  context={"t":tr,"lang":lang,"year":setting(db(),"year")}
  context.update(kw)
  inner=render_template_string(body,**context)
@@ -402,9 +403,57 @@ def export():
  c.close(); f=io.BytesIO(("\ufeff"+out.getvalue()).encode("utf-8")); return send_file(f,mimetype="text/csv",as_attachment=True,download_name="rotation_export.csv")
 @app.get("/backup")
 def backup():
- if super_guard():return super_guard()
- c=db(); c.execute("PRAGMA wal_checkpoint(FULL)"); c.close()
- target=os.path.join(BASE,"rotation_backup_download.db"); shutil.copy2(DB,target)
- return send_file(target,as_attachment=True,download_name="rotation_backup.db")
+ if super_guard(): return super_guard()
+ directory=os.path.dirname(os.path.abspath(DB))
+ target=os.path.join(directory,"rotation_backup_download.db")
+ source=sqlite3.connect(DB,timeout=20)
+ destination=sqlite3.connect(target)
+ try:
+  source.backup(destination)
+  destination.commit()
+ finally:
+  destination.close(); source.close()
+ ctype="application/octet-stream"
+ return send_file(target,mimetype=ctype,as_attachment=True,download_name="rotation_backup.db")
+@app.route("/restore",methods=["GET","POST"])
+def restore():
+ if super_guard(): return super_guard()
+ if request.method=="POST":
+  uploaded=request.files.get("backup_file")
+  if not uploaded or not uploaded.filename or not uploaded.filename.lower().endswith((".db",".sqlite",".sqlite3")):
+   flash("Choose a valid .db/.sqlite backup file.")
+   return redirect("/restore")
+  directory=os.path.dirname(os.path.abspath(DB))
+  staged=None
+  try:
+   with tempfile.NamedTemporaryFile(prefix="rotation_restore_",suffix=".db",dir=directory,delete=False) as temp:
+    staged=temp.name
+    uploaded.save(staged)
+   check=sqlite3.connect("file:"+staged+"?mode=ro",uri=True,timeout=10)
+   integrity=check.execute("PRAGMA integrity_check").fetchone()[0]
+   tables={row[0] for row in check.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+   check.close()
+   required={"residents","terrains","periods","assignments","history","settings"}
+   if integrity!="ok" or not required.issubset(tables):
+    raise ValueError("The uploaded file is not a valid Rotation App database backup.")
+   timestamp=datetime.now().strftime("%Y%m%d_%H%M%S")
+   before=os.path.join(directory,"rotation_backup_before_restore_"+timestamp+".db")
+   current=sqlite3.connect(DB,timeout=20)
+   saved=sqlite3.connect(before)
+   try:
+    current.backup(saved); saved.commit()
+   finally:
+    saved.close(); current.close()
+   os.replace(staged,DB); staged=None
+   app._ready=False
+   init()
+   c=db(); audit_event(c,"database.restored",f"Restored from uploaded backup; pre-restore backup={os.path.basename(before)}"); c.commit(); c.close()
+   flash("Restore completed. A pre-restore backup was saved as "+os.path.basename(before))
+  except Exception as exc:
+   flash("Restore failed; the current database was not intentionally replaced. Details: "+str(exc)[:250])
+  finally:
+   if staged and os.path.exists(staged): os.remove(staged)
+  return redirect("/restore")
+ return page("""<section><h3>Restore database / Restaurer / استرجاع قاعدة البيانات</h3><p>Before replacing the current database, the app creates a separate pre-restore backup. Upload only a backup made by this app. The file is checked for SQLite integrity and required tables first.</p><form method="post" enctype="multipart/form-data"><label>Database backup (.db/.sqlite)</label><input type="file" name="backup_file" accept=".db,.sqlite,.sqlite3" required><button>Validate and restore</button></form></section>""")
 if __name__=="__main__":
  init(); app.run(host="127.0.0.1",port=int(os.environ.get("PORT","5000")),debug=False)
