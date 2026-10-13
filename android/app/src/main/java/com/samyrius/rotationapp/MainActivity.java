@@ -52,7 +52,24 @@ public class MainActivity extends Activity {
                 }
                 fileChooserCallback = callback;
                 try {
-                    Intent intent = params.createIntent();
+                    // ACTION_OPEN_DOCUMENT is more reliable than WebView's default picker intent
+                    // on Android when selecting CSV files from Downloads or document providers.
+                    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType("*/*");
+                    intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
+                        "text/csv",
+                        "application/csv",
+                        "text/comma-separated-values",
+                        "application/vnd.ms-excel",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "application/msword",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "application/pdf",
+                        "text/plain",
+                        "application/octet-stream"
+                    });
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                     startActivityForResult(intent, FILE_CHOOSER_REQUEST);
                     return true;
                 } catch (ActivityNotFoundException ex) {
@@ -140,8 +157,18 @@ public class MainActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == FILE_CHOOSER_REQUEST) {
             if (fileChooserCallback != null) {
-                Uri[] results = (resultCode == RESULT_OK && data != null && data.getData() != null)
-                    ? new Uri[]{data.getData()} : null;
+                Uri[] results = null;
+                if (resultCode == RESULT_OK && data != null) {
+                    if (data.getClipData() != null && data.getClipData().getItemCount() > 0) {
+                        int count = data.getClipData().getItemCount();
+                        results = new Uri[count];
+                        for (int i = 0; i < count; i++) {
+                            results[i] = data.getClipData().getItemAt(i).getUri();
+                        }
+                    } else if (data.getData() != null) {
+                        results = new Uri[]{data.getData()};
+                    }
+                }
                 fileChooserCallback.onReceiveValue(results);
                 fileChooserCallback = null;
             }
