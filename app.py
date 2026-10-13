@@ -52,7 +52,7 @@ def init():
  CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
  """)
  # Additive migrations preserve existing resident and rotation-history records.
- for col, spec in {"birth_place":"TEXT DEFAULT ''","birth_date":"TEXT DEFAULT ''","photo_path":"TEXT DEFAULT ''","dems_status":"TEXT DEFAULT ''}.items():
+ for col, spec in {"birth_place":"TEXT DEFAULT ''","birth_date":"TEXT DEFAULT ''","photo_path":"TEXT DEFAULT ''","dems_status":"TEXT DEFAULT ''"}.items():
   ensure_column(c,"residents",col,spec)
  ensure_column(c,"audit","actor","TEXT DEFAULT ''")
  c.executescript("""
