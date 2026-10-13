@@ -587,8 +587,9 @@ def test_year_four_dems_archive_requires_both_named_super_admins(client):
     assert client.get("/dems-archive").status_code == 200
 
 
-def test_resident_photo_is_private_and_included_in_backup(client):
+def test_resident_photo_is_private_and_included_in_backup(client, tmp_path):
     import io
+    import sqlite3
     import zipfile
 
     with rotation_app.db() as connection:
@@ -615,10 +616,18 @@ def test_resident_photo_is_private_and_included_in_backup(client):
 
     backup = client.get("/backup")
     assert backup.status_code == 200
+    restore_dir = tmp_path / "restore"
+    restore_dir.mkdir()
     with zipfile.ZipFile(io.BytesIO(backup.data)) as archive:
         names = archive.namelist()
         assert "rotation.db" in names
         assert any(name.startswith("uploads/residents/") for name in names)
+        archive.extractall(restore_dir)
+    restored_db = sqlite3.connect(restore_dir / "rotation.db")
+    restored_count = restored_db.execute("SELECT COUNT(*) FROM residents").fetchone()[0]
+    restored_db.close()
+    assert restored_count == 1
+    assert list((restore_dir / "uploads" / "residents").iterdir())
 
 
 def test_resident_import_shows_preview_and_validates_before_saving(client):
