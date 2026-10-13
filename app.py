@@ -347,7 +347,7 @@ def parse_import_file(path, extension):
  if extension==".csv":
   with open(path,"r",encoding="utf-8-sig",newline="") as handle:
    sample=handle.read(4096); handle.seek(0)
-   try: dialect=csv.Sniffer().sniff(sample,delimiters=",;\\t")
+   try: dialect=csv.Sniffer().sniff(sample,delimiters=",;\t")
    except csv.Error: dialect=csv.excel
    rows=list(csv.reader(handle,dialect))
  elif extension in (".xlsx",".xls"):
@@ -373,12 +373,12 @@ def parse_import_file(path, extension):
   text_content="\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
   if not text_content.strip(): raise ValueError("The PDF has no extractable text (it may be scanned). Please provide a text-based PDF or spreadsheet.")
   lines=[line.strip() for line in text_content.splitlines() if line.strip()]
-  delimiter=";" if sum(x.count(";") for x in lines)>sum(x.count(",") for x in lines) else ("\\t" if any("\\t" in x for x in lines) else ",")
+  delimiter=";" if sum(x.count(";") for x in lines)>sum(x.count(",") for x in lines) else ("\t" if any("\t" in x for x in lines) else ",")
   rows=[next(csv.reader([line],delimiter=delimiter)) for line in lines]
  elif extension==".doc":
   result=subprocess.run(["antiword",path],capture_output=True,text=True,check=True)
   lines=[line.strip() for line in result.stdout.splitlines() if line.strip()]
-  rows=[re.split(r"\\s*[,;\\t]\\s*",line) for line in lines]
+  rows=[re.split(r"\s*[,;\t]\s*",line) for line in lines]
  if not rows: raise ValueError("No table rows could be read from this file.")
  header=[normalize_header(x) for x in rows[0]]
  required={"surname","firstname","year"}
