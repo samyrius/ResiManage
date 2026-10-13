@@ -324,9 +324,9 @@ def test_csv_import_requires_preview_and_does_not_invent_history(tmp_path, monke
     source = b"surname,firstname,year,phone\nImportSurname,ImportFirst,3,0551234567\n"
     preview = client.post("/import", data={
         "file": (io.BytesIO(source), "residents.csv")
-    }, content_type="multipart/form-data")
-    assert preview.status_code == 200
-    assert b"ImportSurname" in preview.data
+    }, content_type="multipart/form-data", follow_redirects=True)
+    assert preview.status_code == 200, preview.data.decode("utf-8", errors="replace")
+    assert b"ImportSurname" in preview.data, preview.data.decode("utf-8", errors="replace")
     match = re.search(rb'name="preview_id" value="(\d+)"', preview.data)
     assert match
     confirmed = client.post("/import", data={
