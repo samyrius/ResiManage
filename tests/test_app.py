@@ -43,6 +43,7 @@ def test_login_page_renders_password_field_without_disclosing_default(client):
     [
         "/",
         "/residents",
+        "/profiles",
         "/terrains",
         "/capacities",
         "/assign",
@@ -291,3 +292,133 @@ def test_resident_changes_are_written_to_audit_log(client):
     assert audit_page.status_code == 200
     assert b"resident_add" in audit_page.data
     assert b"AuditTest Resident" in audit_page.data
+
+
+def authenticated(client):
+    with client.session_transaction() as browser_session:
+        browser_session["user"] = "admin"
+        browser_session["lang"] = "en"
+
+
+def test_profile_saves_birth_details_and_exam_scores(client):
+    with rotation_app.db() as connection:
+        resident_id = connection.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES('Profile','Resident',1)"
+        ).lastrowid
+        connection.commit()
+    authenticated(client)
+
+    page = client.get(f"/profiles/{resident_id}")
+    response = client.post(
+        f"/profiles/{resident_id}",
+        data={
+            "_csrf_token": csrf_token(page),
+            "action": "profile",
+            "birth_place": "Tizi Ouzou",
+            "birth_date": "2000-01-02",
+            "phone": "0550000000",
+        },
+    )
+    assert response.status_code == 200
+
+    page = client.get(f"/profiles/{resident_id}")
+    response = client.post(
+        f"/profiles/{resident_id}",
+        data={
+            "_csrf_token": csrf_token(page),
+            "action": "exam",
+            "study_year": "1",
+            "module": "Module A",
+            "theory_score": "12",
+            "practical_score": "14",
+        },
+    )
+    assert response.status_code == 200
+    profile = client.get(f"/profiles/{resident_id}")
+    assert b"Tizi Ouzou" in profile.data
+    assert b"Module A" in profile.data
+    with rotation_app.db() as connection:
+        resident = connection.execute(
+            "SELECT birth_place,birth_date,phone FROM residents WHERE id=?",
+            (resident_id,),
+        ).fetchone()
+        assert tuple(resident) == ("Tizi Ouzou", "2000-01-02", "0550000000")
+
+
+def test_first_year_promotion_requires_all_configured_modules(client):
+    with rotation_app.db() as connection:
+        resident_id = connection.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES('Promotion','Candidate',1)"
+        ).lastrowid
+        connection.execute(
+            "INSERT INTO settings(key,value) VALUES('year1_required_modules','Module A;Module B')"
+        )
+        connection.execute(
+            "INSERT INTO resident_exams(resident_id,study_year,module,theory_score,practical_score) VALUES(?,1,'Module A',12,12)",
+            (resident_id,),
+        )
+        connection.commit()
+    authenticated(client)
+
+    page = client.get(f"/profiles/{resident_id}")
+    response = client.post(
+        f"/profiles/{resident_id}",
+        data={"_csrf_token": csrf_token(page), "action": "advance"},
+    )
+    assert response.status_code == 200
+    with rotation_app.db() as connection:
+        year = connection.execute(
+            "SELECT year FROM residents WHERE id=?", (resident_id,)
+        ).fetchone()["year"]
+    assert year == 1
+
+    page = client.get(f"/profiles/{resident_id}")
+    response = client.post(
+        f"/profiles/{resident_id}",
+        data={
+            "_csrf_token": csrf_token(page),
+            "action": "exam",
+            "study_year": "1",
+            "module": "Module B",
+            "theory_score": "13",
+            "practical_score": "11",
+        },
+    )
+    assert response.status_code == 200
+    page = client.get(f"/profiles/{resident_id}")
+    response = client.post(
+        f"/profiles/{resident_id}",
+        data={"_csrf_token": csrf_token(page), "action": "advance"},
+    )
+    assert response.status_code == 200
+    with rotation_app.db() as connection:
+        year = connection.execute(
+            "SELECT year FROM residents WHERE id=?", (resident_id,)
+        ).fetchone()["year"]
+    assert year == 2
+
+
+def test_first_year_promotion_rejects_any_module_component_below_ten(client):
+    with rotation_app.db() as connection:
+        resident_id = connection.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES('Low','Score',1)"
+        ).lastrowid
+        connection.execute(
+            "INSERT INTO settings(key,value) VALUES('year1_required_modules','Module A')"
+        )
+        connection.execute(
+            "INSERT INTO resident_exams(resident_id,study_year,module,theory_score,practical_score) VALUES(?,1,'Module A',9.99,18)",
+            (resident_id,),
+        )
+        connection.commit()
+    authenticated(client)
+    page = client.get(f"/profiles/{resident_id}")
+    client.post(
+        f"/profiles/{resident_id}",
+        data={"_csrf_token": csrf_token(page), "action": "advance"},
+    )
+    with rotation_app.db() as connection:
+        year = connection.execute(
+            "SELECT year FROM residents WHERE id=?", (resident_id,)
+        ).fetchone()["year"]
+    assert year == 1
