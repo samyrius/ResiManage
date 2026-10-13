@@ -74,3 +74,5 @@ CHU Tizi-Ouzou | مسؤول التوزيع: Pr. Y. Benhocine
 - يوجد ملف APK تجريبي مبني آلياً من GitHub Actions، موجّه لأجهزة Android ذات معالج ARM64 فقط. افتح تبويب Actions ثم أحدث تشغيل ناجح باسم Android APK build، ونزّل Artifact باسم `rotation-app-debug-apk`، فك الضغط ثم ثبّت `app-debug.apk`.
 - هذه نسخة Debug للاختبار وليست نسخة متجر Google Play، ولم يتم اختبارها بعد على هاتف فعلي. بعد أول فتح، أنشئ كلمة مرور المسؤول، ثم أنشئ الحسابين `benhocine` و`drdris` بصلاحية «مسؤول أعلى» وكلمتي مرور منفصلتين.
 - بيانات التطبيق محفوظة في مساحة التطبيق الخاصة. قبل حذف التطبيق، نزّل نسخة ZIP الاحتياطية من داخله لأن حذف التطبيق يمسح البيانات المحلية. ملف ZIP يشمل قاعدة البيانات والصور.
+
+- قالب الاستيراد: [docs/resident_import_template.csv](docs/resident_import_template.csv) ودليل الأعمدة [docs/resident_import_template.md](docs/resident_import_template.md). لإضافة تاريخ تربص موثق، يجب تعبئة المصلحة والسنة الجامعية والفترة؛ إذا كانت المعلومات ناقصة، يعرض النظام تحذيراً ولا يخترع أي مرحلة.
