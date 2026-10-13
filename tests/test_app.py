@@ -44,6 +44,8 @@ def test_login_page_renders_password_field_without_disclosing_default(client):
         "/",
         "/residents",
         "/profiles",
+        "/promotions",
+        "/dems-archive",
         "/terrains",
         "/capacities",
         "/assign",
@@ -508,3 +510,75 @@ def test_admin_account_can_be_created_and_operator_is_restricted(client):
     assert client.get("/settings").status_code == 403
     assert client.get("/audit").status_code == 403
     assert client.get("/residents").status_code == 200
+
+
+def test_year_four_dems_archive_requires_both_named_super_admins(client):
+    from werkzeug.security import generate_password_hash
+
+    with rotation_app.db() as connection:
+        resident_id = connection.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES('DEMS','Candidate',4)"
+        ).lastrowid
+        for username, name in (
+            ("benhocine", "Professor Benhocine"),
+            ("drdris", "Dr Dris"),
+        ):
+            connection.execute(
+                "INSERT INTO admins(username,display_name,password_hash,role) VALUES(?,?,?,'super_admin')",
+                (username, name, generate_password_hash("Very-strong-password-2026")),
+            )
+        connection.commit()
+
+    with client.session_transaction() as browser_session:
+        browser_session["user"] = "admin"
+        browser_session["role"] = "super_admin"
+        browser_session["lang"] = "en"
+
+    page = client.get("/promotions")
+    response = client.post(
+        "/promotions",
+        data={
+            "_csrf_token": csrf_token(page),
+            "action": "request",
+            "resident": str(resident_id),
+        },
+    )
+    assert response.status_code == 200
+    with rotation_app.db() as connection:
+        promotion_id = connection.execute(
+            "SELECT id FROM resident_promotions WHERE resident_id=?", (resident_id,)
+        ).fetchone()["id"]
+
+    for username in ("benhocine", "drdris"):
+        with client.session_transaction() as browser_session:
+            browser_session["user"] = username
+            browser_session["role"] = "super_admin"
+        page = client.get("/promotions")
+        response = client.post(
+            "/promotions",
+            data={
+                "_csrf_token": csrf_token(page),
+                "action": "vote",
+                "promotion_id": str(promotion_id),
+                "decision": "approve",
+                "reason": "DEMS successfully passed",
+            },
+        )
+        assert response.status_code == 200
+
+    with rotation_app.db() as connection:
+        resident = connection.execute(
+            "SELECT status,year FROM residents WHERE id=?", (resident_id,)
+        ).fetchone()
+        archived = connection.execute(
+            "SELECT approved_by FROM dems_archive WHERE resident_id=?", (resident_id,)
+        ).fetchone()
+        votes = connection.execute(
+            "SELECT COUNT(*) FROM promotion_votes WHERE promotion_id=? AND decision='approve'",
+            (promotion_id,),
+        ).fetchone()[0]
+    assert resident["status"] == "dems_success"
+    assert resident["year"] == 4
+    assert archived["approved_by"] == "benhocine,drdris"
+    assert votes == 2
+    assert client.get("/dems-archive").status_code == 200
