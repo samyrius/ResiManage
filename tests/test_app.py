@@ -61,8 +61,11 @@ def test_seed_has_nineteen_terrains_and_four_periods(tmp_path, monkeypatch):
         assert conn.execute("SELECT COUNT(*) FROM terrains").fetchone()[0] == 19
         assert conn.execute("SELECT COUNT(*) FROM periods").fetchone()[0] == 4
         optional = {r[0] for r in conn.execute("SELECT name FROM terrains WHERE kind='optional'")}
-    assert {"Sédation", "Maxillo-faciale", "CAC DBK", "Brûlés", "Chirurgie cardiaque"} <= optional
+    assert optional == {"Sédation", "Maxillo-faciale", "CAC DBK", "Brûlés", "Chirurgie cardiaque"}
     assert "Gynécologie" not in optional
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT kind FROM terrains WHERE name='Gynécologie'").fetchone()[0] != "optional"
+        assert conn.execute("SELECT kind FROM terrains WHERE name='Chirurgie générale'").fetchone()[0] == "mandatory"
 
 
 def test_assignment_requires_capacity_and_blocks_same_period_duplicate(tmp_path, monkeypatch):
@@ -378,3 +381,45 @@ def test_uploaded_resident_photo_is_stored_and_served_safely(tmp_path, monkeypat
     photo_response = client.get(path)
     assert photo_response.status_code == 200
     assert photo_response.data.startswith(b"\x89PNG")
+
+def test_assignment_resident_choices_are_sorted_by_year_priority(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,1)", ("FirstYear", "Resident"))
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,3)", ("ThirdYear", "Resident"))
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,4)", ("FourthYear", "Resident"))
+    response = client.get("/assign")
+    html = response.data.decode("utf-8")
+    assert html.index("FourthYear") < html.index("ThirdYear") < html.index("FirstYear")
+
+
+def test_academic_year_change_creates_four_new_periods_and_preserves_old_periods(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        old_year = conn.execute("SELECT year_label FROM periods ORDER BY id LIMIT 1").fetchone()[0]
+    response = client.post("/settings", data={
+        "lang":"fr","year":"2027-2028","director":"Dr Dris","new_password":""
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM periods WHERE year_label='2027-2028'").fetchone()[0] == 4
+        assert conn.execute("SELECT COUNT(*) FROM periods WHERE year_label=?", (old_year,)).fetchone()[0] == 4
+
+
+def test_xlsx_import_preview(tmp_path, monkeypatch):
+    from openpyxl import Workbook
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["Nom","Prénom","Année","Téléphone"])
+    sheet.append(["ExcelResident","ExcelFirst",2,"0551111111"])
+    stream = io.BytesIO()
+    workbook.save(stream)
+    stream.seek(0)
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    preview = client.post("/import", data={"file":(stream,"residents.xlsx")},
+                          content_type="multipart/form-data", follow_redirects=True)
+    assert preview.status_code == 200
+    assert b"ExcelResident" in preview.data
