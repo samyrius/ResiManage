@@ -17,11 +17,11 @@ The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
 1. Download the `rotation-app-debug-apk` artifact from a successful GitHub Actions run.
 2. Extract `app-debug.apk` from the ZIP.
-3. Install it on a 64-bit ARM Android device (the build currently targets `arm64-v8a`).
+3. Install it on a 64-bit ARM Android device (the APK includes `arm64-v8a` and `x86_64` libraries; x86_64 is included for emulator testing).
 4. Open the app and create the first administrator password when prompted.
 5. Open **Administrator accounts** and create usernames `benhocine` and `drdris`, both with the **Super administrator** role and separate strong passwords.
 
-This is a debug-signed test build, not a Play Store release. It has been built in CI, but has not yet been installed and tested on a physical device. Back up the data from inside the app before uninstalling it: Android removes private app data on uninstall.
+This is a debug-signed test build, not a Play Store release. It is smoke-tested in an Android emulator by CI, but has not yet been installed and tested on a physical device. Back up the data from inside the app before uninstalling it: Android removes private app data on uninstall.
 
 ## Import and backup notes
 
