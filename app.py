@@ -279,7 +279,7 @@ def decisions():
  return page("""<section><h3>{{t('decisions')}}</h3>{% for a in pending %}<p><b>{{a.surname}} {{a.firstname}}</b> — {{a.terrain}} / {{a.period}}</p><form method="post"><input type="hidden" name="aid" value="{{a.id}}"><input name="reason" placeholder="{{t('reason')}}" required><button name="outcome" value="approve">{{t('approve')}}</button> <button name="outcome" value="reject">{{t('reject')}}</button></form>{% else %}<p>{{t('none')}}</p>{% endfor %}</section><section><div class="wrap"><table><tr><th>Date</th><th>{{t('assign')}}</th><th>{{t('status')}}</th><th>{{t('reason')}}</th></tr>{% for d in ds %}<tr><td>{{d.created_at}}</td><td>{{d.details}}</td><td>{{d.decision}}</td><td>{{d.reason}}</td></tr>{% endfor %}</table></div></section>""",pending=pending,ds=ds)
 @app.route("/settings",methods=["GET","POST"])
 def settings():
- if super_guard():return redirect("/login")
+ if super_guard():return super_guard()
  c=db()
  if request.method=="POST":
   lang=request.form.get("lang","ar")
@@ -527,7 +527,7 @@ def exams():
  return page("""<section><h3>Exams and progression / Examens et progression / الامتحانات والترقية</h3><form method="post"><input type="hidden" name="action" value="record"><label>Resident</label><select name="resident">{% for r in rs %}<option value="{{r.id}}" {% if selected==r.id %}selected{% endif %}>{{r.year}} — {{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>Study year</label><select name="study_year">{% for y in range(1,5) %}<option>{{y}}</option>{% endfor %}</select><label>Module / Matière / المادة</label><input name="module" required><div class="grid"><div><label>Theory / Théorie / نظري</label><input type="number" name="theory" min="0" max="20" step="0.01" required></div><div><label>Practical / Pratique / تطبيقي</label><input type="number" name="practical" min="0" max="20" step="0.01" required></div></div><button>Record exam / Enregistrer / تسجيل</button></form></section><section><h4>Evaluate first year / Évaluer la 1re année / تقييم السنة الأولى</h4><form method="post"><input type="hidden" name="action" value="evaluate_first_year"><label>Resident</label><select name="resident">{% for r in rs if r.year==1 %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}}</option>{% endfor %}</select><input type="hidden" name="study_year" value="1"><button>Evaluate and advance if eligible</button></form><h4>Approve progression (years 2–3)</h4><form method="post"><input type="hidden" name="action" value="approve_advance"><label>Resident</label><select name="resident">{% for r in rs if r.year in [2,3] %}<option value="{{r.id}}">{{r.year}} — {{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>Study year</label><select name="study_year"><option>2</option><option>3</option></select><button>Approve progression</button></form></section><section><div class="wrap"><table><tr><th>Resident</th><th>Year</th><th>Module</th><th>Theory</th><th>Practical</th></tr>{% for e in rows %}<tr><td>{{e.surname}} {{e.firstname}}</td><td>{{e.study_year}}</td><td>{{e.module}}</td><td>{{e.theory}}</td><td>{{e.practical}}</td></tr>{% else %}<tr><td colspan="5">{{t('none')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows,rs=rs,selected=selected)
 @app.route("/dems",methods=["GET","POST"])
 def dems():
- if super_guard(): return redirect("/login")
+ if super_guard(): return super_guard()
  c=db()
  if request.method=="POST":
   rid=int(request.form["resident"]); success_date=request.form.get("success_date","").strip()
