@@ -1,4 +1,5 @@
 import io
+import re
 import sys
 from pathlib import Path
 
@@ -316,3 +317,23 @@ def test_backup_and_restore_preserve_a_recoverable_database(tmp_path, monkeypatc
         assert conn.execute("SELECT COUNT(*) FROM residents WHERE surname='AddedAfterBackup'").fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='database.restored'").fetchone()[0] == 1
     assert list(tmp_path.glob("rotation_backup_before_restore_*.db"))
+
+def test_csv_import_requires_preview_and_does_not_invent_history(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    source = b"surname,firstname,year,phone\nImportSurname,ImportFirst,3,0551234567\n"
+    preview = client.post("/import", data={
+        "file": (io.BytesIO(source), "residents.csv")
+    }, content_type="multipart/form-data")
+    assert preview.status_code == 200
+    assert b"ImportSurname" in preview.data
+    match = re.search(rb'name="preview_id" value="(\d+)"', preview.data)
+    assert match
+    confirmed = client.post("/import", data={
+        "action":"confirm", "preview_id":match.group(1).decode()
+    }, follow_redirects=True)
+    assert confirmed.status_code == 200
+    with rotation_app.db() as conn:
+        rid = conn.execute("SELECT id FROM residents WHERE surname='ImportSurname'").fetchone()[0]
+        assert conn.execute("SELECT COUNT(*) FROM history WHERE resident_id=?", (rid,)).fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='residents.imported'").fetchone()[0] == 1
