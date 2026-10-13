@@ -277,6 +277,7 @@ def decisions():
  c=db()
  if request.method=="POST":
   aid=int(request.form["aid"]); outcome=request.form["outcome"]; reason=request.form.get("reason","").strip()
+  if outcome not in ("approve","reject"): c.close(); return ("Invalid decision",400)
   a=c.execute("SELECT a.*,r.surname,r.firstname,t.name terrain,p.name period,p.year_label FROM assignments a JOIN residents r ON r.id=a.resident_id JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id WHERE a.id=? AND a.status='pending'",(aid,)).fetchone()
   if a and reason:
    if outcome=="approve":
@@ -302,6 +303,9 @@ def settings():
   lang=request.form.get("lang","ar")
   if lang in LANGS:session["lang"]=lang
   y=request.form.get("year","").strip()
+  if y and (not re.fullmatch(r"\\d{4}-\\d{4}",y) or int(y.split("-")[1])!=int(y.split("-")[0])+1):
+   flash("Academic year must be formatted as YYYY-YYYY with consecutive years.")
+   y=setting(c,"year")
   if y:
    c.execute("INSERT INTO settings(key,value) VALUES('year',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(y,))
    if not c.execute("SELECT 1 FROM periods WHERE year_label=?",(y,)).fetchone():
@@ -421,6 +425,7 @@ def parse_import_file(path, extension):
 def import_residents():
  if super_guard(): return super_guard()
  c=db()
+ c.execute("DELETE FROM import_previews WHERE created_at < datetime('now','-1 day')"); c.commit()
  if request.method=="POST":
   action=request.form.get("action","upload")
   if action in ("confirm","cancel"):
