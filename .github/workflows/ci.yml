@@ -33,6 +33,6 @@ jobs:
           client = app.app.test_client()
           response = client.get('/login')
           assert response.status_code == 200, response.status_code
-          assert 'Connexion administrateur'.encode() in response.data or 'Administrator login'.encode() in response.data or 'تسجيل'.encode() in response.data
+          assert 'name="password"'.encode() in response.data, 'Password input missing'
           print('Login page smoke test passed')
           PY
