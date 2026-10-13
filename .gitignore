@@ -9,3 +9,4 @@ rotation.db
 *.before_*
 rotation_backup*
 .env
+resident_photos/
