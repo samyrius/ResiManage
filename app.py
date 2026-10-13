@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, request, redirect, session, render_template_string, flash, send_file
-import sqlite3, os, hashlib, hmac, io, csv, shutil
+import sqlite3, os, hashlib, hmac, io, csv, shutil, json
 from datetime import datetime
 
 BASE=os.path.dirname(os.path.abspath(__file__))
@@ -78,7 +78,7 @@ def boot():
  if not getattr(app,"_ready",False): init(); app._ready=True
 def page(body,**kw):
  lang=session.get("lang","ar")
- shell="""<!doctype html><html lang="{{lang}}" dir="{{'rtl' if lang=='ar' else 'ltr'}}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{t('app')}}</title><style>body{font-family:Arial,sans-serif;background:#f1f5f9;margin:0;color:#182b3d}header{background:#164e83;color:white;padding:15px}main{max-width:1050px;margin:auto;padding:12px}nav{display:flex;gap:6px;overflow:auto;background:white;padding:10px}a,button{background:#164e83;color:white;padding:9px 12px;border:0;border-radius:7px;text-decoration:none;display:inline-block;white-space:nowrap}section{background:white;padding:13px;border:1px solid #d7e1eb;border-radius:10px;margin:10px 0}input,select{font:inherit;padding:9px;border:1px solid #bccada;border-radius:7px;width:100%;box-sizing:border-box;margin:4px 0 9px}label{display:block}table{border-collapse:collapse;width:100%;min-width:540px}td,th{text-align:start;border-bottom:1px solid #ddd;padding:8px}.wrap{overflow:auto}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}.msg{background:#fff0c2;padding:10px;border-radius:7px}.good{color:green}.bad{color:#b21d1d}.muted{color:#526274}@media(max-width:600px){main{padding:7px}header{font-size:14px}}</style><header><h2>{{t('app')}}</h2>{{t('year')}}: {{year}}</header>{% if user %}<nav><a href="/">{{t('home')}}</a><a href="/residents">{{t('residents')}}</a><a href="/terrains">{{t('terrains')}}</a><a href="/capacities">{{t('capacities')}}</a><a href="/assign">{{t('assign')}}</a><a href="/history">{{t('history')}}</a><a href="/summary">{{t('summary')}}</a><a href="/decisions">{{t('decisions')}}</a><a href="/settings">{{t('settings')}}</a><a href="/export">{{t('export')}}</a><a href="/backup">{{t('backup')}}</a><a href="/logout">{{t('logout')}}</a></nav>{% endif %}<main>{% for m in get_flashed_messages() %}<p class="msg">{{m}}</p>{% endfor %}{{body|safe}}</main></html>"""
+ shell="""<!doctype html><html lang="{{lang}}" dir="{{'rtl' if lang=='ar' else 'ltr'}}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{t('app')}}</title><style>body{font-family:Arial,sans-serif;background:#f1f5f9;margin:0;color:#182b3d}header{background:#164e83;color:white;padding:15px}main{max-width:1050px;margin:auto;padding:12px}nav{display:flex;gap:6px;overflow:auto;background:white;padding:10px}a,button{background:#164e83;color:white;padding:9px 12px;border:0;border-radius:7px;text-decoration:none;display:inline-block;white-space:nowrap}section{background:white;padding:13px;border:1px solid #d7e1eb;border-radius:10px;margin:10px 0}input,select{font:inherit;padding:9px;border:1px solid #bccada;border-radius:7px;width:100%;box-sizing:border-box;margin:4px 0 9px}label{display:block}table{border-collapse:collapse;width:100%;min-width:540px}td,th{text-align:start;border-bottom:1px solid #ddd;padding:8px}.wrap{overflow:auto}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}.msg{background:#fff0c2;padding:10px;border-radius:7px}.good{color:green}.bad{color:#b21d1d}.muted{color:#526274}@media(max-width:600px){main{padding:7px}header{font-size:14px}}</style><header><h2>{{t('app')}}</h2>{{t('year')}}: {{year}}</header>{% if user %}<nav><a href="/">{{t('home')}}</a><a href="/residents">{{t('residents')}}</a><a href="/terrains">{{t('terrains')}}</a><a href="/capacities">{{t('capacities')}}</a><a href="/assign">{{t('assign')}}</a><a href="/history">{{t('history')}}</a><a href="/summary">{{t('summary')}}</a><a href="/decisions">{{t('decisions')}}</a><a href="/objectives">Objectives</a><a href="/exams">Exams</a><a href="/dems">DEMS</a><a href="/audit">Audit</a><a href="/settings">{{t('settings')}}</a><a href="/export">{{t('export')}}</a><a href="/backup">{{t('backup')}}</a><a href="/logout">{{t('logout')}}</a></nav>{% endif %}<main>{% for m in get_flashed_messages() %}<p class="msg">{{m}}</p>{% endfor %}{{body|safe}}</main></html>"""
  context={"t":tr,"lang":lang,"year":setting(db(),"year")}
  context.update(kw)
  inner=render_template_string(body,**context)
@@ -136,7 +136,7 @@ def residents():
    audit_event(c,"resident.created",request.form["surname"].strip()+" "+request.form["firstname"].strip())
   c.commit(); flash(tr("done"))
  rows=c.execute("SELECT * FROM residents ORDER BY status DESC,year DESC,surname").fetchall(); c.close()
- return page("""<section><h3>{{t('add')}} — {{t('resident')}}</h3><form method="post"><div class="grid"><div><label>{{t('surname')}}</label><input name="surname" required></div><div><label>{{t('firstname')}}</label><input name="firstname" required></div><div><label>{{t('study_year')}}</label><select name="year">{% for y in range(1,5) %}<option>{{y}}</option>{% endfor %}</select></div><div><label>{{t('phone')}}</label><input name="phone"></div></div><label><input type="checkbox" name="repeat_year" value="1"> {{t('repeat')}}</label><button>{{t('add')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('save')}}</th></tr>{% for r in rows %}<tr><td>{{r.surname}} {{r.firstname}}</td><td>{{r.year}}</td><td><form method="post"><input type="hidden" name="action" value="edit"><input type="hidden" name="rid" value="{{r.id}}"><select name="year">{% for y in range(1,5) %}<option value="{{y}}" {% if r.year==y %}selected{% endif %}>{{y}}</option>{% endfor %}</select><label><input type="checkbox" name="repeat_year" value="1" {% if r.repeat_year %}checked{% endif %}> {{t('repeat')}}</label><select name="status"><option value="active">{{t('active')}}</option><option value="inactive">{{t('inactive')}}</option></select><button>{{t('save')}}</button></form></td></tr>{% endfor %}</table></div></section>""",rows=rows)
+ return page("""<section><h3>{{t('add')}} — {{t('resident')}}</h3><form method="post"><div class="grid"><div><label>{{t('surname')}}</label><input name="surname" required></div><div><label>{{t('firstname')}}</label><input name="firstname" required></div><div><label>{{t('study_year')}}</label><select name="year">{% for y in range(1,5) %}<option>{{y}}</option>{% endfor %}</select></div><div><label>{{t('phone')}}</label><input name="phone"></div></div><label><input type="checkbox" name="repeat_year" value="1"> {{t('repeat')}}</label><button>{{t('add')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('save')}}</th></tr>{% for r in rows %}<tr><td><a href="/profile/{{r.id}}">{{r.surname}} {{r.firstname}}</a></td><td>{{r.year}}</td><td><form method="post"><input type="hidden" name="action" value="edit"><input type="hidden" name="rid" value="{{r.id}}"><select name="year">{% for y in range(1,5) %}<option value="{{y}}" {% if r.year==y %}selected{% endif %}>{{y}}</option>{% endfor %}</select><label><input type="checkbox" name="repeat_year" value="1" {% if r.repeat_year %}checked{% endif %}> {{t('repeat')}}</label><select name="status"><option value="active">{{t('active')}}</option><option value="inactive">{{t('inactive')}}</option></select><button>{{t('save')}}</button></form></td></tr>{% endfor %}</table></div></section>""",rows=rows)
 @app.route("/terrains",methods=["GET","POST"])
 def terrains():
  if guard(): return redirect("/login")
@@ -286,6 +286,99 @@ def settings():
   c.commit(); flash(tr("done"))
  vals={r["key"]:r["value"] for r in c.execute("SELECT key,value FROM settings")}; c.close()
  return page("""<section><h3>{{t('settings')}}</h3><form method="post"><label>{{t('language')}}</label><select name="lang"><option value="ar" {% if lang=='ar' %}selected{% endif %}>العربية</option><option value="fr" {% if lang=='fr' %}selected{% endif %}>Français</option><option value="en" {% if lang=='en' %}selected{% endif %}>English</option></select><label>{{t('year')}}</label><input name="year" value="{{vals.get('year','')}}" required><label>{{t('director')}}</label><input name="director" value="{{vals.get('director','')}}"><label>{{t('new_password')}}</label><input type="password" name="new_password"><button>{{t('change')}}</button></form><p class="muted">{{t('note')}}</p></section>""",vals=vals,lang=session.get("lang","ar"))
+@app.route("/profile/<int:rid>",methods=["GET","POST"])
+def resident_profile(rid):
+ if guard(): return redirect("/login")
+ c=db(); r=c.execute("SELECT * FROM residents WHERE id=?",(rid,)).fetchone()
+ if not r: c.close(); return ("Resident not found",404)
+ if request.method=="POST":
+  c.execute("UPDATE residents SET birth_place=?,birth_date=?,photo_path=?,phone=? WHERE id=?",
+   (request.form.get("birth_place","").strip(),request.form.get("birth_date",""),request.form.get("photo_path","").strip(),request.form.get("phone","").strip(),rid))
+  audit_event(c,"resident.profile_updated",f"resident_id={rid}")
+  c.commit(); r=c.execute("SELECT * FROM residents WHERE id=?",(rid,)).fetchone(); flash(tr("done"))
+ history_rows=c.execute("SELECT h.*,t.name terrain FROM history h JOIN terrains t ON t.id=h.terrain_id WHERE h.resident_id=? ORDER BY h.id DESC",(rid,)).fetchall()
+ assignment_rows=c.execute("SELECT a.status,p.name period,p.year_label,t.name terrain FROM assignments a JOIN periods p ON p.id=a.period_id JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=? ORDER BY p.year_label DESC,p.id",(rid,)).fetchall()
+ objectives=c.execute("SELECT o.*,t.name terrain FROM objectives o JOIN terrains t ON t.id=o.terrain_id ORDER BY o.study_year,t.name").fetchall()
+ done={x[0] for x in c.execute("SELECT terrain_id FROM history WHERE resident_id=? UNION SELECT terrain_id FROM assignments WHERE resident_id=? AND status='confirmed'",(rid,rid)).fetchall()}
+ terrains=c.execute("SELECT * FROM terrains ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END,name").fetchall(); c.close()
+ return page("""<section><h3>{{r.surname}} {{r.firstname}} — Resident profile / Profil / الملف</h3><p>Year: {{r.year}} · Status: {{r.status}}</p>{% if r.photo_path %}<p><img src="{{r.photo_path}}" alt="Resident photo" style="max-width:140px;max-height:140px"></p>{% endif %}<form method="post"><label>Birth place / Lieu de naissance / مكان الميلاد</label><input name="birth_place" value="{{r.birth_place or ''}}"><label>Birth date / Date de naissance / تاريخ الميلاد</label><input type="date" name="birth_date" value="{{r.birth_date or ''}}"><label>Phone / Téléphone / الهاتف</label><input name="phone" value="{{r.phone or ''}}"><label>Photo URL/path / Photo / رابط الصورة</label><input name="photo_path" value="{{r.photo_path or ''}}"><button>Save / Enregistrer / حفظ</button></form><p><a href="/exams?resident={{r.id}}">Exams / Examens / الامتحانات</a> · <a href="/dems">DEMS archive</a></p></section><section><h3>Terrain progress / Avancement / تقدم التربصات</h3><div class="wrap"><table><tr><th>Terrain</th><th>Status</th></tr>{% for t in terrains %}<tr><td>{{t.name}}</td><td class="{{'bad' if t.id in done else 'good'}}">{{'Completed / Effectué / مكتمل' if t.id in done else 'Remaining / À faire / متبقٍ'}}</td></tr>{% endfor %}</table></div></section><section><h3>Assignments and history / Affectations et historique / التوزيعات والتاريخ</h3>{% for a in assignment_rows %}<p>{{a.year_label}} — {{a.period}} — {{a.terrain}} ({{a.status}})</p>{% endfor %}{% for h in history_rows %}<p>{{h.year_label}} — {{h.period}} — {{h.terrain}} — {{h.date_done}}</p>{% endfor %}</section><section><h3>Objectives / Objectifs / الأهداف</h3>{% for o in objectives %}<p>Year {{o.study_year}} — {{o.terrain}}: {{o.objective}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",r=r,terrains=terrains,done=done,assignment_rows=assignment_rows,history_rows=history_rows,objectives=objectives)
+@app.route("/objectives",methods=["GET","POST"])
+def manage_objectives():
+ if guard(): return redirect("/login")
+ c=db()
+ if request.method=="POST":
+  tid=int(request.form["terrain"]); sy=int(request.form["study_year"]); obj=request.form["objective"].strip()
+  if obj:
+   c.execute("INSERT INTO objectives(terrain_id,study_year,objective) VALUES(?,?,?)",(tid,sy,obj))
+   audit_event(c,"objective.created",f"terrain_id={tid}; study_year={sy}")
+   c.commit(); flash(tr("done"))
+ ts=c.execute("SELECT * FROM terrains ORDER BY name").fetchall()
+ rows=c.execute("SELECT o.*,t.name terrain FROM objectives o JOIN terrains t ON t.id=o.terrain_id ORDER BY study_year,t.name").fetchall(); c.close()
+ return page("""<section><h3>Objectives / Objectifs / الأهداف</h3><form method="post"><label>Terrain</label><select name="terrain">{% for t in ts %}<option value="{{t.id}}">{{t.name}}</option>{% endfor %}</select><label>Study year</label><select name="study_year">{% for y in range(1,5) %}<option>{{y}}</option>{% endfor %}</select><label>Objective</label><input name="objective" required><button>Save / Enregistrer / حفظ</button></form></section><section>{% for o in rows %}<p>Year {{o.study_year}} — {{o.terrain}}: {{o.objective}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",ts=ts,rows=rows)
+@app.route("/exams",methods=["GET","POST"])
+def exams():
+ if guard(): return redirect("/login")
+ c=db()
+ if request.method=="POST":
+  action=request.form.get("action","record"); rid=int(request.form["resident"]); sy=int(request.form["study_year"])
+  resident=c.execute("SELECT * FROM residents WHERE id=?",(rid,)).fetchone()
+  if not resident:
+   flash("Resident not found")
+  elif action=="record":
+   module=request.form["module"].strip(); theory=float(request.form["theory"]); practical=float(request.form["practical"])
+   if not module or not (0<=theory<=20 and 0<=practical<=20):
+    flash("Module and marks from 0 to 20 are required")
+   else:
+    c.execute("INSERT INTO exam_records(resident_id,study_year,module,theory,practical) VALUES(?,?,?,?,?)",(rid,sy,module,theory,practical))
+    audit_event(c,"exam.recorded",f"resident_id={rid}; year={sy}; module={module}")
+    c.commit(); flash(tr("done"))
+  elif action=="evaluate_first_year":
+   records=c.execute("SELECT theory,practical FROM exam_records WHERE resident_id=? AND study_year=1",(rid,)).fetchall()
+   if not records:
+    flash("Enter first-year exam modules before evaluation")
+   else:
+    average=sum((x["theory"]+x["practical"])/2 for x in records)/len(records)
+    passed=average>=10 and all(x["theory"]>=10 and x["practical"]>=10 for x in records)
+    c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — first-year exams","Passed" if passed else "Failed",f"Average={average:.2f}/20; all theory/practical marks >=10: {all(x['theory']>=10 and x['practical']>=10 for x in records)}",session["user"]))
+    audit_event(c,"exam.first_year_evaluated",f"resident_id={rid}; average={average:.2f}; passed={passed}")
+    if passed and resident["year"]==1:
+     c.execute("UPDATE residents SET year=2 WHERE id=?",(rid,))
+     audit_event(c,"resident.year_advanced",f"resident_id={rid}; from=1; to=2")
+    c.commit(); flash(("Passed; resident advanced to year 2." if passed else "Failed: average must be at least 10/20 and every theory/practical mark must be at least 10/20"))
+  elif action=="approve_advance":
+   if sy not in (2,3) or resident["year"]!=sy:
+    flash("Only an authorized year 2 or 3 progression decision is valid here")
+   else:
+    c.execute("UPDATE residents SET year=? WHERE id=?",(sy+1,rid))
+    c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — year {sy}","Approved","Progression approved by logged-in administrator",session["user"]))
+    audit_event(c,"resident.year_advanced",f"resident_id={rid}; from={sy}; to={sy+1}")
+    c.commit(); flash(tr("done"))
+ rows=c.execute("SELECT e.*,r.surname,r.firstname FROM exam_records e JOIN residents r ON r.id=e.resident_id ORDER BY e.created_at DESC,e.id DESC").fetchall()
+ rs=c.execute("SELECT * FROM residents WHERE status='active' ORDER BY year DESC,surname").fetchall()
+ selected=request.args.get("resident",type=int)
+ c.close()
+ return page("""<section><h3>Exams and progression / Examens et progression / الامتحانات والترقية</h3><form method="post"><input type="hidden" name="action" value="record"><label>Resident</label><select name="resident">{% for r in rs %}<option value="{{r.id}}" {% if selected==r.id %}selected{% endif %}>{{r.year}} — {{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>Study year</label><select name="study_year">{% for y in range(1,5) %}<option>{{y}}</option>{% endfor %}</select><label>Module / Matière / المادة</label><input name="module" required><div class="grid"><div><label>Theory / Théorie / نظري</label><input type="number" name="theory" min="0" max="20" step="0.01" required></div><div><label>Practical / Pratique / تطبيقي</label><input type="number" name="practical" min="0" max="20" step="0.01" required></div></div><button>Record exam / Enregistrer / تسجيل</button></form></section><section><h4>Evaluate first year / Évaluer la 1re année / تقييم السنة الأولى</h4><form method="post"><input type="hidden" name="action" value="evaluate_first_year"><label>Resident</label><select name="resident">{% for r in rs if r.year==1 %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}}</option>{% endfor %}</select><input type="hidden" name="study_year" value="1"><button>Evaluate and advance if eligible</button></form><h4>Approve progression (years 2–3)</h4><form method="post"><input type="hidden" name="action" value="approve_advance"><label>Resident</label><select name="resident">{% for r in rs if r.year in [2,3] %}<option value="{{r.id}}">{{r.year}} — {{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>Study year</label><select name="study_year"><option>2</option><option>3</option></select><button>Approve progression</button></form></section><section><div class="wrap"><table><tr><th>Resident</th><th>Year</th><th>Module</th><th>Theory</th><th>Practical</th></tr>{% for e in rows %}<tr><td>{{e.surname}} {{e.firstname}}</td><td>{{e.study_year}}</td><td>{{e.module}}</td><td>{{e.theory}}</td><td>{{e.practical}}</td></tr>{% else %}<tr><td colspan="5">{{t('none')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows,rs=rs,selected=selected)
+@app.route("/dems",methods=["GET","POST"])
+def dems():
+ if guard(): return redirect("/login")
+ c=db()
+ if request.method=="POST":
+  rid=int(request.form["resident"]); success_date=request.form.get("success_date","").strip()
+  r=c.execute("SELECT * FROM residents WHERE id=? AND year=4 AND status='active'",(rid,)).fetchone()
+  if not r or not success_date:
+   flash("Only an active year-4 resident with a DEMS success date can be archived.")
+  else:
+   hist=c.execute("SELECT h.*,t.name terrain FROM history h JOIN terrains t ON t.id=h.terrain_id WHERE h.resident_id=?",(rid,)).fetchall()
+   asgs=c.execute("SELECT a.*,p.name period,p.year_label,t.name terrain FROM assignments a JOIN periods p ON p.id=a.period_id JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=?",(rid,)).fetchall()
+   profile={k:r[k] for k in r.keys()}
+   c.execute("INSERT INTO dems_archive(resident_id,success_date,profile_json,history_json) VALUES(?,?,?,?)",(rid,success_date,json.dumps(profile,ensure_ascii=False),json.dumps({"history":[dict(x) for x in hist],"assignments":[dict(x) for x in asgs]},ensure_ascii=False)))
+   c.execute("UPDATE residents SET status='graduated',dems_status='success' WHERE id=?",(rid,))
+   audit_event(c,"dems.archived",f"resident_id={rid}; success_date={success_date}")
+   c.commit(); flash("Resident archived; original records retained.")
+ residents_rows=c.execute("SELECT * FROM residents WHERE year=4 AND status='active' ORDER BY surname").fetchall()
+ archive_rows=c.execute("SELECT d.*,r.surname,r.firstname FROM dems_archive d JOIN residents r ON r.id=d.resident_id ORDER BY d.id DESC").fetchall()
+ c.close()
+ return page("""<section><h3>DEMS success archive / Archive DEMS / أرشيف DEMS</h3><form method="post"><label>Year-4 resident</label><select name="resident">{% for r in residents_rows %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>Success date / Date de réussite / تاريخ النجاح</label><input type="date" name="success_date" required><button>Archive successful graduate</button></form><p>Archiving retains resident data and rotation history; it does not delete them.</p></section><section><h4>Archived graduates</h4>{% for a in archive_rows %}<p>{{a.surname}} {{a.firstname}} — DEMS success: {{a.success_date}} — archived {{a.archived_at}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",residents_rows=residents_rows,archive_rows=archive_rows)
 @app.get("/export")
 def export():
  if guard():return redirect("/login")
