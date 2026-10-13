@@ -9,3 +9,6 @@ rotation.db
 *.before_*
 rotation_backup*
 .env
+
+# Resident photos and generated backups stay local; never commit personal data.
+/uploads/
