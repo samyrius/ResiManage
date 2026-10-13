@@ -129,3 +129,30 @@ def test_invalid_password_does_not_authenticate(client):
     assert response.status_code == 200
     assert b'name="password"' in response.data
     assert "Incorrect password".encode() in response.data
+
+
+def test_legacy_sha256_password_is_upgraded_after_successful_login(client):
+    import hashlib
+
+    legacy_password = "Legacy-password-for-migration"
+    with rotation_app.db() as connection:
+        connection.execute(
+            "INSERT INTO settings(key,value) VALUES('password',?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (hashlib.sha256(legacy_password.encode()).hexdigest(),),
+        )
+        connection.commit()
+
+    page = client.get("/login")
+    token = csrf_token(page)
+    response = client.post(
+        "/login",
+        data={"_csrf_token": token, "password": legacy_password},
+    )
+
+    assert response.status_code == 302
+    with rotation_app.db() as connection:
+        stored = connection.execute(
+            "SELECT value FROM settings WHERE key='password'"
+        ).fetchone()["value"]
+    assert stored.startswith(("scrypt:", "pbkdf2:"))
