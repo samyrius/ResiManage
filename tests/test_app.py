@@ -522,6 +522,10 @@ def test_year_four_dems_archive_requires_both_named_super_admins(client):
         resident_id = connection.execute(
             "INSERT INTO residents(surname,firstname,year) VALUES('DEMS','Candidate',4)"
         ).lastrowid
+        connection.execute(
+            "INSERT INTO resident_exam_records(resident_id,exam_key,virtual_score,actual_score) VALUES(?,'dems_main',12,12)",
+            (resident_id,),
+        )
         for username, name in (
             ("benhocine", "Professor Benhocine"),
             ("drdris", "Dr Dris"),
