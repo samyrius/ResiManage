@@ -15,7 +15,7 @@ Open `http://127.0.0.1:5000` in the browser. On a new empty database, create the
 
 ## Current development branch
 
-The prototype and automated tests are being developed on `prototype/verification-2026-10-13`; changes are not yet merged into `main`. Features in this branch include 19 seeded terrains, capacity and assignment rules, individual roles, resident profiles, exam progression, objectives, DEMS archive, validated resident-list import, CSV export, and backup/restore with a pre-restore safety copy.
+The reviewed changes from `prototype/verification-2026-10-13` were merged into `main` through PR #8 (merge commit `52127b58aa1bcc7f86f320c34f7de35f0c63922e`). The code includes 19 seeded terrains, capacity and assignment rules, individual roles, resident profiles, exam progression, objectives, DEMS archive, validated resident-list import, CSV export, and backup/restore with a pre-restore safety copy.
 
 The import preview supports CSV, XLS/XLSX, DOC/DOCX and text-based PDF. Legacy `.doc` files require `antiword` or LibreOffice. Scanned PDFs without extractable text need OCR before import. Imported lists never fabricate previous rotations.
 
@@ -23,4 +23,4 @@ Keep the local secret key, database, backups, uploaded resident photos, and pers
 
 ## ملاحظة بالعربية
 
-لا تحذف قاعدة البيانات `rotation.db` عند تحديث الكود. التطبيق ما زال في فرع التجربة ولم يُدمج بعد في `main`. قبل استرجاع نسخة احتياطية، ينشئ التطبيق نسخة من قاعدة البيانات الحالية.
+لا تحذف قاعدة البيانات `rotation.db` عند تحديث الكود. تم دمج التعديلات في `main` بعد نجاح 25 اختبارًا آليًا على الفرع قبل الدمج؛ يجب انتظار نتيجة CI بعد الدمج أيضًا. قبل استرجاع نسخة احتياطية، ينشئ التطبيق نسخة من قاعدة البيانات الحالية.
