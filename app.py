@@ -342,20 +342,33 @@ def manage_users():
  if super_guard(): return super_guard()
  c=db()
  if request.method=="POST":
-  username=request.form.get("username","").strip()
-  password=request.form.get("password","")
-  role=request.form.get("role","user")
-  if len(username)<3 or len(password)<12 or role not in ("super_admin","user"):
-   flash("Username must have 3+ characters and password 12+ characters.")
-  else:
-   try:
-    c.execute("INSERT INTO users(username,password_hash,role) VALUES(?,?,?)",(username,hash_password(password),role))
-    audit_event(c,"user.created",f"username={username}; role={role}")
+  action=request.form.get("action","create")
+  if action in ("deactivate","activate"):
+   uid=int(request.form["user_id"])
+   target=c.execute("SELECT * FROM users WHERE id=?",(uid,)).fetchone()
+   if not target: flash("User not found.")
+   elif action=="deactivate" and target["username"]==session.get("user"): flash("You cannot deactivate your own account while signed in.")
+   elif action=="deactivate" and target["role"]=="super_admin" and target["active"] and c.execute("SELECT COUNT(*) FROM users WHERE role='super_admin' AND active=1").fetchone()[0]<=1: flash("At least one active Super Admin must remain.")
+   else:
+    active=0 if action=="deactivate" else 1
+    c.execute("UPDATE users SET active=? WHERE id=?",(active,uid))
+    audit_event(c,"user.deactivated" if not active else "user.activated",f"username={target['username']}")
     c.commit(); flash(tr("done"))
-   except sqlite3.IntegrityError:
-    flash("Username already exists.")
+  else:
+   username=request.form.get("username","").strip()
+   password=request.form.get("password","")
+   role=request.form.get("role","user")
+   if len(username)<3 or len(password)<12 or role not in ("super_admin","user"):
+    flash("Username must have 3+ characters and password 12+ characters.")
+   else:
+    try:
+     c.execute("INSERT INTO users(username,password_hash,role) VALUES(?,?,?)",(username,hash_password(password),role))
+     audit_event(c,"user.created",f"username={username}; role={role}")
+     c.commit(); flash(tr("done"))
+    except sqlite3.IntegrityError:
+     flash("Username already exists.")
  rows=c.execute("SELECT id,username,role,active,created_at FROM users ORDER BY role DESC,username").fetchall(); c.close()
- return page("""<section><h3>{{t('users')}}</h3><p>{{t('users_help')}}</p><form method="post"><label>{{t('username')}}</label><input name="username" minlength="3" required><label>{{t('password')}} (12+)</label><input name="password" type="password" minlength="12" required><label>{{t('role')}}</label><select name="role"><option value="user">{{t('standard_user')}}</option><option value="super_admin">{{t('super_admin')}}</option></select><button>{{t('add')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('username')}}</th><th>{{t('role')}}</th><th>{{t('active_col')}}</th><th>{{t('created')}}</th></tr>{% for u in rows %}<tr><td>{{u.username}}</td><td>{{u.role}}</td><td>{{u.active}}</td><td>{{u.created_at}}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
+ return page("""<section><h3>{{t('users')}}</h3><p>{{t('users_help')}}</p><form method="post"><input type="hidden" name="action" value="create"><label>{{t('username')}}</label><input name="username" minlength="3" required><label>{{t('password')}} (12+)</label><input name="password" type="password" minlength="12" required><label>{{t('role')}}</label><select name="role"><option value="user">{{t('standard_user')}}</option><option value="super_admin">{{t('super_admin')}}</option></select><button>{{t('add')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('username')}}</th><th>{{t('role')}}</th><th>{{t('active_col')}}</th><th>{{t('created')}}</th><th>Admin action</th></tr>{% for u in rows %}<tr><td>{{u.username}}</td><td>{{u.role}}</td><td>{{u.active}}</td><td>{{u.created_at}}</td><td>{% if u.username!=session.get('user') or u.active==0 %}<form method="post"><input type="hidden" name="user_id" value="{{u.id}}"><button name="action" value="{{'deactivate' if u.active else 'activate'}}">{{'Deactivate' if u.active else 'Activate'}}</button></form>{% else %}Current account{% endif %}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
 @app.get("/audit")
 def audit_log():
  if super_guard(): return super_guard()
