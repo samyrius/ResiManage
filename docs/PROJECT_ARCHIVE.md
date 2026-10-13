@@ -103,7 +103,7 @@ This file is the durable project handover log for `samyrius/rotation-app`. Read 
 ## Post-merge status (2026-10-13)
 
 - PR #8 is merged into `main`; merge commit: `52127b58aa1bcc7f86f320c34f7de35f0c63922e`.
-- Before merge, the reviewed code commit `49924478a7ee81a5a0a81de6c4768dfa75b597e6` passed **25 automated tests in 8.38 seconds**. The archive-only branch commit also passed 25 tests in 6.93 seconds. Post-merge CI for merge commit `52127b58aa1bcc7f86f320c34f7de35f0c63922e` passed **25 tests in 6.76 seconds**. Documentation-only commits were added after the merge; their latest CI run should also be checked.
+- Before merge, the reviewed code commit `49924478a7ee81a5a0a81de6c4768dfa75b597e6` passed **25 automated tests in 8.38 seconds**. The archive-only branch commit also passed 25 tests in 6.93 seconds. Post-merge CI for merge commit `52127b58aa1bcc7f86f320c34f7de35f0c63922e` passed **25 tests in 6.76 seconds**. The subsequent documentation-only commit `37e585471d3444fedb8a9f4a601724a907374259` also passed **25 tests in 5.54 seconds**.
 - No database, real resident records, backups, uploaded photos, passwords, or tokens were committed. Existing phone installation/data were not modified.
 - Remaining external checks are unchanged: test the merged code against a copy of the existing phone database after backing it up; create the two named Super Admin accounts with private passwords in the app; validate real input files and populate the official module/objective data; and do not claim a new APK or hosted demo until one is actually built and tested.
 
