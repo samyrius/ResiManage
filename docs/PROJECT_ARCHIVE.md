@@ -62,7 +62,7 @@ This file is the durable project handover log for `samyrius/rotation-app`. Read 
 - Pull request #8: https://github.com/samyrius/rotation-app/pull/8
 - This branch adds GitHub Actions CI and smoke tests, corrects the seed to include CAC DBK and the five optional terrains, and has a durable requirements/continuity archive at `docs/PROJECT_ARCHIVE.md`. It has not been merged into main.
 - First CI attempt failed during collection because pytest could not import `app`; the test import path was fixed in commit `c5d80651051ed254308b8177ea72c8730372086d`.
-- Latest verified GitHub Actions run for commit `c8774e679fcd34b4287026f1dc6d67a461bd588a` passed: **7 tests passed in 0.44 seconds**. Coverage includes login/protected route, resident creation in an isolated temporary database, 19 seeded terrains/four periods/optional classification, capacity required, same-period duplicate prevention, capacity limit, and blocking terrain repeats until all core/mandatory terrains have been completed.
+- Historical baseline run for commit `c8774e679fcd34b4287026f1dc6d67a461bd588a` passed 7 initial tests. This has been superseded by the expanded verification recorded below.
 - Do not merge this branch until the tests pass and changes are reviewed. No database files or real resident data were committed.
 
 ## Next steps (continue without asking the user to repeat context)
@@ -72,6 +72,33 @@ This file is the durable project handover log for `samyrius/rotation-app`. Read 
 4. Validate priority ordering, four-period rollover, and annual advancement rules.
 5. Keep this archive current with commits, test evidence, remaining gaps, and completed tasks.
 6. Only after the original requirements are addressed, invite the user to provide the critique and adjustments they have intentionally deferred.
+
+## Expanded implementation and verification update (2026-10-13)
+
+- Latest verified code/test commit: `49924478a7ee81a5a0a81de6c4768dfa75b597e6`. GitHub Actions run `38454544015` completed successfully: **25 tests passed in 8.38 seconds**. Tests use isolated temporary databases; no resident database or real resident records were committed.
+- Implemented on the isolated branch:
+  - PBKDF2 password hashing, migration of legacy SHA-256 hashes after a successful login, no default password displayed in the login page, first-run administrator password setup, and a locally generated Flask secret stored in ignored `.rotation_secret` unless `ROTATION_SECRET` is configured.
+  - Individual user accounts with Super Admin/standard roles; sensitive pages are restricted; accounts can be deactivated safely while preventing deactivation of the current account or the last active Super Admin.
+  - Add/edit/deactivate terrains without deleting history; deactivated terrains are excluded from new assignment/capacity/history/objective selectors.
+  - Audited assignment cancellation rather than physical deletion, so the record remains available for audit/history.
+  - Resident profiles with editable identity/contact/birth fields, photo upload validation (PNG/JPG/WEBP, 4 MB maximum), history, assignment status, terrain completion colors, exam marks, and objectives.
+  - First-year exam progression rule: calculated average at least 10/20 and no theory/practical component below 10/20. The evaluation screen requires confirmation that all module marks have been entered. Years 2–3 progression requires a Super Admin decision; exam records can be corrected without creating duplicate module rows.
+  - DEMS success archive stores the resident profile, stage history, assignments and exam snapshot, while preserving the original resident/history records.
+  - Import preview/validation for CSV, XLS/XLSX, DOC/DOCX and text-based PDF; imported rows are grouped/sorted by study year and name. Import does not fabricate prior stages. Legacy .doc conversion requires antiword or LibreOffice; scanned PDFs without extractable text need OCR outside the app.
+  - CSV export includes residents, terrains, periods, capacities, assignments, history, decisions, exams, objectives, DEMS archive and audit data, but excludes user credential hashes.
+  - SQLite-consistent backup and validated restore. Restore checks SQLite integrity and required tables and creates a separate pre-restore backup before replacement.
+  - Academic-year format validation, four-period creation with previous periods retained, year-priority ordering, exact five optional terrain classification, audit records for key administrative changes, and French/Arabic/English navigation labels for the added workflows.
+- Updated `README.md` with local launch instructions, import limitations, backup/restore safety and branch status.
+- The work remains on `prototype/verification-2026-10-13`; PR #8 is not merged into `main`. The user-confirmed existing phone prototype and local database were not accessed or modified by these repository changes.
+- The CI test suite now covers the main rules, profile/objective workflows, first-year progression, DEMS archive, user roles, backup/restore, CSV/XLSX/DOCX import preview, CSV export, mandatory-year override/audit, priority, academic-year periods, photo upload, terrain deactivation, assignment cancellation, user deactivation, first-run setup and legacy password migration.
+
+## Remaining real-world verification (do not claim complete until checked)
+1. Perform a mobile smoke test of this updated branch against a copy of the existing prototype database. Back up first; never overwrite the user's actual database without explicit approval. This remote repository workflow cannot inspect or operate the user's phone database.
+2. In the running app, create separate accounts for Pr Benhocine and Dr Dris in **Users**, assign both Super Admin, and set private passwords individually. The repository does not contain their passwords and must not.
+3. Confirm the expected module list and enter the actual objectives for each terrain/year; the app provides data-entry forms but no official module/objective list was supplied to seed.
+4. Test real DOC/XLS/PDF examples in the target Termux environment. Legacy DOC needs antiword or LibreOffice, and scanned PDF OCR is not included.
+5. Review the final diff and CI status before deciding whether to merge PR #8. No new APK or hosted demo has been built or verified in this branch.
+6. Only after these original requirements and checks are addressed should the user's deferred critique/adjustments be discussed.
 
 ## Archive limitation
 This repository log captures durable project decisions and progress; it is not a verbatim recording of every voice call or every conversation. Do not store credentials, access tokens, personal secrets, or real resident records here.
