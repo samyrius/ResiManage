@@ -299,6 +299,30 @@ def settings():
   c.commit(); flash(tr("done"))
  vals={r["key"]:r["value"] for r in c.execute("SELECT key,value FROM settings")}; c.close()
  return page("""<section><h3>{{t('settings')}}</h3><form method="post"><label>{{t('language')}}</label><select name="lang"><option value="ar" {% if lang=='ar' %}selected{% endif %}>العربية</option><option value="fr" {% if lang=='fr' %}selected{% endif %}>Français</option><option value="en" {% if lang=='en' %}selected{% endif %}>English</option></select><label>{{t('year')}}</label><input name="year" value="{{vals.get('year','')}}" required><label>{{t('director')}}</label><input name="director" value="{{vals.get('director','')}}"><label>{{t('new_password')}}</label><input type="password" name="new_password"><button>{{t('change')}}</button></form><p class="muted">{{t('note')}}</p></section>""",vals=vals,lang=session.get("lang","ar"))
+@app.route("/users",methods=["GET","POST"])
+def manage_users():
+ if super_guard(): return super_guard()
+ c=db()
+ if request.method=="POST":
+  username=request.form.get("username","").strip()
+  password=request.form.get("password","")
+  role=request.form.get("role","user")
+  if len(username)<3 or len(password)<12 or role not in ("super_admin","user"):
+   flash("Username must have 3+ characters and password 12+ characters.")
+  else:
+   try:
+    c.execute("INSERT INTO users(username,password_hash,role) VALUES(?,?,?)",(username,hash_password(password),role))
+    audit_event(c,"user.created",f"username={username}; role={role}")
+    c.commit(); flash(tr("done"))
+   except sqlite3.IntegrityError:
+    flash("Username already exists.")
+ rows=c.execute("SELECT id,username,role,active,created_at FROM users ORDER BY role DESC,username").fetchall(); c.close()
+ return page("""<section><h3>User accounts / Comptes utilisateurs / حسابات المستخدمين</h3><p>Create separate accounts for Pr Benhocine and Dr Dris and assign both the Super Admin role. Passwords are stored as salted PBKDF2 hashes.</p><form method="post"><label>Username</label><input name="username" minlength="3" required><label>Password (12+ characters)</label><input name="password" type="password" minlength="12" required><label>Role</label><select name="role"><option value="user">Standard user</option><option value="super_admin">Super Admin</option></select><button>Create account</button></form></section><section><div class="wrap"><table><tr><th>Username</th><th>Role</th><th>Active</th><th>Created</th></tr>{% for u in rows %}<tr><td>{{u.username}}</td><td>{{u.role}}</td><td>{{u.active}}</td><td>{{u.created_at}}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
+@app.get("/audit")
+def audit_log():
+ if super_guard(): return super_guard()
+ c=db(); rows=c.execute("SELECT * FROM audit ORDER BY id DESC LIMIT 300").fetchall(); c.close()
+ return page("""<section><h3>Audit log / Journal d’audit / سجل التدقيق</h3><div class="wrap"><table><tr><th>Date</th><th>Actor</th><th>Action</th><th>Details</th></tr>{% for r in rows %}<tr><td>{{r.created_at}}</td><td>{{r.actor}}</td><td>{{r.action}}</td><td>{{r.details}}</td></tr>{% else %}<tr><td colspan="4">{{t('none')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
 @app.route("/profile/<int:rid>",methods=["GET","POST"])
 def resident_profile(rid):
  if guard(): return redirect("/login")
