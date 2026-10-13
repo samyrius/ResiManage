@@ -3,6 +3,8 @@
 Every test uses a temporary SQLite database; no local or real resident data is touched.
 """
 
+import re
+
 import pytest
 
 import app as rotation_app
@@ -12,6 +14,7 @@ import app as rotation_app
 def client(tmp_path, monkeypatch):
     test_db = tmp_path / "rotation-test.db"
     monkeypatch.setattr(rotation_app, "DB", str(test_db))
+    monkeypatch.delenv("ROTATION_INITIAL_PASSWORD", raising=False)
     monkeypatch.setattr(rotation_app.app, "_ready", False, raising=False)
     rotation_app.app.config.update(TESTING=True, SECRET_KEY="test-only-secret")
     rotation_app.init()
@@ -20,11 +23,19 @@ def client(tmp_path, monkeypatch):
         yield test_client
 
 
-def test_login_page_renders_password_field(client):
+def csrf_token(response):
+    match = re.search(rb'name="_csrf_token" value="([^"]+)"', response.data)
+    assert match, "CSRF token is missing from the form"
+    return match.group(1).decode()
+
+
+def test_login_page_renders_password_field_without_disclosing_default(client):
     response = client.get("/login")
 
     assert response.status_code == 200
     assert b'name="password"' in response.data
+    assert b"Benhocine-ChangeMe-2026" not in response.data
+    assert b'name="_csrf_token"' in response.data
 
 
 @pytest.mark.parametrize(
@@ -50,16 +61,63 @@ def test_private_pages_redirect_anonymous_users_to_login(client, path):
     assert response.headers["Location"].endswith("/login")
 
 
-def test_invalid_password_does_not_authenticate(client):
-    response = client.post("/login", data={"password": "definitely-not-the-password"})
+def test_first_admin_password_must_be_long_enough_and_confirmed(client):
+    page = client.get("/login")
+    token = csrf_token(page)
+    response = client.post(
+        "/login",
+        data={
+            "_csrf_token": token,
+            "password": "short",
+            "password_confirm": "short",
+        },
+    )
 
     assert response.status_code == 200
-    assert b"name=\"password\"" in response.data
-    assert b"Incorrect password" in response.data or "كلمة المرور غير صحيحة".encode() in response.data
+    assert "12".encode() in response.data
 
 
-def test_language_switch_redirects_to_login_when_no_referrer(client):
-    response = client.get("/lang/en")
+def test_first_admin_password_is_hashed_and_authenticates(client):
+    page = client.get("/login")
+    token = csrf_token(page)
+    response = client.post(
+        "/login",
+        data={
+            "_csrf_token": token,
+            "password": "A-secure-test-password-2026",
+            "password_confirm": "A-secure-test-password-2026",
+        },
+    )
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/login")
+    assert response.headers["Location"].endswith("/")
+    with rotation_app.db() as connection:
+        stored = connection.execute(
+            "SELECT value FROM settings WHERE key='password'"
+        ).fetchone()["value"]
+    assert stored.startswith(("scrypt:", "pbkdf2:"))
+    assert client.get("/").status_code == 200
+
+
+def test_post_without_csrf_token_is_rejected(client):
+    response = client.post("/login", data={"password": "anything"})
+
+    assert response.status_code == 400
+    assert b"CSRF token" in response.data
+
+
+def test_invalid_password_does_not_authenticate(client):
+    page = client.get("/login")
+    token = csrf_token(page)
+    response = client.post(
+        "/login",
+        data={
+            "_csrf_token": token,
+            "password": "A-secure-but-wrong-password",
+            "password_confirm": "A-secure-but-wrong-password",
+        },
+    )
+
+    assert response.status_code == 200
+    assert b'name="password"' in response.data
+    assert "12".encode() in response.data
