@@ -142,6 +142,7 @@ def residents():
  c=db()
  if request.method=="POST":
   if request.form.get("action")=="edit":
+   if session.get("role")!="super_admin": c.close(); return ("Forbidden — Super Admin only",403)
    rid=int(request.form["rid"])
    c.execute("UPDATE residents SET year=?,repeat_year=?,status=? WHERE id=?",(int(request.form["year"]),int(request.form.get("repeat_year","0")),request.form["status"],rid))
    audit_event(c,"resident.updated",f"resident_id={rid}; year={request.form['year']}; status={request.form['status']}")
@@ -156,6 +157,7 @@ def terrains():
  if guard(): return redirect("/login")
  c=db()
  if request.method=="POST":
+  if session.get("role")!="super_admin": c.close(); return ("Forbidden — Super Admin only",403)
   try:
    c.execute("INSERT INTO terrains(name,kind,mandatory_year) VALUES(?,?,?)",(request.form["name"].strip(),request.form["kind"],int(request.form["mandatory_year"])))
    audit_event(c,"terrain.created",request.form["name"].strip()+" kind="+request.form["kind"])
@@ -168,6 +170,7 @@ def capacities():
  if guard(): return redirect("/login")
  c=db(); y=setting(c,"year")
  if request.method=="POST":
+  if session.get("role")!="super_admin": c.close(); return ("Forbidden — Super Admin only",403)
   tid,pid,places=int(request.form["terrain"]),int(request.form["period"]),max(0,int(request.form["places"]))
   used=c.execute("SELECT COUNT(*) FROM assignments WHERE terrain_id=? AND period_id=? AND status IN ('confirmed','pending')",(tid,pid)).fetchone()[0]
   if places<used: flash(tr("full"))
@@ -240,6 +243,7 @@ def history():
  if guard():return redirect("/login")
  c=db()
  if request.method=="POST":
+  if session.get("role")!="super_admin": c.close(); return ("Forbidden — Super Admin only",403)
   rid=int(request.form["resident"]); tid=int(request.form["terrain"])
   c.execute("INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",(rid,tid,request.form["year_label"],request.form.get("period",""),request.form.get("date_done","")))
   audit_event(c,"history.created",f"resident_id={rid}; terrain_id={tid}; year={request.form['year_label']}")
@@ -261,10 +265,10 @@ def decisions():
  c=db()
  if request.method=="POST":
   aid=int(request.form["aid"]); outcome=request.form["outcome"]; reason=request.form.get("reason","").strip()
-  a=c.execute("SELECT a.*,r.surname,r.firstname,t.name terrain,p.name period FROM assignments a JOIN residents r ON r.id=a.resident_id JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id WHERE a.id=? AND a.status='pending'",(aid,)).fetchone()
+  a=c.execute("SELECT a.*,r.surname,r.firstname,t.name terrain,p.name period,p.year_label FROM assignments a JOIN residents r ON r.id=a.resident_id JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id WHERE a.id=? AND a.status='pending'",(aid,)).fetchone()
   if a and reason:
    if outcome=="approve":
-    cap=c.execute("SELECT places FROM capacities WHERE year_label=? AND terrain_id=? AND period_id=?",(setting(c,"year"),a["terrain_id"],a["period_id"])).fetchone()
+    cap=c.execute("SELECT places FROM capacities WHERE year_label=? AND terrain_id=? AND period_id=?",(a["year_label"],a["terrain_id"],a["period_id"])).fetchone()
     used=c.execute("SELECT COUNT(*) FROM assignments WHERE terrain_id=? AND period_id=? AND status='confirmed'",(a["terrain_id"],a["period_id"])).fetchone()[0]
     dup=c.execute("SELECT id FROM assignments WHERE resident_id=? AND period_id=? AND id<>? AND status IN ('confirmed','pending')",(a["resident_id"],a["period_id"],aid)).fetchone()
     if not cap or used>=cap["places"] or dup: flash(tr("full") if not dup else tr("duplicate"))
@@ -294,8 +298,9 @@ def settings():
   if d:c.execute("INSERT INTO settings(key,value) VALUES('director',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(d,))
   pw=request.form.get("new_password","")
   if pw:
-   c.execute("INSERT INTO settings(key,value) VALUES('password',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(hash_password(pw),))
-   c.execute("UPDATE users SET password_hash=? WHERE username=?",(hash_password(pw),session.get("user","admin")))
+   secure_hash=hash_password(pw)
+   c.execute("INSERT INTO settings(key,value) VALUES('password',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(secure_hash,))
+   c.execute("UPDATE users SET password_hash=? WHERE username=?",(secure_hash,session.get("user","admin")))
    audit_event(c,"security.password_changed","Administrator password changed")
   audit_event(c,"settings.updated",f"year={y}; director_updated={bool(d)}")
   c.commit(); flash(tr("done"))
@@ -489,7 +494,7 @@ def resident_profile(rid):
  exam_rows=c.execute("SELECT * FROM exam_records WHERE resident_id=? ORDER BY study_year,module",(rid,)).fetchall()
  done={x[0] for x in c.execute("SELECT terrain_id FROM history WHERE resident_id=? UNION SELECT terrain_id FROM assignments WHERE resident_id=? AND status='confirmed'",(rid,rid)).fetchall()}
  terrains=c.execute("SELECT * FROM terrains ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END,name").fetchall(); c.close()
- return page("""<section><h3>{{r.surname}} {{r.firstname}} — Resident profile / Profil / الملف</h3><p>Year: {{r.year}} · Status: {{r.status}}</p>{% if r.photo_path %}<p><img src="{{r.photo_path}}" alt="Resident photo" style="max-width:140px;max-height:140px"></p>{% endif %}<form method="post"><label>Birth place / Lieu de naissance / مكان الميلاد</label><input name="birth_place" value="{{r.birth_place or ''}}"><label>Birth date / Date de naissance / تاريخ الميلاد</label><input type="date" name="birth_date" value="{{r.birth_date or ''}}"><label>Phone / Téléphone / الهاتف</label><input name="phone" value="{{r.phone or ''}}"><label>Photo URL/path / Photo / رابط الصورة</label><input name="photo_path" value="{{r.photo_path or ''}}"><label>Upload photo (PNG/JPG/WEBP, max 4 MB)</label><input type="file" name="photo" accept="image/png,image/jpeg,image/webp"><button>Save / Enregistrer / حفظ</button></form><p><a href="/exams?resident={{r.id}}">Exams / Examens / الامتحانات</a> · <a href="/dems">DEMS archive</a></p></section><section><h3>Terrain progress / Avancement / تقدم التربصات</h3><div class="wrap"><table><tr><th>Terrain</th><th>Status</th></tr>{% for t in terrains %}<tr><td>{{t.name}}</td><td class="{{'bad' if t.id in done else 'good'}}">{{'Completed / Effectué / مكتمل' if t.id in done else 'Remaining / À faire / متبقٍ'}}</td></tr>{% endfor %}</table></div></section><section><h3>Assignments and history / Affectations et historique / التوزيعات والتاريخ</h3>{% for a in assignment_rows %}<p>{{a.year_label}} — {{a.period}} — {{a.terrain}} ({{a.status}})</p>{% endfor %}{% for h in history_rows %}<p>{{h.year_label}} — {{h.period}} — {{h.terrain}} — {{h.date_done}}</p>{% endfor %}</section><section><h3>Exam scores / Notes d’examen / علامات الامتحان</h3><div class="wrap"><table><tr><th>Study year</th><th>Module</th><th>Theory</th><th>Practical</th></tr>{% for e in exam_rows %}<tr><td>{{e.study_year}}</td><td>{{e.module}}</td><td>{{e.theory}}/20</td><td>{{e.practical}}/20</td></tr>{% else %}<tr><td colspan="4">{{t('none')}}</td></tr>{% endfor %}</table></div></section><section><h3>Objectives / Objectifs / الأهداف</h3>{% for o in objectives %}<p>Year {{o.study_year}} — {{o.terrain}}: {{o.objective}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",r=r,terrains=terrains,done=done,assignment_rows=assignment_rows,history_rows=history_rows,objectives=objectives,exam_rows=exam_rows)
+ return page("""<section><h3>{{r.surname}} {{r.firstname}} — Resident profile / Profil / الملف</h3><p>Year: {{r.year}} · Status: {{r.status}}</p>{% if r.photo_path %}<p><img src="{{r.photo_path}}" alt="Resident photo" style="max-width:140px;max-height:140px"></p>{% endif %}<form method="post" enctype="multipart/form-data"><label>Birth place / Lieu de naissance / مكان الميلاد</label><input name="birth_place" value="{{r.birth_place or ''}}"><label>Birth date / Date de naissance / تاريخ الميلاد</label><input type="date" name="birth_date" value="{{r.birth_date or ''}}"><label>Phone / Téléphone / الهاتف</label><input name="phone" value="{{r.phone or ''}}"><label>Photo URL/path / Photo / رابط الصورة</label><input name="photo_path" value="{{r.photo_path or ''}}"><label>Upload photo (PNG/JPG/WEBP, max 4 MB)</label><input type="file" name="photo" accept="image/png,image/jpeg,image/webp"><button>Save / Enregistrer / حفظ</button></form><p><a href="/exams?resident={{r.id}}">Exams / Examens / الامتحانات</a> · <a href="/dems">DEMS archive</a></p></section><section><h3>Terrain progress / Avancement / تقدم التربصات</h3><div class="wrap"><table><tr><th>Terrain</th><th>Status</th></tr>{% for t in terrains %}<tr><td>{{t.name}}</td><td class="{{'bad' if t.id in done else 'good'}}">{{'Completed / Effectué / مكتمل' if t.id in done else 'Remaining / À faire / متبقٍ'}}</td></tr>{% endfor %}</table></div></section><section><h3>Assignments and history / Affectations et historique / التوزيعات والتاريخ</h3>{% for a in assignment_rows %}<p>{{a.year_label}} — {{a.period}} — {{a.terrain}} ({{a.status}})</p>{% endfor %}{% for h in history_rows %}<p>{{h.year_label}} — {{h.period}} — {{h.terrain}} — {{h.date_done}}</p>{% endfor %}</section><section><h3>Exam scores / Notes d’examen / علامات الامتحان</h3><div class="wrap"><table><tr><th>Study year</th><th>Module</th><th>Theory</th><th>Practical</th></tr>{% for e in exam_rows %}<tr><td>{{e.study_year}}</td><td>{{e.module}}</td><td>{{e.theory}}/20</td><td>{{e.practical}}/20</td></tr>{% else %}<tr><td colspan="4">{{t('none')}}</td></tr>{% endfor %}</table></div></section><section><h3>Objectives / Objectifs / الأهداف</h3>{% for o in objectives %}<p>Year {{o.study_year}} — {{o.terrain}}: {{o.objective}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",r=r,terrains=terrains,done=done,assignment_rows=assignment_rows,history_rows=history_rows,objectives=objectives,exam_rows=exam_rows)
 @app.route("/objectives",methods=["GET","POST"])
 def manage_objectives():
  if super_guard(): return super_guard()
@@ -521,6 +526,7 @@ def exams():
     audit_event(c,"exam.recorded",f"resident_id={rid}; year={sy}; module={module}")
     c.commit(); flash(tr("done"))
   elif action=="evaluate_first_year":
+   if session.get("role")!="super_admin": c.close(); return ("Forbidden — Super Admin only",403)
    records=c.execute("SELECT theory,practical FROM exam_records WHERE resident_id=? AND study_year=1",(rid,)).fetchall()
    if not records:
     flash("Enter first-year exam modules before evaluation")
@@ -534,6 +540,7 @@ def exams():
      audit_event(c,"resident.year_advanced",f"resident_id={rid}; from=1; to=2")
     c.commit(); flash(("Passed; resident advanced to year 2." if passed else "Failed: average must be at least 10/20 and every theory/practical mark must be at least 10/20"))
   elif action=="approve_advance":
+   if session.get("role")!="super_admin": c.close(); return ("Forbidden — Super Admin only",403)
    if sy not in (2,3) or resident["year"]!=sy:
     flash("Only an authorized year 2 or 3 progression decision is valid here")
    else:
@@ -571,7 +578,7 @@ def dems():
 def export():
  if super_guard():return super_guard()
  c=db(); out=io.StringIO(); w=csv.writer(out)
- for table in ["residents","terrains","periods","capacities","assignments","history","decisions"]:
+ for table in ["residents","terrains","periods","capacities","assignments","history","decisions","exam_records","objectives","dems_archive","audit"]:
   w.writerow([table])
   w.writerow([x[1] for x in c.execute('PRAGMA table_info("'+table+'")')])
   for row in c.execute('SELECT * FROM "'+table+'"'):w.writerow(list(row))
