@@ -757,7 +757,7 @@ def test_import_adds_only_explicitly_documented_stage_history(client):
                 io.BytesIO(
                     "Nom,Prénom,Année,Téléphone,Terrain,Année universitaire,Période,Date de réalisation\n"
                     "Historique,Documenté,2,0550000000,Réanimation polyvalente,2024-2025,P1,2024-04-30\n"
-                    "Sans,Histoire,2,0550000001,,,,\n".encode("utf-8")
+                    "Sans,Histoire,2,0550000001,Réanimation polyvalente,,,\n".encode("utf-8")
                 ),
                 "residents-with-history.csv",
             ),
