@@ -145,6 +145,7 @@ def test_legacy_sha256_password_is_upgraded_after_successful_login(client):
         )
         connection.commit()
 
+    rotation_app.init()
     page = client.get("/login")
     token = csrf_token(page)
     response = client.post(
@@ -272,6 +273,7 @@ def test_repeating_core_terrain_is_blocked_until_all_core_terrains_are_done(clie
 def test_resident_changes_are_written_to_audit_log(client):
     with client.session_transaction() as browser_session:
         browser_session["user"] = "admin"
+        browser_session["role"] = "super_admin"
         browser_session["lang"] = "en"
 
     form_page = client.get("/residents")
@@ -422,3 +424,44 @@ def test_first_year_promotion_rejects_any_module_component_below_ten(client):
             "SELECT year FROM residents WHERE id=?", (resident_id,)
         ).fetchone()["year"]
     assert year == 1
+
+
+def test_admin_account_can_be_created_and_operator_is_restricted(client):
+    page = client.get("/login")
+    response = client.post(
+        "/login",
+        data={
+            "_csrf_token": csrf_token(page),
+            "username": "admin",
+            "password": "A-secure-test-password-2026",
+            "password_confirm": "A-secure-test-password-2026",
+        },
+    )
+    assert response.status_code == 302
+    page = client.get("/users")
+    response = client.post(
+        "/users",
+        data={
+            "_csrf_token": csrf_token(page),
+            "username": "operator1",
+            "display_name": "Rotation Operator",
+            "password": "Operator-secure-password-2026",
+            "role": "operator",
+        },
+    )
+    assert response.status_code == 200
+    with client.session_transaction() as browser_session:
+        browser_session.clear()
+    page = client.get("/login")
+    response = client.post(
+        "/login",
+        data={
+            "_csrf_token": csrf_token(page),
+            "username": "operator1",
+            "password": "Operator-secure-password-2026",
+        },
+    )
+    assert response.status_code == 302
+    assert client.get("/settings").status_code == 403
+    assert client.get("/audit").status_code == 403
+    assert client.get("/residents").status_code == 200
