@@ -1,0 +1,38 @@
+name: Python checks
+
+on:
+  push:
+    branches: [main, security/harden-authentication]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+      - name: Compile Python source
+        run: python -m compileall -q app.py
+      - name: Smoke-test login page with a temporary CI database
+        run: |
+          python - <<'PY'
+          import app
+          app.app.config.update(TESTING=True)
+          app.init()
+          client = app.app.test_client()
+          response = client.get('/login')
+          assert response.status_code == 200, response.status_code
+          assert 'Connexion administrateur'.encode() in response.data or 'Administrator login'.encode() in response.data or 'تسجيل'.encode() in response.data
+          print('Login page smoke test passed')
+          PY
