@@ -30,7 +30,7 @@ def verify_password(password, stored):
    return hmac.compare_digest(candidate,digest)
   except (ValueError,TypeError):
    return False
- return hashlib.compare_digest(hashlib.sha256(password.encode("utf-8")).hexdigest(),stored)
+ return hmac.compare_digest(hashlib.sha256(password.encode("utf-8")).hexdigest(),stored)
 def ensure_column(c, table, column, spec):
  existing={row[1] for row in c.execute("PRAGMA table_info("+table+")")}
  if column not in existing:
