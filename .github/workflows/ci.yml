@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   test:
@@ -24,6 +25,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest
       - name: Run tests
+        id: tests
         env:
           ROTATION_SECRET: ci-test-secret
-        run: pytest -q
+        run: |
+          set +e
+          pytest -q > pytest-output.txt 2>&1
+          result=$?
+          cat pytest-output.txt
+          {
+            echo 'report<<PYTEST_REPORT'
+            cat pytest-output.txt
+            echo 'PYTEST_REPORT'
+          } >> "$GITHUB_OUTPUT"
+          exit "$result"
+      - name: Publish failure details temporarily
+        if: failure() && steps.tests.outputs.report != ''
+        uses: actions/github-script@v7
+        env:
+          PYTEST_REPORT: ${{ steps.tests.outputs.report }}
+        with:
+          script: |
+            const body = 'Temporary CI diagnostic for run ' + context.runId + ':\n\n' + process.env.PYTEST_REPORT.slice(0, 6000);
+            await github.rest.issues.createComment({owner: context.repo.owner, repo: context.repo.repo, issue_number: 8, body});
