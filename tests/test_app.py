@@ -337,3 +337,44 @@ def test_csv_import_requires_preview_and_does_not_invent_history(tmp_path, monke
         rid = conn.execute("SELECT id FROM residents WHERE surname='ImportSurname'").fetchone()[0]
         assert conn.execute("SELECT COUNT(*) FROM history WHERE resident_id=?", (rid,)).fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='residents.imported'").fetchone()[0] == 1
+
+def test_mandatory_year_override_requires_reason_and_records_audit(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,2)", ("Override", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Override'").fetchone()[0]
+        conn.execute("INSERT INTO terrains(name,kind,mandatory_year) VALUES(?,?,3)", ("Year Three Only", "mandatory"))
+        tid = conn.execute("SELECT id FROM terrains WHERE name='Year Three Only'").fetchone()[0]
+        period_id = conn.execute("SELECT id FROM periods ORDER BY id LIMIT 1").fetchone()[0]
+        year_label = conn.execute("SELECT year_label FROM periods WHERE id=?", (period_id,)).fetchone()[0]
+        conn.execute("INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,1)", (year_label,tid,period_id))
+    response = client.post("/assign", data={"resident":str(rid),"terrain":str(tid),"period":str(period_id)}, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        aid = conn.execute("SELECT id FROM assignments WHERE resident_id=? AND status='pending'", (rid,)).fetchone()[0]
+    client.post("/decisions", data={"aid":str(aid),"outcome":"approve","reason":"Authorized educational exception"}, follow_redirects=True)
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT status FROM assignments WHERE id=?", (aid,)).fetchone()[0] == "confirmed"
+        assert conn.execute("SELECT COUNT(*) FROM decisions WHERE reason='Authorized educational exception'").fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='assignment.override_approved'").fetchone()[0] == 1
+
+
+def test_uploaded_resident_photo_is_stored_and_served_safely(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,1)", ("Photo", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Photo'").fetchone()[0]
+    png = b"\x89PNG\r\n\x1a\n" + b"test"
+    response = client.post("/profile/" + str(rid), data={
+        "birth_place":"", "birth_date":"", "phone":"",
+        "photo":(io.BytesIO(png),"portrait.png")
+    }, content_type="multipart/form-data", follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        path = conn.execute("SELECT photo_path FROM residents WHERE id=?", (rid,)).fetchone()[0]
+    assert path.startswith("/photos/resident_")
+    photo_response = client.get(path)
+    assert photo_response.status_code == 200
+    assert photo_response.data.startswith(b"\x89PNG")
