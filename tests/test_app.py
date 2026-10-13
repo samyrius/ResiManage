@@ -423,3 +423,36 @@ def test_xlsx_import_preview(tmp_path, monkeypatch):
                           content_type="multipart/form-data", follow_redirects=True)
     assert preview.status_code == 200
     assert b"ExcelResident" in preview.data, preview.data.decode("utf-8", errors="replace")
+
+def test_docx_import_reads_table_headers_and_resident_rows(tmp_path, monkeypatch):
+    from docx import Document
+    document = Document()
+    table = document.add_table(rows=1, cols=3)
+    table.rows[0].cells[0].text = "Nom"
+    table.rows[0].cells[1].text = "Prénom"
+    table.rows[0].cells[2].text = "Année"
+    row = table.add_row().cells
+    row[0].text = "WordResident"
+    row[1].text = "WordFirst"
+    row[2].text = "4"
+    stream = io.BytesIO()
+    document.save(stream)
+    stream.seek(0)
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    preview = client.post("/import", data={"file":(stream,"residents.docx")},
+                          content_type="multipart/form-data", follow_redirects=True)
+    assert preview.status_code == 200
+    assert b"WordResident" in preview.data
+
+
+def test_csv_export_includes_exam_objective_archive_and_audit_tables_but_not_users(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.get("/export")
+    assert response.status_code == 200
+    content = response.get_data().decode("utf-8-sig")
+    for table in ("exam_records", "objectives", "dems_archive", "audit"):
+        assert table in content
+    assert "users" not in content
+    assert "password_hash" not in content
