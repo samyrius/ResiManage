@@ -254,7 +254,7 @@ def summary():
  return page("""<section><h3>{{t('summary')}} — {{year}}</h3><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('assign')}}</th><th>{{t('history')}}</th></tr>{% for r,a,h in rows %}<tr><td>{{r.surname}} {{r.firstname}}</td><td>{{r.year}}</td><td>{% for x in a %}<div>{{x.period}} — {{x.terrain}} ({{x.status}})</div>{% else %}—{% endfor %}</td><td>{% for x in h %}<div>{{x.terrain}} — {{x.year_label}} / {{x.period}} / {{x.date_done}}</div>{% else %}—{% endfor %}</td></tr>{% endfor %}</table></div></section>""",rows=rows,year=y)
 @app.route("/decisions",methods=["GET","POST"])
 def decisions():
- if super_guard():return redirect("/login")
+ if super_guard():return super_guard()
  c=db()
  if request.method=="POST":
   aid=int(request.form["aid"]); outcome=request.form["outcome"]; reason=request.form.get("reason","").strip()
@@ -292,6 +292,7 @@ def settings():
   pw=request.form.get("new_password","")
   if pw:
    c.execute("INSERT INTO settings(key,value) VALUES('password',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(hash_password(pw),))
+   c.execute("UPDATE users SET password_hash=? WHERE username=?",(hash_password(pw),session.get("user","admin")))
    audit_event(c,"security.password_changed","Administrator password changed")
   audit_event(c,"settings.updated",f"year={y}; director_updated={bool(d)}")
   c.commit(); flash(tr("done"))
@@ -315,7 +316,7 @@ def resident_profile(rid):
  return page("""<section><h3>{{r.surname}} {{r.firstname}} — Resident profile / Profil / الملف</h3><p>Year: {{r.year}} · Status: {{r.status}}</p>{% if r.photo_path %}<p><img src="{{r.photo_path}}" alt="Resident photo" style="max-width:140px;max-height:140px"></p>{% endif %}<form method="post"><label>Birth place / Lieu de naissance / مكان الميلاد</label><input name="birth_place" value="{{r.birth_place or ''}}"><label>Birth date / Date de naissance / تاريخ الميلاد</label><input type="date" name="birth_date" value="{{r.birth_date or ''}}"><label>Phone / Téléphone / الهاتف</label><input name="phone" value="{{r.phone or ''}}"><label>Photo URL/path / Photo / رابط الصورة</label><input name="photo_path" value="{{r.photo_path or ''}}"><button>Save / Enregistrer / حفظ</button></form><p><a href="/exams?resident={{r.id}}">Exams / Examens / الامتحانات</a> · <a href="/dems">DEMS archive</a></p></section><section><h3>Terrain progress / Avancement / تقدم التربصات</h3><div class="wrap"><table><tr><th>Terrain</th><th>Status</th></tr>{% for t in terrains %}<tr><td>{{t.name}}</td><td class="{{'bad' if t.id in done else 'good'}}">{{'Completed / Effectué / مكتمل' if t.id in done else 'Remaining / À faire / متبقٍ'}}</td></tr>{% endfor %}</table></div></section><section><h3>Assignments and history / Affectations et historique / التوزيعات والتاريخ</h3>{% for a in assignment_rows %}<p>{{a.year_label}} — {{a.period}} — {{a.terrain}} ({{a.status}})</p>{% endfor %}{% for h in history_rows %}<p>{{h.year_label}} — {{h.period}} — {{h.terrain}} — {{h.date_done}}</p>{% endfor %}</section><section><h3>Objectives / Objectifs / الأهداف</h3>{% for o in objectives %}<p>Year {{o.study_year}} — {{o.terrain}}: {{o.objective}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",r=r,terrains=terrains,done=done,assignment_rows=assignment_rows,history_rows=history_rows,objectives=objectives)
 @app.route("/objectives",methods=["GET","POST"])
 def manage_objectives():
- if super_guard(): return redirect("/login")
+ if super_guard(): return super_guard()
  c=db()
  if request.method=="POST":
   tid=int(request.form["terrain"]); sy=int(request.form["study_year"]); obj=request.form["objective"].strip()
@@ -392,7 +393,7 @@ def dems():
  return page("""<section><h3>DEMS success archive / Archive DEMS / أرشيف DEMS</h3><form method="post"><label>Year-4 resident</label><select name="resident">{% for r in residents_rows %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>Success date / Date de réussite / تاريخ النجاح</label><input type="date" name="success_date" required><button>Archive successful graduate</button></form><p>Archiving retains resident data and rotation history; it does not delete them.</p></section><section><h4>Archived graduates</h4>{% for a in archive_rows %}<p>{{a.surname}} {{a.firstname}} — DEMS success: {{a.success_date}} — archived {{a.archived_at}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",residents_rows=residents_rows,archive_rows=archive_rows)
 @app.get("/export")
 def export():
- if guard():return redirect("/login")
+ if super_guard():return super_guard()
  c=db(); out=io.StringIO(); w=csv.writer(out)
  for table in ["residents","terrains","periods","capacities","assignments","history","decisions"]:
   w.writerow([table])
@@ -401,7 +402,7 @@ def export():
  c.close(); f=io.BytesIO(("\ufeff"+out.getvalue()).encode("utf-8")); return send_file(f,mimetype="text/csv",as_attachment=True,download_name="rotation_export.csv")
 @app.get("/backup")
 def backup():
- if guard():return redirect("/login")
+ if super_guard():return super_guard()
  c=db(); c.execute("PRAGMA wal_checkpoint(FULL)"); c.close()
  target=os.path.join(BASE,"rotation_backup_download.db"); shutil.copy2(DB,target)
  return send_file(target,as_attachment=True,download_name="rotation_backup.db")
