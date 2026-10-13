@@ -14,9 +14,6 @@ jobs:
   build-debug-apk:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -25,11 +22,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Accept Android SDK licenses and install build tools
-        run: |
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager"
-          yes | "$SDKMANAGER" --licenses
-          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0 ndk;27.2.12479018'
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
       - name: Download Gradle
         run: |
           curl --fail --location --silent --show-error https://services.gradle.org/distributions/gradle-8.13-bin.zip --output /tmp/gradle.zip
