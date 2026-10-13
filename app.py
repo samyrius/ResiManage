@@ -478,9 +478,12 @@ def resident_profile(rid):
    ext=os.path.splitext(secure_filename(photo_file.filename))[1].lower()
    if ext not in (".png",".jpg",".jpeg",".webp"):
     c.close(); flash("Photo must be PNG, JPG or WEBP."); return redirect("/profile/"+str(rid))
-   photo_file.stream.seek(0,os.SEEK_END); photo_size=photo_file.stream.tell(); photo_file.stream.seek(0)
-   if photo_size>4*1024*1024:
+   photo_bytes=photo_file.stream.read(4*1024*1024+1); photo_file.stream.seek(0)
+   if len(photo_bytes)>4*1024*1024:
     c.close(); flash("Photo must be 4 MB or smaller."); return redirect("/profile/"+str(rid))
+   valid_image=(ext==".png" and photo_bytes.startswith(b"\\x89PNG\\r\\n\\x1a\\n")) or (ext in (".jpg",".jpeg") and photo_bytes.startswith(b"\\xff\\xd8\\xff")) or (ext==".webp" and len(photo_bytes)>12 and photo_bytes.startswith(b"RIFF") and photo_bytes[8:12]==b"WEBP")
+   if not valid_image:
+    c.close(); flash("The uploaded file is not a valid PNG/JPG/WEBP image."); return redirect("/profile/"+str(rid))
    photo_dir=os.path.join(os.path.dirname(os.path.abspath(DB)),"resident_photos"); os.makedirs(photo_dir,exist_ok=True)
    photo_name="resident_"+str(rid)+"_"+str(int(datetime.now().timestamp()))+ext
    photo_file.save(os.path.join(photo_dir,photo_name)); photo_path="/photos/"+photo_name
