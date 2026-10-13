@@ -214,3 +214,83 @@ def test_repeat_is_blocked_until_all_core_terrains_are_completed(tmp_path, monke
     assert allowed is True
     assert status == "confirmed"
     assert "يمكن التكرار" in message
+
+def test_resident_profile_and_objectives_are_saved_and_audited(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname, firstname, year) VALUES(?,?,?)", ("Profile", "Resident", 2))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Profile'").fetchone()[0]
+        terrain_id = conn.execute("SELECT id FROM terrains WHERE name='Réanimation chirurgicale'").fetchone()[0]
+    response = client.post("/profile/" + str(rid), data={
+        "birth_place": "Tizi Ouzou", "birth_date": "1998-05-02",
+        "phone": "0550000000", "photo_path": ""
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        row = conn.execute("SELECT birth_place,birth_date,phone FROM residents WHERE id=?", (rid,)).fetchone()
+        assert tuple(row) == ("Tizi Ouzou", "1998-05-02", "0550000000")
+    response = client.post("/objectives", data={
+        "terrain": str(terrain_id), "study_year": "2", "objective": "Manage airway safely"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"Manage airway safely" in response.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='resident.profile_updated'").fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM objectives WHERE objective='Manage airway safely'").fetchone()[0] == 1
+
+
+def test_first_year_progression_requires_every_component_at_least_ten(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,1)", ("Pass", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Pass'").fetchone()[0]
+    for module, theory, practical in [("Module A", 12, 11), ("Module B", 10, 10)]:
+        client.post("/exams", data={"action":"record","resident":str(rid),"study_year":"1","module":module,"theory":str(theory),"practical":str(practical)})
+    client.post("/exams", data={"action":"evaluate_first_year","resident":str(rid),"study_year":"1"})
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT year FROM residents WHERE id=?", (rid,)).fetchone()[0] == 2
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,1)", ("Fail", "Resident"))
+        fail_id = conn.execute("SELECT id FROM residents WHERE surname='Fail'").fetchone()[0]
+    for module, theory, practical in [("Module A", 15, 15), ("Module B", 9, 16)]:
+        client.post("/exams", data={"action":"record","resident":str(fail_id),"study_year":"1","module":module,"theory":str(theory),"practical":str(practical)})
+    client.post("/exams", data={"action":"evaluate_first_year","resident":str(fail_id),"study_year":"1"})
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT year FROM residents WHERE id=?", (fail_id,)).fetchone()[0] == 1
+
+
+def test_dems_archive_keeps_resident_and_history(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,4)", ("Graduate", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Graduate'").fetchone()[0]
+        tid = conn.execute("SELECT id FROM terrains WHERE name='Urologie'").fetchone()[0]
+        conn.execute("INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+                     (rid, tid, "2025-2026", "01 Mai - 30 Juillet", "2025-07-30"))
+    response = client.post("/dems", data={"resident":str(rid),"success_date":"2026-10-01"}, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        row = conn.execute("SELECT status,dems_status FROM residents WHERE id=?", (rid,)).fetchone()
+        assert tuple(row) == ("graduated", "success")
+        assert conn.execute("SELECT COUNT(*) FROM history WHERE resident_id=?", (rid,)).fetchone()[0] == 1
+        archive = conn.execute("SELECT history_json FROM dems_archive WHERE resident_id=?", (rid,)).fetchone()
+        assert "Urologie" in archive["history_json"]
+
+
+def test_standard_user_cannot_access_super_admin_pages(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.post("/users", data={
+        "username":"ordinary-user","password":"ordinary-password-2026","role":"user"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    client.get("/logout")
+    response = client.post("/login", data={
+        "username":"ordinary-user","password":"ordinary-password-2026"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert client.get("/settings").status_code == 403
+    assert client.get("/dems").status_code == 403
+    assert client.get("/audit").status_code == 403
