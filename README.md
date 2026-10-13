@@ -20,7 +20,7 @@ The automated tests use temporary SQLite databases. Do not commit `rotation.db`,
 
 ## Android APK
 
-The GitHub Actions workflow **Android APK build** builds a debug APK and uploads the `rotation-app-debug-apk` artifact. The current build targets 64-bit ARM phones and x86_64 emulators. The CI workflow smoke-tests the embedded Flask login page on an emulator; the APK is not a Play Store release and has not yet been tested on a physical phone.
+The GitHub Actions workflow **Android APK build** builds a debug APK and uploads the `rotation-app-debug-apk` artifact. The APK includes 64-bit ARM (`arm64-v8a`) and x86_64 libraries. The CI build succeeds, but emulator startup was not reliably confirmed and the APK has not yet been tested on a physical phone. It is not a Play Store release.
 
 ## Security and data
 
