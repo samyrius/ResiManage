@@ -51,6 +51,7 @@ def test_login_page_renders_password_field_without_disclosing_default(client):
         "/summary",
         "/decisions",
         "/audit",
+        "/users",
         "/settings",
         "/export",
         "/backup",
@@ -299,6 +300,7 @@ def test_resident_changes_are_written_to_audit_log(client):
 def authenticated(client):
     with client.session_transaction() as browser_session:
         browser_session["user"] = "admin"
+        browser_session["role"] = "super_admin"
         browser_session["lang"] = "en"
 
 
