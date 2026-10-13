@@ -512,16 +512,28 @@ def promotions():
       audit(c,"promotion_rejected",f"promotion_id={promotion_id};voter={username};reason={reason}")
       flash(tr("promotion_rejected"))
      elif votes_by_user.get("benhocine")=="approve" and votes_by_user.get("drdris")=="approve":
-      c.execute("UPDATE resident_promotions SET status='approved' WHERE id=?",(promotion_id,))
       resident=c.execute("SELECT * FROM residents WHERE id=?",(promotion["resident_id"],)).fetchone()
       if promotion["to_year"]==5:
-       c.execute("INSERT OR IGNORE INTO dems_archive(resident_id,approved_by,notes) VALUES(?,?,?)",(resident["id"],"benhocine,drdris","DEMS réussi — validation des deux responsables"))
-       c.execute("UPDATE residents SET status='dems_success' WHERE id=?",(resident["id"],))
-       audit(c,"dems_success_archived",f"resident_id={resident['id']};promotion_id={promotion_id}")
+       dems=c.execute("SELECT exam_key,virtual_score,actual_score,single_score FROM resident_exam_records WHERE resident_id=? AND exam_key IN ('dems_main','dems_resit')",(resident["id"],)).fetchall()
+       dems_by_key={row["exam_key"]:row for row in dems}
+       main=dems_by_key.get("dems_main")
+       resit=dems_by_key.get("dems_resit")
+       main_pass=bool(main and main["virtual_score"] is not None and main["actual_score"] is not None and (main["virtual_score"]+main["actual_score"])/2>=10)
+       resit_pass=bool(resit and resit["single_score"] is not None and resit["single_score"]>=10)
+       if not (main_pass or resit_pass):
+        audit(c,"dems_archive_blocked",f"resident_id={resident['id']};promotion_id={promotion_id};reason=missing_or_failing_exam")
+        flash("DEMS archive blocked: record a passing main exam (both parts, average >=10/20) or resit score >=10/20 before approval.")
+       else:
+        c.execute("UPDATE resident_promotions SET status='approved' WHERE id=?",(promotion_id,))
+        c.execute("INSERT OR IGNORE INTO dems_archive(resident_id,approved_by,notes) VALUES(?,?,?)",(resident["id"],"benhocine,drdris","DEMS réussi — examen enregistré et validation des deux responsables"))
+        c.execute("UPDATE residents SET status='dems_success' WHERE id=?",(resident["id"],))
+        audit(c,"dems_success_archived",f"resident_id={resident['id']};promotion_id={promotion_id};exam={'dems_main' if main_pass else 'dems_resit'}")
+        flash(tr("promotion_approved"))
       else:
+       c.execute("UPDATE resident_promotions SET status='approved' WHERE id=?",(promotion_id,))
        c.execute("UPDATE residents SET year=?,repeat_year=0 WHERE id=?",(promotion["to_year"],resident["id"]))
        audit(c,"resident_advanced_by_officials",f"resident_id={resident['id']};from={promotion['from_year']};to={promotion['to_year']}")
-      flash(tr("promotion_approved"))
+       flash(tr("promotion_approved"))
      else:
       audit(c,"promotion_vote_recorded",f"promotion_id={promotion_id};voter={username};decision={decision}")
       flash(tr("promotion_waiting"))
