@@ -195,6 +195,7 @@ def test_repeat_is_blocked_until_all_core_terrains_are_completed(tmp_path, monke
             assert allowed is False
             assert "التربص منجز سابقاً" in message
 
+    with rotation_app.db() as conn:
         conn.execute(
             """
             INSERT INTO history(resident_id, terrain_id, year_label, period, date_done)
