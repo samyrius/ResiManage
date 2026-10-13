@@ -1,3 +1,4 @@
+import hashlib
 import io
 import re
 import sys
@@ -456,3 +457,40 @@ def test_csv_export_includes_exam_objective_archive_and_audit_tables_but_not_use
         assert table in content
     assert "users" not in content
     assert "password_hash" not in content
+
+def test_fresh_database_requires_admin_to_set_a_private_password(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    monkeypatch.delenv("ROTATION_INITIAL_PASSWORD", raising=False)
+    page = client.get("/login")
+    assert page.status_code == 200
+    assert b"confirm_password" in page.data
+    response = client.post("/login", data={
+        "username":"admin",
+        "password":"fresh-private-password-2026",
+        "confirm_password":"fresh-private-password-2026"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        stored = conn.execute("SELECT value FROM settings WHERE key='password'").fetchone()[0]
+        user = conn.execute("SELECT role,password_hash FROM users WHERE username='admin'").fetchone()
+    assert stored.startswith("pbkdf2_sha256$")
+    assert user["role"] == "super_admin"
+    assert user["password_hash"].startswith("pbkdf2_sha256$")
+
+
+def test_legacy_password_hash_is_upgraded_after_successful_login(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    with rotation_app.app.test_request_context("/"):
+        with rotation_app.db() as conn:
+            conn.execute("UPDATE settings SET value=? WHERE key='password'",
+                         (hashlib.sha256(b"legacy-test-password-2026").hexdigest(),))
+    response = client.post("/login", data={
+        "username":"admin","password":"legacy-test-password-2026"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        stored = conn.execute("SELECT value FROM settings WHERE key='password'").fetchone()[0]
+        user = conn.execute("SELECT password_hash,role FROM users WHERE username='admin'").fetchone()
+    assert stored.startswith("pbkdf2_sha256$")
+    assert user["password_hash"].startswith("pbkdf2_sha256$")
+    assert user["role"] == "super_admin"
