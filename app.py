@@ -43,8 +43,9 @@ def init():
  if initial_password:
   c.execute("INSERT OR IGNORE INTO settings VALUES('password',?)",(generate_password_hash(initial_password),))
  c.execute("INSERT OR IGNORE INTO settings VALUES('director',?)",("Professor Benhocine",))
- for n,k in [("Réanimation chirurgicale","basic"),("Réanimation polyvalente","basic"),("Chirurgie générale","mandatory"),("Urologie","basic"),("Orthopédie","basic"),("Neurochirurgie","basic"),("Sédation","optional"),("Maxillo-faciale","basic"),("CCI","basic"),("Obstétrique","basic"),("Chirurgie cardiaque","basic"),("PU Médecine","basic"),("PU Chirurgie","basic"),("ORL","basic"),("Ophtalmologie","basic"),("Gynécologie","basic"),("Chirurgie thoracique","basic"),("Brûlés","basic")]:
+ for n,k in [("Réanimation chirurgicale","basic"),("Réanimation polyvalente","basic"),("Chirurgie générale","mandatory"),("Urologie","basic"),("Orthopédie","basic"),("Neurochirurgie","basic"),("Sédation","optional"),("Maxillo-faciale","optional"),("CCI","basic"),("Obstétrique","basic"),("Chirurgie cardiaque","optional"),("PU Médecine","basic"),("PU Chirurgie","basic"),("ORL","basic"),("Ophtalmologie","basic"),("Gynécologie","basic"),("Chirurgie thoracique","basic"),("Brûlés","optional"),("CAC DBK","optional")]:
   c.execute("INSERT OR IGNORE INTO terrains(name,kind) VALUES(?,?)",(n,k))
+ c.execute("UPDATE terrains SET kind='optional' WHERE name IN ('Sédation','Maxillo-faciale','Chirurgie cardiaque','Brûlés','CAC DBK')")
  y=setting(c,"year",y)
  if not c.execute("SELECT 1 FROM periods WHERE year_label=?",(y,)).fetchone():
   for n in ["01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"]:
