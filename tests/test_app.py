@@ -189,10 +189,11 @@ def test_repeat_is_blocked_until_all_core_terrains_are_completed(tmp_path, monke
             (rid, target, "2025-2026", "01 Fév - 30 Avr", "2026-04-30"),
         )
 
-    with rotation_app.db() as conn:
-        allowed, message, status = rotation_app.check(conn, rid, target, period_id, year_label)
-        assert allowed is False
-        assert "التربص منجز سابقاً" in message
+    with rotation_app.app.test_request_context("/"):
+        with rotation_app.db() as conn:
+            allowed, message, status = rotation_app.check(conn, rid, target, period_id, year_label)
+            assert allowed is False
+            assert "التربص منجز سابقاً" in message
 
         conn.execute(
             """
@@ -205,8 +206,9 @@ def test_repeat_is_blocked_until_all_core_terrains_are_completed(tmp_path, monke
             (rid, rid),
         )
 
-    with rotation_app.db() as conn:
-        allowed, message, status = rotation_app.check(conn, rid, target, period_id, year_label)
+    with rotation_app.app.test_request_context("/"):
+        with rotation_app.db() as conn:
+            allowed, message, status = rotation_app.check(conn, rid, target, period_id, year_label)
     assert allowed is True
     assert status == "confirmed"
     assert "يمكن التكرار" in message
