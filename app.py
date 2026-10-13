@@ -454,7 +454,7 @@ def dems_archive():
 def normalize_import_header(value):
  raw=str(value or "").strip().lower()
  ascii_value=unicodedata.normalize("NFKD",raw).encode("ascii","ignore").decode("ascii")
- return re.sub(r"[^a-z0-9]+"," ",ascii_value).strip()
+ return re.sub(r"[^a-z0-9]+"," ",ascii_value).strip() or re.sub(r"\s+"," ",raw)
 
 def extract_import_rows(filename,data):
  ext=os.path.splitext(filename.lower())[1]
@@ -555,7 +555,7 @@ def import_residents():
    else:
     payload=json.loads(item["rows_json"]); inserted=0; duplicates=0
     for row in payload["rows"]:
-     exists=c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=? AND status='active'",(row["surname"],row["firstname"],row["year"])).fetchone()
+     exists=c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=?",(row["surname"],row["firstname"],row["year"])).fetchone()
      if exists:duplicates+=1; continue
      c.execute("INSERT INTO residents(surname,firstname,year,phone,birth_place,birth_date,status) VALUES(?,?,?,?,?,?, 'active')",(row["surname"],row["firstname"],row["year"],row.get("phone",""),row.get("birth_place",""),row.get("birth_date","")))
      inserted+=1
