@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, request, redirect, session, render_template_string, flash, send_file
-import sqlite3, os, hashlib, hmac, io, csv, shutil, json, tempfile
+import sqlite3, os, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess
 from datetime import datetime
 
 BASE=os.path.dirname(os.path.abspath(__file__))
@@ -61,6 +61,7 @@ def init():
  CREATE TABLE IF NOT EXISTS objectives(id INTEGER PRIMARY KEY,terrain_id INTEGER NOT NULL,study_year INTEGER NOT NULL,objective TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS dems_archive(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL UNIQUE,success_date TEXT NOT NULL,profile_json TEXT NOT NULL,history_json TEXT NOT NULL,archived_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,username TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('super_admin','user')),active INTEGER NOT NULL DEFAULT 1,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+ CREATE TABLE IF NOT EXISTS import_previews(id INTEGER PRIMARY KEY,owner TEXT NOT NULL,rows_json TEXT NOT NULL,errors_json TEXT NOT NULL,filename TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  """)
  y=str(datetime.now().year)+"-"+str(datetime.now().year+1)
  c.execute("INSERT OR IGNORE INTO settings VALUES('year',?)",(y,))
@@ -80,7 +81,7 @@ def boot():
  if not getattr(app,"_ready",False): init(); app._ready=True
 def page(body,**kw):
  lang=session.get("lang","ar")
- shell="""<!doctype html><html lang="{{lang}}" dir="{{'rtl' if lang=='ar' else 'ltr'}}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{t('app')}}</title><style>body{font-family:Arial,sans-serif;background:#f1f5f9;margin:0;color:#182b3d}header{background:#164e83;color:white;padding:15px}main{max-width:1050px;margin:auto;padding:12px}nav{display:flex;gap:6px;overflow:auto;background:white;padding:10px}a,button{background:#164e83;color:white;padding:9px 12px;border:0;border-radius:7px;text-decoration:none;display:inline-block;white-space:nowrap}section{background:white;padding:13px;border:1px solid #d7e1eb;border-radius:10px;margin:10px 0}input,select{font:inherit;padding:9px;border:1px solid #bccada;border-radius:7px;width:100%;box-sizing:border-box;margin:4px 0 9px}label{display:block}table{border-collapse:collapse;width:100%;min-width:540px}td,th{text-align:start;border-bottom:1px solid #ddd;padding:8px}.wrap{overflow:auto}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}.msg{background:#fff0c2;padding:10px;border-radius:7px}.good{color:green}.bad{color:#b21d1d}.muted{color:#526274}@media(max-width:600px){main{padding:7px}header{font-size:14px}}</style><header><h2>{{t('app')}}</h2>{{t('year')}}: {{year}}</header>{% if user %}<nav><a href="/">{{t('home')}}</a><a href="/residents">{{t('residents')}}</a><a href="/terrains">{{t('terrains')}}</a><a href="/capacities">{{t('capacities')}}</a><a href="/assign">{{t('assign')}}</a><a href="/history">{{t('history')}}</a><a href="/summary">{{t('summary')}}</a><a href="/decisions">{{t('decisions')}}</a><a href="/users">Users</a><a href="/objectives">Objectives</a><a href="/exams">Exams</a><a href="/dems">DEMS</a><a href="/audit">Audit</a><a href="/settings">{{t('settings')}}</a><a href="/export">{{t('export')}}</a><a href="/backup">{{t('backup')}}</a><a href="/restore">Restore</a><a href="/logout">{{t('logout')}}</a></nav>{% endif %}<main>{% for m in get_flashed_messages() %}<p class="msg">{{m}}</p>{% endfor %}{{body|safe}}</main></html>"""
+ shell="""<!doctype html><html lang="{{lang}}" dir="{{'rtl' if lang=='ar' else 'ltr'}}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{t('app')}}</title><style>body{font-family:Arial,sans-serif;background:#f1f5f9;margin:0;color:#182b3d}header{background:#164e83;color:white;padding:15px}main{max-width:1050px;margin:auto;padding:12px}nav{display:flex;gap:6px;overflow:auto;background:white;padding:10px}a,button{background:#164e83;color:white;padding:9px 12px;border:0;border-radius:7px;text-decoration:none;display:inline-block;white-space:nowrap}section{background:white;padding:13px;border:1px solid #d7e1eb;border-radius:10px;margin:10px 0}input,select{font:inherit;padding:9px;border:1px solid #bccada;border-radius:7px;width:100%;box-sizing:border-box;margin:4px 0 9px}label{display:block}table{border-collapse:collapse;width:100%;min-width:540px}td,th{text-align:start;border-bottom:1px solid #ddd;padding:8px}.wrap{overflow:auto}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}.msg{background:#fff0c2;padding:10px;border-radius:7px}.good{color:green}.bad{color:#b21d1d}.muted{color:#526274}@media(max-width:600px){main{padding:7px}header{font-size:14px}}</style><header><h2>{{t('app')}}</h2>{{t('year')}}: {{year}}</header>{% if user %}<nav><a href="/">{{t('home')}}</a><a href="/residents">{{t('residents')}}</a><a href="/terrains">{{t('terrains')}}</a><a href="/capacities">{{t('capacities')}}</a><a href="/assign">{{t('assign')}}</a><a href="/history">{{t('history')}}</a><a href="/summary">{{t('summary')}}</a><a href="/decisions">{{t('decisions')}}</a><a href="/users">Users</a><a href="/import">Import</a><a href="/objectives">Objectives</a><a href="/exams">Exams</a><a href="/dems">DEMS</a><a href="/audit">Audit</a><a href="/settings">{{t('settings')}}</a><a href="/export">{{t('export')}}</a><a href="/backup">{{t('backup')}}</a><a href="/restore">Restore</a><a href="/logout">{{t('logout')}}</a></nav>{% endif %}<main>{% for m in get_flashed_messages() %}<p class="msg">{{m}}</p>{% endfor %}{{body|safe}}</main></html>"""
  context={"t":tr,"lang":lang,"year":setting(db(),"year")}
  context.update(kw)
  inner=render_template_string(body,**context)
@@ -323,6 +324,135 @@ def audit_log():
  if super_guard(): return super_guard()
  c=db(); rows=c.execute("SELECT * FROM audit ORDER BY id DESC LIMIT 300").fetchall(); c.close()
  return page("""<section><h3>Audit log / Journal d’audit / سجل التدقيق</h3><div class="wrap"><table><tr><th>Date</th><th>Actor</th><th>Action</th><th>Details</th></tr>{% for r in rows %}<tr><td>{{r.created_at}}</td><td>{{r.actor}}</td><td>{{r.action}}</td><td>{{r.details}}</td></tr>{% else %}<tr><td colspan="4">{{t('none')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
+def normalize_header(value):
+ value=str(value or "").strip().lower()
+ value=re.sub(r"[\\s_\\-]+"," ",value)
+ aliases={
+  "surname":"surname","nom":"surname","family name":"surname","last name":"surname","اللقب":"surname",
+  "firstname":"firstname","first name":"firstname","prénom":"firstname","prenom":"firstname","given name":"firstname","الاسم":"firstname",
+  "year":"year","study year":"year","année":"year","annee":"year","niveau":"year","السنة":"year",
+  "phone":"phone","telephone":"phone","téléphone":"phone","mobile":"phone","الهاتف":"phone",
+  "birth place":"birth_place","lieu de naissance":"birth_place","مكان الميلاد":"birth_place",
+  "birth date":"birth_date","date de naissance":"birth_date","تاريخ الميلاد":"birth_date"
+ }
+ return aliases.get(value,value.replace(" ","_"))
+def parse_import_file(path, extension):
+ rows=[]
+ if extension==".csv":
+  with open(path,"r",encoding="utf-8-sig",newline="") as handle:
+   sample=handle.read(4096); handle.seek(0)
+   try: dialect=csv.Sniffer().sniff(sample,delimiters=",;\\t")
+   except csv.Error: dialect=csv.excel
+   rows=list(csv.reader(handle,dialect))
+ elif extension in (".xlsx",".xls"):
+  if extension==".xlsx":
+   from openpyxl import load_workbook
+   book=load_workbook(path,read_only=True,data_only=True)
+   rows=[list(row) for row in book.active.iter_rows(values_only=True)]
+   book.close()
+  else:
+   import xlrd
+   book=xlrd.open_workbook(path)
+   sheet=book.sheet_by_index(0)
+   rows=[[sheet.cell_value(r,c) for c in range(sheet.ncols)] for r in range(sheet.nrows)]
+ elif extension==".docx":
+  from docx import Document
+  doc=Document(path)
+  for table in doc.tables:
+   rows.extend([[cell.text.strip() for cell in row.cells] for row in table.rows])
+  if not rows:
+   rows=[re.split(r"\\s*[,;\\t]\\s*",p.text.strip()) for p in doc.paragraphs if p.text.strip()]
+ elif extension==".pdf":
+  from pypdf import PdfReader
+  text_content="\\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
+  if not text_content.strip(): raise ValueError("The PDF has no extractable text (it may be scanned). Please provide a text-based PDF or spreadsheet.")
+  lines=[line.strip() for line in text_content.splitlines() if line.strip()]
+  delimiter=";" if sum(x.count(";") for x in lines)>sum(x.count(",") for x in lines) else ("\\t" if any("\\t" in x for x in lines) else ",")
+  rows=[next(csv.reader([line],delimiter=delimiter)) for line in lines]
+ elif extension==".doc":
+  result=subprocess.run(["antiword",path],capture_output=True,text=True,check=True)
+  lines=[line.strip() for line in result.stdout.splitlines() if line.strip()]
+  rows=[re.split(r"\\s*[,;\\t]\\s*",line) for line in lines]
+ if not rows: raise ValueError("No table rows could be read from this file.")
+ header=[normalize_header(x) for x in rows[0]]
+ required={"surname","firstname","year"}
+ if not required.issubset(set(header)):
+  raise ValueError("Missing required columns. Include surname/nom/اللقب, firstname/prénom/الاسم, and year/année/السنة in the first row.")
+ parsed=[]
+ for line_number,values in enumerate(rows[1:],start=2):
+  if not any(str(x or "").strip() for x in values): continue
+  item={}
+  for i,key in enumerate(header):
+   if key and i<len(values): item[key]=str(values[i] if values[i] is not None else "").strip()
+  item["_row"]=line_number
+  parsed.append(item)
+ if not parsed: raise ValueError("The file contains headers but no resident rows.")
+ return parsed
+@app.route("/import",methods=["GET","POST"])
+def import_residents():
+ if super_guard(): return super_guard()
+ c=db()
+ if request.method=="POST":
+  action=request.form.get("action","upload")
+  if action in ("confirm","cancel"):
+   preview_id=request.form.get("preview_id",type=int)
+   preview=c.execute("SELECT * FROM import_previews WHERE id=? AND owner=?",(preview_id,session["user"])).fetchone()
+   if not preview:
+    c.close(); flash("Import preview expired or not found."); return redirect("/import")
+   if action=="cancel":
+    c.execute("DELETE FROM import_previews WHERE id=?",(preview_id,)); c.commit(); c.close(); flash("Import cancelled."); return redirect("/import")
+   rows=json.loads(preview["rows_json"]); errors=json.loads(preview["errors_json"])
+   if errors:
+    c.close(); flash("Fix the invalid rows in the source file before importing."); return redirect("/import")
+   inserted=0
+   for row in rows:
+    c.execute("INSERT INTO residents(surname,firstname,year,phone,birth_place,birth_date,status) VALUES(?,?,?,?,?,?, 'active')",
+      (row["surname"],row["firstname"],int(row["year"]),row.get("phone",""),row.get("birth_place",""),row.get("birth_date","")))
+    inserted+=1
+   audit_event(c,"residents.imported",f"filename={preview['filename']}; imported={inserted}; history_not_imported=true")
+   c.execute("DELETE FROM import_previews WHERE id=?",(preview_id,)); c.commit(); c.close()
+   flash(f"Imported {inserted} residents. No past rotations were invented or imported.")
+   return redirect("/residents")
+  upload=request.files.get("file")
+  if not upload or not upload.filename:
+   c.close(); flash("Choose a file first."); return redirect("/import")
+  filename=os.path.basename(upload.filename); extension=os.path.splitext(filename)[1].lower()
+  allowed={".csv",".xlsx",".xls",".docx",".doc",".pdf"}
+  if extension not in allowed:
+   c.close(); flash("Supported formats: CSV, XLS/XLSX, DOC/DOCX and text-based PDF."); return redirect("/import")
+  staged=None
+  try:
+   with tempfile.NamedTemporaryFile(prefix="rotation_import_",suffix=extension,dir=os.path.dirname(os.path.abspath(DB)),delete=False) as temp:
+    staged=temp.name; upload.save(staged)
+   rows=parse_import_file(staged,extension)
+   errors=[]; seen=set()
+   for row in rows:
+    row_errors=[]
+    surname=row.get("surname","").strip(); firstname=row.get("firstname","").strip()
+    if not surname or not firstname: row_errors.append("Surname and first name are required.")
+    try:
+     year=int(float(row.get("year","")))
+     if year not in (1,2,3,4): raise ValueError()
+     row["year"]=year
+    except (ValueError,TypeError): row_errors.append("Year must be 1, 2, 3 or 4.")
+    row["surname"]=surname; row["firstname"]=firstname
+    key=(surname.casefold(),firstname.casefold(),row.get("year"))
+    if key in seen: row_errors.append("Duplicate resident row in this file.")
+    seen.add(key)
+    exists=c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=?",(surname,firstname,row.get("year",0))).fetchone()
+    if exists: row_errors.append("Resident with same name and year already exists.")
+    if row_errors: errors.append({"row":row.get("_row"),"message":" ".join(row_errors)})
+   c.execute("DELETE FROM import_previews WHERE created_at < datetime('now','-1 day')")
+   c.execute("INSERT INTO import_previews(owner,rows_json,errors_json,filename) VALUES(?,?,?,?)",(session["user"],json.dumps(rows,ensure_ascii=False),json.dumps(errors,ensure_ascii=False),filename))
+   preview_id=c.execute("SELECT last_insert_rowid()").fetchone()[0]; c.commit()
+   preview=c.execute("SELECT * FROM import_previews WHERE id=?",(preview_id,)).fetchone(); c.close()
+   return page("""<section><h3>Import preview / Aperçu / معاينة الاستيراد</h3><p>File: {{filename}} — {{rows|length}} rows. Past stages/history will not be fabricated.</p>{% if errors %}<p class="bad">Validation errors: {{errors|length}}. Correct the source file and upload again; no rows can be imported while errors remain.</p>{% endif %}<div class="wrap"><table><tr><th>Row</th><th>Surname</th><th>First name</th><th>Year</th><th>Phone</th><th>Validation</th></tr>{% for row in rows %}<tr><td>{{row._row}}</td><td>{{row.surname}}</td><td>{{row.firstname}}</td><td>{{row.year}}</td><td>{{row.phone or ''}}</td><td>{% for e in errors if e.row==row._row %}<span class="bad">{{e.message}}</span>{% else %}<span class="good">OK</span>{% endfor %}</td></tr>{% endfor %}</table></div><form method="post"><input type="hidden" name="preview_id" value="{{preview_id}}"><button name="action" value="confirm" {% if errors %}disabled{% endif %}>Confirm import / Confirmer / تأكيد</button> <button name="action" value="cancel">Cancel / Annuler / إلغاء</button></form></section>""",filename=filename,rows=rows,errors=errors,preview_id=preview_id)
+  except Exception as exc:
+   c.close(); flash("Could not read/validate the file: "+str(exc)[:250]); return redirect("/import")
+  finally:
+   if staged and os.path.exists(staged): os.remove(staged)
+ c.close()
+ return page("""<section><h3>Import resident list / Importer les résidents / استيراد قائمة المقيمين</h3><p>Supported formats: CSV, XLS, XLSX, DOC, DOCX and text-based PDF. The first row must contain columns for surname, first name and study year. Review the preview before confirming. Only resident profile fields are imported; historical stages are never invented.</p><form method="post" enctype="multipart/form-data"><input type="file" name="file" accept=".csv,.xls,.xlsx,.doc,.docx,.pdf" required><button>Upload and preview / Charger et prévisualiser / رفع ومعاينة</button></form></section>""")
 @app.route("/profile/<int:rid>",methods=["GET","POST"])
 def resident_profile(rid):
  if guard(): return redirect("/login")
