@@ -7,6 +7,7 @@ import app as rotation_app
 
 
 def setup_client(tmp_path, monkeypatch):
+    monkeypatch.setenv("ROTATION_INITIAL_PASSWORD", "test-strong-password-2026")
     monkeypatch.setattr(rotation_app, "DB", str(tmp_path / "test_rotation.db"))
     monkeypatch.setattr(rotation_app.app, "_ready", False, raising=False)
     rotation_app.app.config.update(TESTING=True, SECRET_KEY="test-only-secret")
@@ -14,7 +15,7 @@ def setup_client(tmp_path, monkeypatch):
 
 
 def login(client):
-    return client.post("/login", data={"password": "Benhocine-ChangeMe-2026"}, follow_redirects=True)
+    return client.post("/login", data={"password": "test-strong-password-2026"}, follow_redirects=True)
 
 
 def test_login_page_and_language_selector(tmp_path, monkeypatch):
