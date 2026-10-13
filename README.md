@@ -1,6 +1,6 @@
-# rotation-app
+# Resistage — resident rotation management
 
-Resident rotation management app for CHU Nedir Mohamed — Flask/SQLite with an Android WebView wrapper.
+Resident rotation management app for CHU Nedir Mohamed — Flask/SQLite with an Android WebView wrapper, branded Resistage.
 
 ## Documentation
 
