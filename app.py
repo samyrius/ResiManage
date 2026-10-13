@@ -198,13 +198,13 @@ def assign():
    else:
     old=c.execute("SELECT id,status FROM assignments WHERE resident_id=? AND period_id=?",(rid,pid)).fetchone()
     if old and old["status"] not in ("rejected","cancelled"): flash(tr("duplicate"))
-     elif old:
-      c.execute("UPDATE assignments SET terrain_id=?,status=? WHERE id=?",(tid,status,old["id"]))
-      audit(c,"assignment_reopened",f"assignment_id={old['id']};resident_id={rid};terrain_id={tid};period_id={pid};status={status}")
-      c.commit(); flash(msg)
-     else:
-      c.execute("INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,?)",(rid,tid,pid,status))
-      audit(c,"assignment_created",f"resident_id={rid};terrain_id={tid};period_id={pid};status={status}")
+    elif old:
+     c.execute("UPDATE assignments SET terrain_id=?,status=? WHERE id=?",(tid,status,old["id"]))
+     audit(c,"assignment_reopened",f"assignment_id={old['id']};resident_id={rid};terrain_id={tid};period_id={pid};status={status}")
+     c.commit(); flash(msg)
+    else:
+     c.execute("INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,?)",(rid,tid,pid,status))
+     audit(c,"assignment_created",f"resident_id={rid};terrain_id={tid};period_id={pid};status={status}")
       c.commit(); flash(msg)
   except Exception: c.rollback(); flash("Invalid assignment / Affectation invalide / تعيين غير صالح")
  rs=c.execute("SELECT * FROM residents WHERE status='active' ORDER BY year DESC,surname").fetchall(); ts=c.execute("SELECT * FROM terrains ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END, name").fetchall(); ps=c.execute("SELECT * FROM periods WHERE year_label=? ORDER BY id",(y,)).fetchall()
