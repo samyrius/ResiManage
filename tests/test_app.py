@@ -107,17 +107,25 @@ def test_post_without_csrf_token_is_rejected(client):
 
 
 def test_invalid_password_does_not_authenticate(client):
-    page = client.get("/login")
-    token = csrf_token(page)
-    response = client.post(
+    setup_page = client.get("/login")
+    setup_token = csrf_token(setup_page)
+    client.post(
         "/login",
         data={
-            "_csrf_token": token,
-            "password": "A-secure-but-wrong-password",
-            "password_confirm": "A-secure-but-wrong-password",
+            "_csrf_token": setup_token,
+            "password": "A-secure-test-password-2026",
+            "password_confirm": "A-secure-test-password-2026",
         },
+    )
+    client.get("/logout")
+
+    login_page = client.get("/login")
+    token = csrf_token(login_page)
+    response = client.post(
+        "/login",
+        data={"_csrf_token": token, "password": "A-secure-but-wrong-password"},
     )
 
     assert response.status_code == 200
     assert b'name="password"' in response.data
-    assert "12".encode() in response.data
+    assert "Incorrect password".encode() in response.data
