@@ -164,3 +164,49 @@ def test_capacity_limit_is_enforced_for_two_residents(tmp_path, monkeypatch):
             (terrain_id, period_id),
         ).fetchone()[0]
     assert count == 1
+
+
+def test_repeat_is_blocked_until_all_core_terrains_are_completed(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname, firstname, year) VALUES(?,?,?)",
+            ("RepeatRule", "Resident", 4),
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='RepeatRule'").fetchone()[0]
+        target = conn.execute(
+            "SELECT id FROM terrains WHERE name='Réanimation chirurgicale'"
+        ).fetchone()[0]
+        period_id = conn.execute("SELECT id FROM periods ORDER BY id LIMIT 1").fetchone()[0]
+        year_label = conn.execute("SELECT year_label FROM periods WHERE id=?", (period_id,)).fetchone()[0]
+        conn.execute(
+            "INSERT INTO capacities(year_label, terrain_id, period_id, places) VALUES(?,?,?,2)",
+            (year_label, target, period_id),
+        )
+        conn.execute(
+            "INSERT INTO history(resident_id, terrain_id, year_label, period, date_done) VALUES(?,?,?,?,?)",
+            (rid, target, "2025-2026", "01 Fév - 30 Avr", "2026-04-30"),
+        )
+
+    with rotation_app.db() as conn:
+        allowed, message, status = rotation_app.check(conn, rid, target, period_id, year_label)
+        assert allowed is False
+        assert "التربص منجز سابقاً" in message
+
+        conn.execute(
+            """
+            INSERT INTO history(resident_id, terrain_id, year_label, period, date_done)
+            SELECT ?, id, '2025-2026', 'historique', '2026-04-30'
+            FROM terrains
+            WHERE kind IN ('mandatory', 'basic')
+              AND id NOT IN (SELECT terrain_id FROM history WHERE resident_id=?)
+            """,
+            (rid, rid),
+        )
+
+    with rotation_app.db() as conn:
+        allowed, message, status = rotation_app.check(conn, rid, target, period_id, year_label)
+    assert allowed is True
+    assert status == "confirmed"
+    assert "يمكن التكرار" in message
