@@ -552,7 +552,7 @@ def exams():
    flash("Resident not found")
   elif action=="record":
    module=request.form["module"].strip(); theory=float(request.form["theory"]); practical=float(request.form["practical"])
-   if not module or not (0<=theory<=20 and 0<=practical<=20):
+   if sy not in (1,2,3,4) or not module or not (0<=theory<=20 and 0<=practical<=20):
     flash("Module and marks from 0 to 20 are required")
    else:
     existing=c.execute("SELECT id FROM exam_records WHERE resident_id=? AND study_year=? AND lower(module)=lower(?)",(rid,sy,module)).fetchone()
