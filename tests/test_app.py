@@ -14,6 +14,7 @@ import app as rotation_app
 def client(tmp_path, monkeypatch):
     test_db = tmp_path / "rotation-test.db"
     monkeypatch.setattr(rotation_app, "DB", str(test_db))
+    monkeypatch.setattr(rotation_app, "UPLOAD_DIR", str(tmp_path / "uploads" / "residents"))
     monkeypatch.delenv("ROTATION_INITIAL_PASSWORD", raising=False)
     monkeypatch.setattr(rotation_app.app, "_ready", False, raising=False)
     rotation_app.app.config.update(TESTING=True, SECRET_KEY="test-only-secret")
@@ -582,3 +583,37 @@ def test_year_four_dems_archive_requires_both_named_super_admins(client):
     assert archived["approved_by"] == "benhocine,drdris"
     assert votes == 2
     assert client.get("/dems-archive").status_code == 200
+
+
+def test_resident_photo_is_private_and_included_in_backup(client):
+    import io
+    import zipfile
+
+    with rotation_app.db() as connection:
+        resident_id = connection.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES('Photo','Resident',2)"
+        ).lastrowid
+        connection.commit()
+    authenticated(client)
+    page = client.get(f"/profiles/{resident_id}")
+    png = b"\x89PNG\r\n\x1a\n" + b"test-image-bytes"
+    response = client.post(
+        f"/profiles/{resident_id}",
+        data={
+            "_csrf_token": csrf_token(page),
+            "action": "photo",
+            "photo": (io.BytesIO(png), "resident.png"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200
+    image_response = client.get(f"/resident-photo/{resident_id}")
+    assert image_response.status_code == 200
+    assert image_response.data.startswith(b"\x89PNG\r\n\x1a\n")
+
+    backup = client.get("/backup")
+    assert backup.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(backup.data)) as archive:
+        names = archive.namelist()
+        assert "rotation.db" in names
+        assert any(name.startswith("uploads/residents/") for name in names)
