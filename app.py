@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-from flask import Flask, request, redirect, session, render_template_string, flash, send_file
+from flask import Flask, request, redirect, session, render_template_string, flash, send_file, send_from_directory
 import sqlite3, os, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess
 from datetime import datetime
+from werkzeug.utils import secure_filename
 
 BASE=os.path.dirname(os.path.abspath(__file__))
 DB=os.path.join(BASE,"rotation.db")
@@ -453,22 +454,42 @@ def import_residents():
    if staged and os.path.exists(staged): os.remove(staged)
  c.close()
  return page("""<section><h3>Import resident list / Importer les résidents / استيراد قائمة المقيمين</h3><p>Supported formats: CSV, XLS, XLSX, DOC, DOCX and text-based PDF. The first row must contain columns for surname, first name and study year. Review the preview before confirming. Only resident profile fields are imported; historical stages are never invented.</p><form method="post" enctype="multipart/form-data"><input type="file" name="file" accept=".csv,.xls,.xlsx,.doc,.docx,.pdf" required><button>Upload and preview / Charger et prévisualiser / رفع ومعاينة</button></form></section>""")
+@app.get("/photos/<filename>")
+def resident_photo(filename):
+ if guard(): return redirect("/login")
+ safe=secure_filename(filename)
+ if safe!=filename or not safe.startswith("resident_") or os.path.splitext(safe)[1].lower() not in (".png",".jpg",".jpeg",".webp"): return ("Not found",404)
+ directory=os.path.join(os.path.dirname(os.path.abspath(DB)),"resident_photos")
+ return send_from_directory(directory,safe)
 @app.route("/profile/<int:rid>",methods=["GET","POST"])
 def resident_profile(rid):
  if guard(): return redirect("/login")
  c=db(); r=c.execute("SELECT * FROM residents WHERE id=?",(rid,)).fetchone()
  if not r: c.close(); return ("Resident not found",404)
  if request.method=="POST":
+  photo_path=request.form.get("photo_path","").strip()
+  photo_file=request.files.get("photo")
+  if photo_file and photo_file.filename:
+   ext=os.path.splitext(secure_filename(photo_file.filename))[1].lower()
+   if ext not in (".png",".jpg",".jpeg",".webp"):
+    c.close(); flash("Photo must be PNG, JPG or WEBP."); return redirect("/profile/"+str(rid))
+   photo_file.stream.seek(0,os.SEEK_END); photo_size=photo_file.stream.tell(); photo_file.stream.seek(0)
+   if photo_size>4*1024*1024:
+    c.close(); flash("Photo must be 4 MB or smaller."); return redirect("/profile/"+str(rid))
+   photo_dir=os.path.join(os.path.dirname(os.path.abspath(DB)),"resident_photos"); os.makedirs(photo_dir,exist_ok=True)
+   photo_name="resident_"+str(rid)+"_"+str(int(datetime.now().timestamp()))+ext
+   photo_file.save(os.path.join(photo_dir,photo_name)); photo_path="/photos/"+photo_name
   c.execute("UPDATE residents SET birth_place=?,birth_date=?,photo_path=?,phone=? WHERE id=?",
-   (request.form.get("birth_place","").strip(),request.form.get("birth_date",""),request.form.get("photo_path","").strip(),request.form.get("phone","").strip(),rid))
-  audit_event(c,"resident.profile_updated",f"resident_id={rid}")
+   (request.form.get("birth_place","").strip(),request.form.get("birth_date",""),photo_path,request.form.get("phone","").strip(),rid))
+  audit_event(c,"resident.profile_updated",f"resident_id={rid}; photo_uploaded={bool(photo_file and photo_file.filename)}")
   c.commit(); r=c.execute("SELECT * FROM residents WHERE id=?",(rid,)).fetchone(); flash(tr("done"))
  history_rows=c.execute("SELECT h.*,t.name terrain FROM history h JOIN terrains t ON t.id=h.terrain_id WHERE h.resident_id=? ORDER BY h.id DESC",(rid,)).fetchall()
  assignment_rows=c.execute("SELECT a.status,p.name period,p.year_label,t.name terrain FROM assignments a JOIN periods p ON p.id=a.period_id JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=? ORDER BY p.year_label DESC,p.id",(rid,)).fetchall()
  objectives=c.execute("SELECT o.*,t.name terrain FROM objectives o JOIN terrains t ON t.id=o.terrain_id ORDER BY o.study_year,t.name").fetchall()
+ exam_rows=c.execute("SELECT * FROM exam_records WHERE resident_id=? ORDER BY study_year,module",(rid,)).fetchall()
  done={x[0] for x in c.execute("SELECT terrain_id FROM history WHERE resident_id=? UNION SELECT terrain_id FROM assignments WHERE resident_id=? AND status='confirmed'",(rid,rid)).fetchall()}
  terrains=c.execute("SELECT * FROM terrains ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END,name").fetchall(); c.close()
- return page("""<section><h3>{{r.surname}} {{r.firstname}} — Resident profile / Profil / الملف</h3><p>Year: {{r.year}} · Status: {{r.status}}</p>{% if r.photo_path %}<p><img src="{{r.photo_path}}" alt="Resident photo" style="max-width:140px;max-height:140px"></p>{% endif %}<form method="post"><label>Birth place / Lieu de naissance / مكان الميلاد</label><input name="birth_place" value="{{r.birth_place or ''}}"><label>Birth date / Date de naissance / تاريخ الميلاد</label><input type="date" name="birth_date" value="{{r.birth_date or ''}}"><label>Phone / Téléphone / الهاتف</label><input name="phone" value="{{r.phone or ''}}"><label>Photo URL/path / Photo / رابط الصورة</label><input name="photo_path" value="{{r.photo_path or ''}}"><button>Save / Enregistrer / حفظ</button></form><p><a href="/exams?resident={{r.id}}">Exams / Examens / الامتحانات</a> · <a href="/dems">DEMS archive</a></p></section><section><h3>Terrain progress / Avancement / تقدم التربصات</h3><div class="wrap"><table><tr><th>Terrain</th><th>Status</th></tr>{% for t in terrains %}<tr><td>{{t.name}}</td><td class="{{'bad' if t.id in done else 'good'}}">{{'Completed / Effectué / مكتمل' if t.id in done else 'Remaining / À faire / متبقٍ'}}</td></tr>{% endfor %}</table></div></section><section><h3>Assignments and history / Affectations et historique / التوزيعات والتاريخ</h3>{% for a in assignment_rows %}<p>{{a.year_label}} — {{a.period}} — {{a.terrain}} ({{a.status}})</p>{% endfor %}{% for h in history_rows %}<p>{{h.year_label}} — {{h.period}} — {{h.terrain}} — {{h.date_done}}</p>{% endfor %}</section><section><h3>Objectives / Objectifs / الأهداف</h3>{% for o in objectives %}<p>Year {{o.study_year}} — {{o.terrain}}: {{o.objective}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",r=r,terrains=terrains,done=done,assignment_rows=assignment_rows,history_rows=history_rows,objectives=objectives)
+ return page("""<section><h3>{{r.surname}} {{r.firstname}} — Resident profile / Profil / الملف</h3><p>Year: {{r.year}} · Status: {{r.status}}</p>{% if r.photo_path %}<p><img src="{{r.photo_path}}" alt="Resident photo" style="max-width:140px;max-height:140px"></p>{% endif %}<form method="post"><label>Birth place / Lieu de naissance / مكان الميلاد</label><input name="birth_place" value="{{r.birth_place or ''}}"><label>Birth date / Date de naissance / تاريخ الميلاد</label><input type="date" name="birth_date" value="{{r.birth_date or ''}}"><label>Phone / Téléphone / الهاتف</label><input name="phone" value="{{r.phone or ''}}"><label>Photo URL/path / Photo / رابط الصورة</label><input name="photo_path" value="{{r.photo_path or ''}}"><label>Upload photo (PNG/JPG/WEBP, max 4 MB)</label><input type="file" name="photo" accept="image/png,image/jpeg,image/webp"><button>Save / Enregistrer / حفظ</button></form><p><a href="/exams?resident={{r.id}}">Exams / Examens / الامتحانات</a> · <a href="/dems">DEMS archive</a></p></section><section><h3>Terrain progress / Avancement / تقدم التربصات</h3><div class="wrap"><table><tr><th>Terrain</th><th>Status</th></tr>{% for t in terrains %}<tr><td>{{t.name}}</td><td class="{{'bad' if t.id in done else 'good'}}">{{'Completed / Effectué / مكتمل' if t.id in done else 'Remaining / À faire / متبقٍ'}}</td></tr>{% endfor %}</table></div></section><section><h3>Assignments and history / Affectations et historique / التوزيعات والتاريخ</h3>{% for a in assignment_rows %}<p>{{a.year_label}} — {{a.period}} — {{a.terrain}} ({{a.status}})</p>{% endfor %}{% for h in history_rows %}<p>{{h.year_label}} — {{h.period}} — {{h.terrain}} — {{h.date_done}}</p>{% endfor %}</section><section><h3>Exam scores / Notes d’examen / علامات الامتحان</h3><div class="wrap"><table><tr><th>Study year</th><th>Module</th><th>Theory</th><th>Practical</th></tr>{% for e in exam_rows %}<tr><td>{{e.study_year}}</td><td>{{e.module}}</td><td>{{e.theory}}/20</td><td>{{e.practical}}/20</td></tr>{% else %}<tr><td colspan="4">{{t('none')}}</td></tr>{% endfor %}</table></div></section><section><h3>Objectives / Objectifs / الأهداف</h3>{% for o in objectives %}<p>Year {{o.study_year}} — {{o.terrain}}: {{o.objective}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",r=r,terrains=terrains,done=done,assignment_rows=assignment_rows,history_rows=history_rows,objectives=objectives,exam_rows=exam_rows)
 @app.route("/objectives",methods=["GET","POST"])
 def manage_objectives():
  if super_guard(): return super_guard()
