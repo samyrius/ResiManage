@@ -472,6 +472,7 @@ def resident_profile(rid):
  c=db(); r=c.execute("SELECT * FROM residents WHERE id=?",(rid,)).fetchone()
  if not r: c.close(); return ("Resident not found",404)
  if request.method=="POST":
+  if session.get("role")!="super_admin": c.close(); return ("Forbidden — Super Admin only",403)
   photo_path=request.form.get("photo_path","").strip()
   photo_file=request.files.get("photo")
   if photo_file and photo_file.filename:
@@ -568,8 +569,9 @@ def dems():
   else:
    hist=c.execute("SELECT h.*,t.name terrain FROM history h JOIN terrains t ON t.id=h.terrain_id WHERE h.resident_id=?",(rid,)).fetchall()
    asgs=c.execute("SELECT a.*,p.name period,p.year_label,t.name terrain FROM assignments a JOIN periods p ON p.id=a.period_id JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=?",(rid,)).fetchall()
+   exams_snapshot=c.execute("SELECT * FROM exam_records WHERE resident_id=? ORDER BY study_year,module",(rid,)).fetchall()
    profile={k:r[k] for k in r.keys()}
-   c.execute("INSERT INTO dems_archive(resident_id,success_date,profile_json,history_json) VALUES(?,?,?,?)",(rid,success_date,json.dumps(profile,ensure_ascii=False),json.dumps({"history":[dict(x) for x in hist],"assignments":[dict(x) for x in asgs]},ensure_ascii=False)))
+   c.execute("INSERT INTO dems_archive(resident_id,success_date,profile_json,history_json) VALUES(?,?,?,?)",(rid,success_date,json.dumps(profile,ensure_ascii=False),json.dumps({"history":[dict(x) for x in hist],"assignments":[dict(x) for x in asgs],"exams":[dict(x) for x in exams_snapshot]},ensure_ascii=False)))
    c.execute("UPDATE residents SET status='graduated',dems_status='success' WHERE id=?",(rid,))
    audit_event(c,"dems.archived",f"resident_id={rid}; success_date={success_date}")
    c.commit(); flash("Resident archived; original records retained.")
