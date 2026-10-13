@@ -467,3 +467,44 @@ def test_admin_account_can_be_created_and_operator_is_restricted(client):
     assert client.get("/settings").status_code == 403
     assert client.get("/audit").status_code == 403
     assert client.get("/residents").status_code == 200
+
+
+def test_admin_account_can_be_created_and_operator_is_restricted(client):
+    page = client.get("/login")
+    response = client.post(
+        "/login",
+        data={
+            "_csrf_token": csrf_token(page),
+            "username": "admin",
+            "password": "A-secure-test-password-2026",
+            "password_confirm": "A-secure-test-password-2026",
+        },
+    )
+    assert response.status_code == 302
+    page = client.get("/users")
+    response = client.post(
+        "/users",
+        data={
+            "_csrf_token": csrf_token(page),
+            "username": "operator1",
+            "display_name": "Rotation Operator",
+            "password": "Operator-secure-password-2026",
+            "role": "operator",
+        },
+    )
+    assert response.status_code == 200
+    with client.session_transaction() as browser_session:
+        browser_session.clear()
+    page = client.get("/login")
+    response = client.post(
+        "/login",
+        data={
+            "_csrf_token": csrf_token(page),
+            "username": "operator1",
+            "password": "Operator-secure-password-2026",
+        },
+    )
+    assert response.status_code == 302
+    assert client.get("/settings").status_code == 403
+    assert client.get("/audit").status_code == 403
+    assert client.get("/residents").status_code == 200
