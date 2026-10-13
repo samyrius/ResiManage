@@ -1,14 +1,26 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, request, redirect, session, render_template_string, flash, send_file, send_from_directory
-import sqlite3, os, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess
+import sqlite3, os, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess, secrets
 from datetime import datetime
 from werkzeug.utils import secure_filename
 
 BASE=os.path.dirname(os.path.abspath(__file__))
 DB=os.path.join(BASE,"rotation.db")
+def local_secret_key():
+ path=os.path.join(BASE,".rotation_secret")
+ try:
+  with open(path,"r",encoding="ascii") as handle: return handle.read().strip()
+ except FileNotFoundError:
+  value=secrets.token_hex(32)
+  try:
+   fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+   with os.fdopen(fd,"w",encoding="ascii") as handle: handle.write(value)
+   return value
+  except FileExistsError:
+   with open(path,"r",encoding="ascii") as handle: return handle.read().strip()
 app=Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"]=25*1024*1024
-app.secret_key=os.environ.get("ROTATION_SECRET") or os.urandom(32)
+app.secret_key=os.environ.get("ROTATION_SECRET") or local_secret_key()
 LANGS=("ar","fr","en")
 D={
 "ar":{"app":"تسيير تربصات الأطباء المقيمين","home":"الرئيسية","residents":"المقيمون","terrains":"المصالح","capacities":"المقاعد","assign":"التوزيع","history":"التاريخ","summary":"ملخص المقيمين","decisions":"القرارات","settings":"الإعدادات","logout":"خروج","login":"دخول المسؤول","password":"كلمة المرور","signin":"دخول","badpass":"كلمة المرور غير صحيحة","year":"السنة الجامعية","resident":"المقيم","surname":"اللقب","firstname":"الاسم","study_year":"السنة","phone":"الهاتف","repeat":"يعيد السنة","status":"الحالة","active":"نشط","inactive":"غير نشط","add":"إضافة","save":"حفظ","terrain":"المصلحة","kind":"النوع","mandatory":"إجباري","basic":"أساسي","optional":"اختياري","mandatory_year":"السنة الإلزامية","any":"حسب البرنامج","period":"الفترة","places":"عدد المقاعد","used":"المستعمل","remaining":"المتبقي","date":"تاريخ الإنجاز","academic_year":"السنة الجامعية","choose":"اختيار","assign_now":"تعيين مقيم","check_save":"التحقق والحفظ","confirmed":"مؤكد","pending":"بانتظار القرار","rejected":"مرفوض","history_add":"تسجيل تربص سابق","reason":"سبب القرار","approve":"موافقة","reject":"رفض","language":"لغة الواجهة","director":"المسؤول","new_password":"كلمة مرور جديدة (اختياري)","change":"حفظ الإعدادات","note":"تغيير اللغة لا يغيّر البيانات المحفوظة.","priority":"الأولوية للسنة الرابعة ثم الثالثة والثانية والأولى.","none":"لا توجد بيانات","capacity_first":"حدّد السعة أولاً لهذه المصلحة والفترة","full":"السعة مكتملة","duplicate":"المقيم مسجّل في نفس الفترة بمصلحة: ","same_terrain_year":"سبق للمقيم إنجاز هذه المصلحة خلال السنة الجامعية في الفترة: ","history_block":"التربص منجز سابقاً؛ يمنع التكرار حتى إكمال جميع المصالح.","history_repeat":"يمكن التكرار لأن المقيم أكمل جميع المصالح.","mismatch":"السنة لا تطابق السنة الإلزامية؛ التعيين بانتظار قرار المسؤول","done":"تم الحفظ","overview":"ملخص التوزيع السنوي","count":"عدد التعيينات","type":"التصنيف" ,"export":"تصدير CSV","backup":"تنزيل نسخة احتياطية","all":"كل المصالح","four":"التعيينات المؤكدة / 4 فترات","waiting":"معلّق"},
@@ -364,9 +376,10 @@ def parse_import_file(path, extension):
  elif extension==".docx":
   from docx import Document
   doc=Document(path)
-  for table in doc.tables:
-   rows.extend([[cell.text.strip() for cell in row.cells] for row in table.rows])
-  if not rows:
+  if doc.tables:
+   table=doc.tables[0]
+   rows=[[cell.text.strip() for cell in row.cells] for row in table.rows]
+  else:
    rows=[re.split(r"[,;\t]+",p.text.strip()) for p in doc.paragraphs if p.text.strip()]
  elif extension==".pdf":
   from pypdf import PdfReader
@@ -448,6 +461,7 @@ def import_residents():
     exists=c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=?",(surname,firstname,row.get("year",0))).fetchone()
     if exists: row_errors.append("Resident with same name and year already exists.")
     if row_errors: errors.append({"row":row.get("row_number"),"message":" ".join(row_errors)})
+   rows.sort(key=lambda row:(row.get("year",99),row.get("surname","").casefold(),row.get("firstname","").casefold()))
    c.execute("DELETE FROM import_previews WHERE created_at < datetime('now','-1 day')")
    c.execute("INSERT INTO import_previews(owner,rows_json,errors_json,filename) VALUES(?,?,?,?)",(session["user"],json.dumps(rows,ensure_ascii=False),json.dumps(errors,ensure_ascii=False),filename))
    preview_id=c.execute("SELECT last_insert_rowid()").fetchone()[0]; c.commit()
