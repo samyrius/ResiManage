@@ -174,3 +174,94 @@ def test_seed_contains_all_19_terrains_and_correct_optional_categories(client):
         "CAC DBK",
     }
     assert by_name["Gynécologie"] != "optional"
+
+
+def test_assignment_requires_capacity_and_rejects_duplicate_period(client):
+    with rotation_app.db() as connection:
+        year_label = rotation_app.setting(connection, "year")
+        resident_id = connection.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES('Test','Resident',2)"
+        ).lastrowid
+        terrain_id = connection.execute(
+            "SELECT id FROM terrains WHERE kind!='optional' ORDER BY id LIMIT 1"
+        ).fetchone()["id"]
+        periods = connection.execute(
+            "SELECT id FROM periods WHERE year_label=? ORDER BY id", (year_label,)
+        ).fetchall()
+        period_id = periods[0]["id"]
+        connection.commit()
+
+        with rotation_app.app.test_request_context("/"):
+            ok, message, status = rotation_app.check(
+                connection, resident_id, terrain_id, period_id, year_label
+            )
+        assert not ok
+        assert "حدّد السعة" in message
+        assert status is None
+
+        connection.execute(
+            "INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,1)",
+            (year_label, terrain_id, period_id),
+        )
+        connection.commit()
+        with rotation_app.app.test_request_context("/"):
+            ok, _, status = rotation_app.check(
+                connection, resident_id, terrain_id, period_id, year_label
+            )
+        assert ok and status == "confirmed"
+
+        connection.execute(
+            "INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",
+            (resident_id, terrain_id, period_id),
+        )
+        connection.commit()
+        with rotation_app.app.test_request_context("/"):
+            ok, message, _ = rotation_app.check(
+                connection, resident_id, terrain_id, period_id, year_label
+            )
+        assert not ok
+        assert "مصلحة" in message
+
+
+def test_repeating_core_terrain_is_blocked_until_all_core_terrains_are_done(client):
+    with rotation_app.db() as connection:
+        year_label = rotation_app.setting(connection, "year")
+        resident_id = connection.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES('Test','Repeater',3)"
+        ).lastrowid
+        core_terrains = connection.execute(
+            "SELECT id FROM terrains WHERE kind IN ('mandatory','basic') ORDER BY id"
+        ).fetchall()
+        terrain_id = core_terrains[0]["id"]
+        periods = connection.execute(
+            "SELECT id FROM periods WHERE year_label=? ORDER BY id", (year_label,)
+        ).fetchall()
+        first_period, second_period = periods[0]["id"], periods[1]["id"]
+        connection.execute(
+            "INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",
+            (resident_id, terrain_id, first_period),
+        )
+        connection.execute(
+            "INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,1)",
+            (year_label, terrain_id, second_period),
+        )
+        connection.commit()
+
+        with rotation_app.app.test_request_context("/"):
+            ok, message, _ = rotation_app.check(
+                connection, resident_id, terrain_id, second_period, year_label
+            )
+        assert not ok
+        assert "سبق للمقيم" in message
+
+        for row in core_terrains[1:]:
+            connection.execute(
+                "INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+                (resident_id, row["id"], year_label, "historique", "2026-01-01"),
+            )
+        connection.commit()
+        with rotation_app.app.test_request_context("/"):
+            ok, _, status = rotation_app.check(
+                connection, resident_id, terrain_id, second_period, year_label
+            )
+        assert ok and status == "confirmed"
