@@ -370,7 +370,7 @@ def parse_import_file(path, extension):
    rows=[re.split(r"[,;\t]+",p.text.strip()) for p in doc.paragraphs if p.text.strip()]
  elif extension==".pdf":
   from pypdf import PdfReader
-  text_content="\\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
+  text_content="\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
   if not text_content.strip(): raise ValueError("The PDF has no extractable text (it may be scanned). Please provide a text-based PDF or spreadsheet.")
   lines=[line.strip() for line in text_content.splitlines() if line.strip()]
   delimiter=";" if sum(x.count(";") for x in lines)>sum(x.count(",") for x in lines) else ("\\t" if any("\\t" in x for x in lines) else ",")
@@ -481,7 +481,7 @@ def resident_profile(rid):
    photo_bytes=photo_file.stream.read(4*1024*1024+1); photo_file.stream.seek(0)
    if len(photo_bytes)>4*1024*1024:
     c.close(); flash("Photo must be 4 MB or smaller."); return redirect("/profile/"+str(rid))
-   valid_image=(ext==".png" and photo_bytes.startswith(b"\\x89PNG\\r\\n\\x1a\\n")) or (ext in (".jpg",".jpeg") and photo_bytes.startswith(b"\\xff\\xd8\\xff")) or (ext==".webp" and len(photo_bytes)>12 and photo_bytes.startswith(b"RIFF") and photo_bytes[8:12]==b"WEBP")
+   valid_image=(ext==".png" and photo_bytes.startswith(b"\x89PNG\r\n\x1a\n")) or (ext in (".jpg",".jpeg") and photo_bytes.startswith(b"\xff\xd8\xff")) or (ext==".webp" and len(photo_bytes)>12 and photo_bytes.startswith(b"RIFF") and photo_bytes[8:12]==b"WEBP")
    if not valid_image:
     c.close(); flash("The uploaded file is not a valid PNG/JPG/WEBP image."); return redirect("/profile/"+str(rid))
    photo_dir=os.path.join(os.path.dirname(os.path.abspath(DB)),"resident_photos"); os.makedirs(photo_dir,exist_ok=True)
