@@ -326,7 +326,7 @@ def audit_log():
  return page("""<section><h3>Audit log / Journal d’audit / سجل التدقيق</h3><div class="wrap"><table><tr><th>Date</th><th>Actor</th><th>Action</th><th>Details</th></tr>{% for r in rows %}<tr><td>{{r.created_at}}</td><td>{{r.actor}}</td><td>{{r.action}}</td><td>{{r.details}}</td></tr>{% else %}<tr><td colspan="4">{{t('none')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
 def normalize_header(value):
  value=str(value or "").strip().lower()
- value=re.sub(r"[\\s_\\-]+"," ",value)
+ value=re.sub(r"[\s_\-]+"," ",value)
  aliases={
   "surname":"surname","nom":"surname","family name":"surname","last name":"surname","اللقب":"surname",
   "firstname":"firstname","first name":"firstname","prénom":"firstname","prenom":"firstname","given name":"firstname","الاسم":"firstname",
@@ -348,7 +348,7 @@ def parse_import_file(path, extension):
   if extension==".xlsx":
    from openpyxl import load_workbook
    book=load_workbook(path,read_only=True,data_only=True)
-   rows=[list(row) for row in book.active.iter_rows(values_only=True)]
+   rows=[list(row) for row in book.active.iterrow_numbers(values_only=True)]
    book.close()
   else:
    import xlrd
@@ -361,7 +361,7 @@ def parse_import_file(path, extension):
   for table in doc.tables:
    rows.extend([[cell.text.strip() for cell in row.cells] for row in table.rows])
   if not rows:
-   rows=[re.split(r"\\s*[,;\\t]\\s*",p.text.strip()) for p in doc.paragraphs if p.text.strip()]
+   rows=[re.split(r"[,;\t]+",p.text.strip()) for p in doc.paragraphs if p.text.strip()]
  elif extension==".pdf":
   from pypdf import PdfReader
   text_content="\\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
@@ -384,7 +384,7 @@ def parse_import_file(path, extension):
   item={}
   for i,key in enumerate(header):
    if key and i<len(values): item[key]=str(values[i] if values[i] is not None else "").strip()
-  item["_row"]=line_number
+  item["row_number"]=line_number
   parsed.append(item)
  if not parsed: raise ValueError("The file contains headers but no resident rows.")
  return parsed
@@ -441,12 +441,12 @@ def import_residents():
     seen.add(key)
     exists=c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=?",(surname,firstname,row.get("year",0))).fetchone()
     if exists: row_errors.append("Resident with same name and year already exists.")
-    if row_errors: errors.append({"row":row.get("_row"),"message":" ".join(row_errors)})
+    if row_errors: errors.append({"row":row.get("row_number"),"message":" ".join(row_errors)})
    c.execute("DELETE FROM import_previews WHERE created_at < datetime('now','-1 day')")
    c.execute("INSERT INTO import_previews(owner,rows_json,errors_json,filename) VALUES(?,?,?,?)",(session["user"],json.dumps(rows,ensure_ascii=False),json.dumps(errors,ensure_ascii=False),filename))
-   preview_id=c.execute("SELECT last_insert_rowid()").fetchone()[0]; c.commit()
+   preview_id=c.execute("SELECT last_insertrow_numberid()").fetchone()[0]; c.commit()
    preview=c.execute("SELECT * FROM import_previews WHERE id=?",(preview_id,)).fetchone(); c.close()
-   return page("""<section><h3>Import preview / Aperçu / معاينة الاستيراد</h3><p>File: {{filename}} — {{rows|length}} rows. Past stages/history will not be fabricated.</p>{% if errors %}<p class="bad">Validation errors: {{errors|length}}. Correct the source file and upload again; no rows can be imported while errors remain.</p>{% endif %}<div class="wrap"><table><tr><th>Row</th><th>Surname</th><th>First name</th><th>Year</th><th>Phone</th><th>Validation</th></tr>{% for row in rows %}<tr><td>{{row._row}}</td><td>{{row.surname}}</td><td>{{row.firstname}}</td><td>{{row.year}}</td><td>{{row.phone or ''}}</td><td>{% for e in errors if e.row==row._row %}<span class="bad">{{e.message}}</span>{% else %}<span class="good">OK</span>{% endfor %}</td></tr>{% endfor %}</table></div><form method="post"><input type="hidden" name="preview_id" value="{{preview_id}}"><button name="action" value="confirm" {% if errors %}disabled{% endif %}>Confirm import / Confirmer / تأكيد</button> <button name="action" value="cancel">Cancel / Annuler / إلغاء</button></form></section>""",filename=filename,rows=rows,errors=errors,preview_id=preview_id)
+   return page("""<section><h3>Import preview / Aperçu / معاينة الاستيراد</h3><p>File: {{filename}} — {{rows|length}} rows. Past stages/history will not be fabricated.</p>{% if errors %}<p class="bad">Validation errors: {{errors|length}}. Correct the source file and upload again; no rows can be imported while errors remain.</p>{% endif %}<div class="wrap"><table><tr><th>Row</th><th>Surname</th><th>First name</th><th>Year</th><th>Phone</th><th>Validation</th></tr>{% for row in rows %}<tr><td>{{row.row_number}}</td><td>{{row.surname}}</td><td>{{row.firstname}}</td><td>{{row.year}}</td><td>{{row.phone or ''}}</td><td>{% for e in errors if e.row==row.row_number %}<span class="bad">{{e.message}}</span>{% else %}<span class="good">OK</span>{% endfor %}</td></tr>{% endfor %}</table></div><form method="post"><input type="hidden" name="preview_id" value="{{preview_id}}"><button name="action" value="confirm" {% if errors %}disabled{% endif %}>Confirm import / Confirmer / تأكيد</button> <button name="action" value="cancel">Cancel / Annuler / إلغاء</button></form></section>""",filename=filename,rows=rows,errors=errors,preview_id=preview_id)
   except Exception as exc:
    c.close(); flash("Could not read/validate the file: "+str(exc)[:250]); return redirect("/import")
   finally:
@@ -463,12 +463,12 @@ def resident_profile(rid):
    (request.form.get("birth_place","").strip(),request.form.get("birth_date",""),request.form.get("photo_path","").strip(),request.form.get("phone","").strip(),rid))
   audit_event(c,"resident.profile_updated",f"resident_id={rid}")
   c.commit(); r=c.execute("SELECT * FROM residents WHERE id=?",(rid,)).fetchone(); flash(tr("done"))
- history_rows=c.execute("SELECT h.*,t.name terrain FROM history h JOIN terrains t ON t.id=h.terrain_id WHERE h.resident_id=? ORDER BY h.id DESC",(rid,)).fetchall()
- assignment_rows=c.execute("SELECT a.status,p.name period,p.year_label,t.name terrain FROM assignments a JOIN periods p ON p.id=a.period_id JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=? ORDER BY p.year_label DESC,p.id",(rid,)).fetchall()
+ historyrow_numbers=c.execute("SELECT h.*,t.name terrain FROM history h JOIN terrains t ON t.id=h.terrain_id WHERE h.resident_id=? ORDER BY h.id DESC",(rid,)).fetchall()
+ assignmentrow_numbers=c.execute("SELECT a.status,p.name period,p.year_label,t.name terrain FROM assignments a JOIN periods p ON p.id=a.period_id JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=? ORDER BY p.year_label DESC,p.id",(rid,)).fetchall()
  objectives=c.execute("SELECT o.*,t.name terrain FROM objectives o JOIN terrains t ON t.id=o.terrain_id ORDER BY o.study_year,t.name").fetchall()
  done={x[0] for x in c.execute("SELECT terrain_id FROM history WHERE resident_id=? UNION SELECT terrain_id FROM assignments WHERE resident_id=? AND status='confirmed'",(rid,rid)).fetchall()}
  terrains=c.execute("SELECT * FROM terrains ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END,name").fetchall(); c.close()
- return page("""<section><h3>{{r.surname}} {{r.firstname}} — Resident profile / Profil / الملف</h3><p>Year: {{r.year}} · Status: {{r.status}}</p>{% if r.photo_path %}<p><img src="{{r.photo_path}}" alt="Resident photo" style="max-width:140px;max-height:140px"></p>{% endif %}<form method="post"><label>Birth place / Lieu de naissance / مكان الميلاد</label><input name="birth_place" value="{{r.birth_place or ''}}"><label>Birth date / Date de naissance / تاريخ الميلاد</label><input type="date" name="birth_date" value="{{r.birth_date or ''}}"><label>Phone / Téléphone / الهاتف</label><input name="phone" value="{{r.phone or ''}}"><label>Photo URL/path / Photo / رابط الصورة</label><input name="photo_path" value="{{r.photo_path or ''}}"><button>Save / Enregistrer / حفظ</button></form><p><a href="/exams?resident={{r.id}}">Exams / Examens / الامتحانات</a> · <a href="/dems">DEMS archive</a></p></section><section><h3>Terrain progress / Avancement / تقدم التربصات</h3><div class="wrap"><table><tr><th>Terrain</th><th>Status</th></tr>{% for t in terrains %}<tr><td>{{t.name}}</td><td class="{{'bad' if t.id in done else 'good'}}">{{'Completed / Effectué / مكتمل' if t.id in done else 'Remaining / À faire / متبقٍ'}}</td></tr>{% endfor %}</table></div></section><section><h3>Assignments and history / Affectations et historique / التوزيعات والتاريخ</h3>{% for a in assignment_rows %}<p>{{a.year_label}} — {{a.period}} — {{a.terrain}} ({{a.status}})</p>{% endfor %}{% for h in history_rows %}<p>{{h.year_label}} — {{h.period}} — {{h.terrain}} — {{h.date_done}}</p>{% endfor %}</section><section><h3>Objectives / Objectifs / الأهداف</h3>{% for o in objectives %}<p>Year {{o.study_year}} — {{o.terrain}}: {{o.objective}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",r=r,terrains=terrains,done=done,assignment_rows=assignment_rows,history_rows=history_rows,objectives=objectives)
+ return page("""<section><h3>{{r.surname}} {{r.firstname}} — Resident profile / Profil / الملف</h3><p>Year: {{r.year}} · Status: {{r.status}}</p>{% if r.photo_path %}<p><img src="{{r.photo_path}}" alt="Resident photo" style="max-width:140px;max-height:140px"></p>{% endif %}<form method="post"><label>Birth place / Lieu de naissance / مكان الميلاد</label><input name="birth_place" value="{{r.birth_place or ''}}"><label>Birth date / Date de naissance / تاريخ الميلاد</label><input type="date" name="birth_date" value="{{r.birth_date or ''}}"><label>Phone / Téléphone / الهاتف</label><input name="phone" value="{{r.phone or ''}}"><label>Photo URL/path / Photo / رابط الصورة</label><input name="photo_path" value="{{r.photo_path or ''}}"><button>Save / Enregistrer / حفظ</button></form><p><a href="/exams?resident={{r.id}}">Exams / Examens / الامتحانات</a> · <a href="/dems">DEMS archive</a></p></section><section><h3>Terrain progress / Avancement / تقدم التربصات</h3><div class="wrap"><table><tr><th>Terrain</th><th>Status</th></tr>{% for t in terrains %}<tr><td>{{t.name}}</td><td class="{{'bad' if t.id in done else 'good'}}">{{'Completed / Effectué / مكتمل' if t.id in done else 'Remaining / À faire / متبقٍ'}}</td></tr>{% endfor %}</table></div></section><section><h3>Assignments and history / Affectations et historique / التوزيعات والتاريخ</h3>{% for a in assignmentrow_numbers %}<p>{{a.year_label}} — {{a.period}} — {{a.terrain}} ({{a.status}})</p>{% endfor %}{% for h in historyrow_numbers %}<p>{{h.year_label}} — {{h.period}} — {{h.terrain}} — {{h.date_done}}</p>{% endfor %}</section><section><h3>Objectives / Objectifs / الأهداف</h3>{% for o in objectives %}<p>Year {{o.study_year}} — {{o.terrain}}: {{o.objective}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",r=r,terrains=terrains,done=done,assignmentrow_numbers=assignmentrow_numbers,historyrow_numbers=historyrow_numbers,objectives=objectives)
 @app.route("/objectives",methods=["GET","POST"])
 def manage_objectives():
  if super_guard(): return super_guard()
@@ -542,10 +542,10 @@ def dems():
    c.execute("UPDATE residents SET status='graduated',dems_status='success' WHERE id=?",(rid,))
    audit_event(c,"dems.archived",f"resident_id={rid}; success_date={success_date}")
    c.commit(); flash("Resident archived; original records retained.")
- residents_rows=c.execute("SELECT * FROM residents WHERE year=4 AND status='active' ORDER BY surname").fetchall()
- archive_rows=c.execute("SELECT d.*,r.surname,r.firstname FROM dems_archive d JOIN residents r ON r.id=d.resident_id ORDER BY d.id DESC").fetchall()
+ residentsrow_numbers=c.execute("SELECT * FROM residents WHERE year=4 AND status='active' ORDER BY surname").fetchall()
+ archiverow_numbers=c.execute("SELECT d.*,r.surname,r.firstname FROM dems_archive d JOIN residents r ON r.id=d.resident_id ORDER BY d.id DESC").fetchall()
  c.close()
- return page("""<section><h3>DEMS success archive / Archive DEMS / أرشيف DEMS</h3><form method="post"><label>Year-4 resident</label><select name="resident">{% for r in residents_rows %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>Success date / Date de réussite / تاريخ النجاح</label><input type="date" name="success_date" required><button>Archive successful graduate</button></form><p>Archiving retains resident data and rotation history; it does not delete them.</p></section><section><h4>Archived graduates</h4>{% for a in archive_rows %}<p>{{a.surname}} {{a.firstname}} — DEMS success: {{a.success_date}} — archived {{a.archived_at}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",residents_rows=residents_rows,archive_rows=archive_rows)
+ return page("""<section><h3>DEMS success archive / Archive DEMS / أرشيف DEMS</h3><form method="post"><label>Year-4 resident</label><select name="resident">{% for r in residentsrow_numbers %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>Success date / Date de réussite / تاريخ النجاح</label><input type="date" name="success_date" required><button>Archive successful graduate</button></form><p>Archiving retains resident data and rotation history; it does not delete them.</p></section><section><h4>Archived graduates</h4>{% for a in archiverow_numbers %}<p>{{a.surname}} {{a.firstname}} — DEMS success: {{a.success_date}} — archived {{a.archived_at}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",residentsrow_numbers=residentsrow_numbers,archiverow_numbers=archiverow_numbers)
 @app.get("/export")
 def export():
  if super_guard():return super_guard()
