@@ -401,7 +401,7 @@ def resident_records(resident_id):
    else: raise ValueError
    c.commit(); flash(tr("done"))
   except Exception as exc:
-   c.rollback(); flash("Invalid values / Valeurs invalides / معلومات غير صالحة"+(" — leave allowance exceeded" if str(exc)=="leave_limit" else ""))
+   c.rollback(); flash("Invalid values / Valeurs invalides / معلومات غير صالحة"+(" — leave allowance exceeded (31 calendar days/year)" if str(exc)=="leave_limit" else " — overlapping leave dates" if str(exc)=="leave_overlap" else ""))
  leave_rows=c.execute("SELECT * FROM resident_leave WHERE resident_id=? ORDER BY leave_year DESC,start_date DESC",(resident_id,)).fetchall()
  leave_totals=c.execute("SELECT leave_year,SUM(days) used_days FROM resident_leave WHERE resident_id=? GROUP BY leave_year ORDER BY leave_year DESC",(resident_id,)).fetchall()
  training_rows=c.execute("SELECT * FROM foreign_training WHERE resident_id=? ORDER BY start_date DESC",(resident_id,)).fetchall()
