@@ -1,11 +1,11 @@
 # rotation-app
 
-Gestion des stages des médecins résidents — Flask / SQLite.
+Resident rotation management app for CHU Nedir Mohamed — Flask/SQLite with an Android WebView wrapper.
 
 ## Documentation
 
-- Instructions en arabe pour Termux et la sauvegarde des données : [README_AR.txt](README_AR.txt)
-- The app is still under active development; review and test the rules before using it for official resident allocation.
+- [Instructions en arabe pour Termux, sauvegardes et usage](README_AR.txt)
+- [Android build and installation guide](android/README.md)
 
 ## Development checks
 
@@ -15,13 +15,17 @@ python -m ruff check --select E9,F63,F7,F82 app.py tests
 python -m pytest -q
 ```
 
-The automated tests use temporary SQLite databases. Do not commit `rotation.db`, database backups, passwords, tokens, or environment secrets.
+The automated tests use temporary SQLite databases. Do not commit `rotation.db`, database backups, resident photos, passwords, tokens, or environment secrets.
 
-## Security notes
+## Android APK
+
+The GitHub Actions workflow **Android APK build** builds a debug APK and uploads the `rotation-app-debug-apk` artifact. The current build targets 64-bit ARM devices and has not yet been installed on a physical phone. It is not a Play Store release.
+
+## Security and data
 
 - New databases prompt the administrator to create a password of at least 12 characters.
 - Existing legacy SHA-256 password hashes are upgraded after successful login.
 - POST forms require CSRF tokens.
-- Set `ROTATION_SECRET` through the runtime environment for a stable secret key; never commit it.
-- Resident import supports CSV, XLS/XLSX, DOCX, and text-based PDFs with preview/validation; legacy DOC needs antiword and scanned PDFs need OCR.
-- Separate super-admin/operator accounts, resident profiles/photos/exams, two-official promotion decisions, and the DEMS archive are implemented on the candidate branch and covered by regression tests.
+- Set `ROTATION_SECRET` through the runtime environment for a stable secret key outside the Android wrapper; never commit it.
+- The database, backups, and `uploads/` are excluded from Git.
+- Review the official curriculum and test backup restoration before using real resident records.
