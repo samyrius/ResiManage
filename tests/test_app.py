@@ -49,6 +49,7 @@ def test_login_page_renders_password_field_without_disclosing_default(client):
         "/history",
         "/summary",
         "/decisions",
+        "/audit",
         "/settings",
         "/export",
         "/backup",
@@ -265,3 +266,28 @@ def test_repeating_core_terrain_is_blocked_until_all_core_terrains_are_done(clie
                 connection, resident_id, terrain_id, second_period, year_label
             )
         assert ok and status == "confirmed"
+
+
+def test_resident_changes_are_written_to_audit_log(client):
+    with client.session_transaction() as browser_session:
+        browser_session["user"] = "admin"
+        browser_session["lang"] = "en"
+
+    form_page = client.get("/residents")
+    token = csrf_token(form_page)
+    response = client.post(
+        "/residents",
+        data={
+            "_csrf_token": token,
+            "surname": "AuditTest",
+            "firstname": "Resident",
+            "year": "2",
+            "phone": "",
+        },
+    )
+    assert response.status_code == 200
+
+    audit_page = client.get("/audit")
+    assert audit_page.status_code == 200
+    assert b"resident_add" in audit_page.data
+    assert b"AuditTest Resident" in audit_page.data
