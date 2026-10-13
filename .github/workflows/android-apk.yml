@@ -25,7 +25,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools platforms;android-35 build-tools;35.0.0 ndk;27.2.12479018'
+          packages: 'platform-tools emulator platforms;android-35 build-tools;35.0.0 ndk;27.2.12479018 system-images;android-35;google_apis;x86_64'
           accept-android-sdk-licenses: true
           log-accepted-android-sdk-licenses: false
       - name: Download Gradle
@@ -35,6 +35,27 @@ jobs:
       - name: Build debug APK
         working-directory: android
         run: /tmp/gradle-8.13/bin/gradle --no-daemon --stacktrace assembleDebug
+      - name: Smoke test APK in Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          emulator-options: -no-window -no-audio -no-boot-anim
+          disable-animations: true
+          script: |
+            adb install android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell am start -n com.samyrius.rotationapp/.MainActivity
+            for attempt in $(seq 1 40); do
+              if adb shell 'toybox wget -qO- http://127.0.0.1:5000/login' | grep -q 'name="password"'; then
+                echo "Embedded Flask login page responded."
+                exit 0
+              fi
+              sleep 2
+            done
+            adb logcat -d | grep -i -E 'python.stderr|Traceback|Exception' | tail -100 || true
+            exit 1
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
