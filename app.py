@@ -48,13 +48,13 @@ def init():
   if column not in resident_columns: c.execute(f'ALTER TABLE residents ADD COLUMN {column} TEXT DEFAULT \'\'')
  y=str(datetime.now().year)+"-"+str(datetime.now().year+1)
  c.execute("INSERT OR IGNORE INTO settings VALUES('year',?)",(y,))
+ initial_password=os.environ.get("ROTATION_INITIAL_PASSWORD")
+ if initial_password:
+  c.execute("INSERT OR IGNORE INTO settings VALUES('password',?)",(generate_password_hash(initial_password),))
  # Preserve the existing single-admin credential by migrating it into an account.
  legacy_password=setting(c,'password')
  if legacy_password and not c.execute('SELECT 1 FROM admins LIMIT 1').fetchone():
   c.execute('INSERT INTO admins(username,display_name,password_hash,role) VALUES(?,?,?,?)',('admin','Administrateur initial',legacy_password,'super_admin'))
- initial_password=os.environ.get("ROTATION_INITIAL_PASSWORD")
- if initial_password:
-  c.execute("INSERT OR IGNORE INTO settings VALUES('password',?)",(generate_password_hash(initial_password),))
  c.execute("INSERT OR IGNORE INTO settings VALUES('director',?)",("Professor Benhocine",))
  for n,k in [("Réanimation chirurgicale","basic"),("Réanimation polyvalente","basic"),("Chirurgie générale","mandatory"),("Urologie","basic"),("Orthopédie","basic"),("Neurochirurgie","basic"),("Sédation","optional"),("Maxillo-faciale","optional"),("CCI","basic"),("Obstétrique","basic"),("Chirurgie cardiaque","optional"),("PU Médecine","basic"),("PU Chirurgie","basic"),("ORL","basic"),("Ophtalmologie","basic"),("Gynécologie","basic"),("Chirurgie thoracique","basic"),("Brûlés","optional"),("CAC DBK","optional")]:
   c.execute("INSERT OR IGNORE INTO terrains(name,kind) VALUES(?,?)",(n,k))
