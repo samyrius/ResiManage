@@ -495,3 +495,52 @@ def test_legacy_password_hash_is_upgraded_after_successful_login(tmp_path, monke
     assert stored.startswith("pbkdf2_sha256$")
     assert user["password_hash"].startswith("pbkdf2_sha256$")
     assert user["role"] == "super_admin"
+
+def test_terrain_deactivation_preserves_history_and_hides_it_from_new_assignments(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,2)", ("TerrainHistory", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='TerrainHistory'").fetchone()[0]
+        tid = conn.execute("SELECT id FROM terrains WHERE name='Urologie'").fetchone()[0]
+        conn.execute("INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+                     (rid,tid,"2025-2026","01 Mai - 30 Juillet","2025-07-30"))
+    response = client.post("/terrains", data={"action":"deactivate","tid":str(tid)}, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT active FROM terrains WHERE id=?", (tid,)).fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM history WHERE resident_id=? AND terrain_id=?", (rid,tid)).fetchone()[0] == 1
+    assert b"Urologie" not in client.get("/assign").data
+
+
+def test_assignment_cancellation_is_audited_and_does_not_delete_record(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,3)", ("Cancel", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Cancel'").fetchone()[0]
+        tid = conn.execute("SELECT id FROM terrains WHERE name='Urologie'").fetchone()[0]
+        pid = conn.execute("SELECT id FROM periods ORDER BY id LIMIT 1").fetchone()[0]
+        conn.execute("INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",(rid,tid,pid))
+        aid = conn.execute("SELECT id FROM assignments WHERE resident_id=?", (rid,)).fetchone()[0]
+    response = client.post("/assignments/" + str(aid) + "/cancel", follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT status FROM assignments WHERE id=?", (aid,)).fetchone()[0] == "cancelled"
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='assignment.cancelled'").fetchone()[0] == 1
+
+
+def test_user_deactivation_is_audited_and_blocks_login(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    client.post("/users", data={"username":"temporary-user","password":"temporary-user-password-2026","role":"user"})
+    with rotation_app.db() as conn:
+        uid = conn.execute("SELECT id FROM users WHERE username='temporary-user'").fetchone()[0]
+    client.post("/users", data={"action":"deactivate","user_id":str(uid)})
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT active FROM users WHERE id=?", (uid,)).fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='user.deactivated'").fetchone()[0] == 1
+    client.get("/logout")
+    response = client.post("/login", data={"username":"temporary-user","password":"temporary-user-password-2026"}, follow_redirects=True)
+    assert b"Temporary user" not in response.data
+    assert client.get("/settings").status_code == 302
