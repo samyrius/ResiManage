@@ -156,3 +156,21 @@ def test_legacy_sha256_password_is_upgraded_after_successful_login(client):
             "SELECT value FROM settings WHERE key='password'"
         ).fetchone()["value"]
     assert stored.startswith(("scrypt:", "pbkdf2:"))
+
+
+def test_seed_contains_all_19_terrains_and_correct_optional_categories(client):
+    with rotation_app.db() as connection:
+        rows = connection.execute("SELECT name,kind FROM terrains").fetchall()
+
+    by_name = {row["name"]: row["kind"] for row in rows}
+    optional = {name for name, kind in by_name.items() if kind == "optional"}
+
+    assert len(by_name) == 19
+    assert optional == {
+        "Sédation",
+        "Maxillo-faciale",
+        "Chirurgie cardiaque",
+        "Brûlés",
+        "CAC DBK",
+    }
+    assert by_name["Gynécologie"] != "optional"
