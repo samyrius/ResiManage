@@ -480,6 +480,7 @@ def test_fresh_database_requires_admin_to_set_a_private_password(tmp_path, monke
 
 def test_legacy_password_hash_is_upgraded_after_successful_login(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
+    client.get("/login")
     with rotation_app.app.test_request_context("/"):
         with rotation_app.db() as conn:
             conn.execute("UPDATE settings SET value=? WHERE key='password'",
