@@ -337,10 +337,10 @@ def settings():
   if d:c.execute("INSERT INTO settings(key,value) VALUES('director',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(d,))
   pw=request.form.get("new_password","")
   if pw and len(pw)<12:flash(tr("weak_password"))
-   elif pw:
-    hashed=generate_password_hash(pw)
-    c.execute("INSERT INTO settings(key,value) VALUES('password',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(hashed,))
-    c.execute("UPDATE admins SET password_hash=? WHERE username=?",(hashed,session["user"]))
+  elif pw:
+   hashed=generate_password_hash(pw)
+   c.execute("INSERT INTO settings(key,value) VALUES('password',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(hashed,))
+   c.execute("UPDATE admins SET password_hash=? WHERE username=?",(hashed,session["user"]))
   audit(c,"settings_updated",f"year={y};director_changed={bool(d)}")
   if pw and len(pw)>=12:audit(c,"password_changed","administrator password updated")
   c.commit(); flash(tr("done"))
