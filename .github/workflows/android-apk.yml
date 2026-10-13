@@ -36,6 +36,7 @@ jobs:
         working-directory: android
         run: /tmp/gradle-8.13/bin/gradle --no-daemon --stacktrace assembleDebug
       - name: Smoke test APK in Android emulator
+        timeout-minutes: 10
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -48,7 +49,7 @@ jobs:
             adb install android/app/build/outputs/apk/debug/app-debug.apk
             adb shell am start -n com.samyrius.rotationapp/.MainActivity
             for attempt in $(seq 1 40); do
-              if adb shell 'toybox wget -qO- http://127.0.0.1:5000/login' | grep -q 'name="password"'; then
+              if timeout 8s adb shell 'toybox wget -qO- -T 5 http://127.0.0.1:5000/login' | grep -q 'name="password"'; then
                 echo "Embedded Flask login page responded."
                 exit 0
               fi
