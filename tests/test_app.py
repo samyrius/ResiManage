@@ -60,3 +60,107 @@ def test_seed_has_nineteen_terrains_and_four_periods(tmp_path, monkeypatch):
         optional = {r[0] for r in conn.execute("SELECT name FROM terrains WHERE kind='optional'")}
     assert {"Sédation", "Maxillo-faciale", "CAC DBK", "Brûlés", "Chirurgie cardiaque"} <= optional
     assert "Gynécologie" not in optional
+
+
+def test_assignment_requires_capacity_and_blocks_same_period_duplicate(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        resident_id = conn.execute("SELECT id FROM residents WHERE surname='TestSurname'").fetchone()
+        if resident_id is None:
+            conn.execute(
+                "INSERT INTO residents(surname, firstname, year) VALUES(?,?,?)",
+                ("AssignTest", "Resident", 2),
+            )
+            resident_id = conn.execute("SELECT id FROM residents WHERE surname='AssignTest'").fetchone()
+        rid = resident_id[0]
+        terrain_id = conn.execute("SELECT id FROM terrains WHERE name='Réanimation chirurgicale'").fetchone()[0]
+        second_terrain_id = conn.execute("SELECT id FROM terrains WHERE name='Urologie'").fetchone()[0]
+        period_id = conn.execute("SELECT id FROM periods ORDER BY id LIMIT 1").fetchone()[0]
+        year_label = conn.execute("SELECT year_label FROM periods WHERE id=?", (period_id,)).fetchone()[0]
+
+    response = client.post(
+        "/assign",
+        data={"resident": str(rid), "terrain": str(terrain_id), "period": str(period_id)},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "حدّد السعة أولاً".encode() in response.data
+
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO capacities(year_label, terrain_id, period_id, places) VALUES(?,?,?,1)",
+            (year_label, terrain_id, period_id),
+        )
+
+    response = client.post(
+        "/assign",
+        data={"resident": str(rid), "terrain": str(terrain_id), "period": str(period_id)},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        assigned = conn.execute(
+            "SELECT status FROM assignments WHERE resident_id=? AND period_id=?",
+            (rid, period_id),
+        ).fetchone()
+    assert assigned is not None
+    assert assigned["status"] == "confirmed"
+
+    response = client.post(
+        "/assign",
+        data={"resident": str(rid), "terrain": str(second_terrain_id), "period": str(period_id)},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM assignments WHERE resident_id=? AND period_id=?",
+            (rid, period_id),
+        ).fetchone()[0]
+    assert count == 1
+
+
+def test_capacity_limit_is_enforced_for_two_residents(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname, firstname, year) VALUES(?,?,?)",
+            ("CapacityOne", "Resident", 3),
+        )
+        conn.execute(
+            "INSERT INTO residents(surname, firstname, year) VALUES(?,?,?)",
+            ("CapacityTwo", "Resident", 2),
+        )
+        ids = conn.execute(
+            "SELECT id, surname FROM residents WHERE surname IN ('CapacityOne','CapacityTwo')"
+        ).fetchall()
+        resident_ids = {r["surname"]: r["id"] for r in ids}
+        terrain_id = conn.execute("SELECT id FROM terrains WHERE name='Réanimation polyvalente'").fetchone()[0]
+        period_id = conn.execute("SELECT id FROM periods ORDER BY id LIMIT 1").fetchone()[0]
+        year_label = conn.execute("SELECT year_label FROM periods WHERE id=?", (period_id,)).fetchone()[0]
+        conn.execute(
+            "INSERT INTO capacities(year_label, terrain_id, period_id, places) VALUES(?,?,?,1)",
+            (year_label, terrain_id, period_id),
+        )
+
+    first = client.post(
+        "/assign",
+        data={"resident": str(resident_ids["CapacityOne"]), "terrain": str(terrain_id), "period": str(period_id)},
+        follow_redirects=True,
+    )
+    assert first.status_code == 200
+    second = client.post(
+        "/assign",
+        data={"resident": str(resident_ids["CapacityTwo"]), "terrain": str(terrain_id), "period": str(period_id)},
+        follow_redirects=True,
+    )
+    assert second.status_code == 200
+    assert "السعة مكتملة".encode() in second.data
+    with rotation_app.db() as conn:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM assignments WHERE terrain_id=? AND period_id=? AND status='confirmed'",
+            (terrain_id, period_id),
+        ).fetchone()[0]
+    assert count == 1
