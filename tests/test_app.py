@@ -128,7 +128,7 @@ def test_invalid_password_does_not_authenticate(client):
 
     assert response.status_code == 200
     assert b'name="password"' in response.data
-    assert "Incorrect password".encode() in response.data
+    assert "كلمة المرور غير صحيحة".encode() in response.data
 
 
 def test_legacy_sha256_password_is_upgraded_after_successful_login(client):
