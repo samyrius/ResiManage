@@ -422,4 +422,4 @@ def test_xlsx_import_preview(tmp_path, monkeypatch):
     preview = client.post("/import", data={"file":(stream,"residents.xlsx")},
                           content_type="multipart/form-data", follow_redirects=True)
     assert preview.status_code == 200
-    assert b"ExcelResident" in preview.data
+    assert b"ExcelResident" in preview.data, preview.data.decode("utf-8", errors="replace")
