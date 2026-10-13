@@ -45,6 +45,7 @@ def test_login_page_renders_password_field_without_disclosing_default(client):
         "/",
         "/residents",
         "/profiles",
+        "/objectives",
         "/import",
         "/promotions",
         "/dems-archive",
@@ -671,3 +672,34 @@ def test_resident_import_shows_preview_and_validates_before_saving(client):
     assert len(rows) == 1
     assert tuple(rows[0]) == ("Importé", "Valide", 1, "0550000000")
     assert history_count == 0
+
+
+def test_terrain_objectives_are_year_specific_and_profile_marks_completion(client):
+    with rotation_app.db() as connection:
+        resident_id = connection.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES('Objective','Resident',2)"
+        ).lastrowid
+        terrains = connection.execute(
+            "SELECT id,name FROM terrains ORDER BY id LIMIT 2"
+        ).fetchall()
+        connection.execute(
+            "INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+            (resident_id, terrains[0]["id"], "2025-2026", "P1", "2025-04-30"),
+        )
+        connection.commit()
+    authenticated(client)
+    page = client.get("/objectives")
+    response = client.post(
+        "/objectives",
+        data={
+            "_csrf_token": csrf_token(page),
+            "terrain": str(terrains[0]["id"]),
+            "study_year": "2",
+            "objectives": "Airway management and safe handover",
+        },
+    )
+    assert response.status_code == 200
+    profile = client.get(f"/profiles/{resident_id}")
+    assert b"Airway management and safe handover" in profile.data
+    assert b'class="bad">Completed' in profile.data
+    assert b'class="good">Not completed' in profile.data
