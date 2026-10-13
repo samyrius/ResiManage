@@ -703,3 +703,31 @@ def test_terrain_objectives_are_year_specific_and_profile_marks_completion(clien
     assert b"Airway management and safe handover" in profile.data
     assert b'class="bad">Completed' in profile.data
     assert b'class="good">Not completed' in profile.data
+
+
+def test_official_super_admin_accounts_cannot_be_demoted_or_disabled(client):
+    from werkzeug.security import generate_password_hash
+
+    with rotation_app.db() as connection:
+        official_id = connection.execute(
+            "INSERT INTO admins(username,display_name,password_hash,role) VALUES(?,?,?,'super_admin')",
+            ("benhocine", "Professor Benhocine", generate_password_hash("Official-password-2026")),
+        ).lastrowid
+        connection.commit()
+    authenticated(client)
+    page = client.get("/users")
+    response = client.post(
+        "/users",
+        data={
+            "_csrf_token": csrf_token(page),
+            "action": "toggle",
+            "user_id": str(official_id),
+        },
+    )
+    assert response.status_code == 200
+    with rotation_app.db() as connection:
+        account = connection.execute(
+            "SELECT role,active FROM admins WHERE id=?", (official_id,)
+        ).fetchone()
+    assert account["role"] == "super_admin"
+    assert account["active"] == 1
