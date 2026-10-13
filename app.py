@@ -303,7 +303,7 @@ def settings():
   lang=request.form.get("lang","ar")
   if lang in LANGS:session["lang"]=lang
   y=request.form.get("year","").strip()
-  if y and (not re.fullmatch(r"\\d{4}-\\d{4}",y) or int(y.split("-")[1])!=int(y.split("-")[0])+1):
+  if y and (not re.fullmatch(r"\d{4}-\d{4}",y) or int(y.split("-")[1])!=int(y.split("-")[0])+1):
    flash("Academic year must be formatted as YYYY-YYYY with consecutive years.")
    y=setting(c,"year")
   if y:
