@@ -6,6 +6,7 @@ Resident rotation management app for CHU Nedir Mohamed — Flask/SQLite with an 
 
 - [Instructions en arabe pour Termux, sauvegardes et usage](README_AR.txt)
 - [Android build and installation guide](android/README.md)
+- [Resident and documented-stage import template](docs/resident_import_template.md)
 
 ## Development checks
 
@@ -19,7 +20,7 @@ The automated tests use temporary SQLite databases. Do not commit `rotation.db`,
 
 ## Android APK
 
-The GitHub Actions workflow **Android APK build** builds a debug APK and uploads the `rotation-app-debug-apk` artifact. The current build targets 64-bit ARM devices and has not yet been installed on a physical phone. It is not a Play Store release.
+The GitHub Actions workflow **Android APK build** builds a debug APK and uploads the `rotation-app-debug-apk` artifact. The current build targets 64-bit ARM phones and x86_64 emulators. The CI workflow smoke-tests the embedded Flask login page on an emulator; the APK is not a Play Store release and has not yet been tested on a physical phone.
 
 ## Security and data
 
