@@ -23,4 +23,5 @@ The automated tests use temporary SQLite databases. Do not commit `rotation.db`,
 - Existing legacy SHA-256 password hashes are upgraded after successful login.
 - POST forms require CSRF tokens.
 - Set `ROTATION_SECRET` through the runtime environment for a stable secret key; never commit it.
-- The current app still needs further implementation and validation for separate administrator accounts, resident profiles/photos/exams, bulk import, and the DEMS archive.
+- Resident import supports CSV, XLS/XLSX, DOCX, and text-based PDFs with preview/validation; legacy DOC needs antiword and scanned PDFs need OCR.
+- Separate super-admin/operator accounts, resident profiles/photos/exams, two-official promotion decisions, and the DEMS archive are implemented on the candidate branch and covered by regression tests.
