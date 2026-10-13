@@ -5,10 +5,11 @@ from datetime import datetime
 from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE=os.path.dirname(os.path.abspath(__file__))
-DB=os.path.join(BASE,"rotation.db")
+DATA_DIR=os.environ.get("ROTATION_DATA_DIR",BASE)
+DB=os.path.join(DATA_DIR,"rotation.db")
 app=Flask(__name__)
 app.secret_key=os.environ.get("ROTATION_SECRET") or secrets.token_hex(32)
-UPLOAD_DIR=os.path.join(BASE,"uploads","residents")
+UPLOAD_DIR=os.path.join(DATA_DIR,"uploads","residents")
 app.config["MAX_CONTENT_LENGTH"]=5*1024*1024
 app.config.update(
  SESSION_COOKIE_HTTPONLY=True,
@@ -645,7 +646,7 @@ def backup():
  if guard():return redirect("/login")
  if session.get("role")!="super_admin":return "Forbidden",403
  c=db(); c.execute("PRAGMA wal_checkpoint(FULL)"); c.close()
- target=os.path.join(BASE,"rotation_backup_download.zip")
+ target=os.path.join(DATA_DIR,"rotation_backup_download.zip")
  with zipfile.ZipFile(target,"w",compression=zipfile.ZIP_DEFLATED) as archive:
   archive.write(DB,"rotation.db")
   if os.path.isdir(UPLOAD_DIR):
