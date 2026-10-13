@@ -60,7 +60,7 @@ This file is the durable project handover log for `samyrius/rotation-app`. Read 
 - Main branch baseline noted previously at commit `97ca43634f09a9506f929f7405595d09b8439306`.
 - Isolated working branch: `prototype/verification-2026-10-13`.
 - Pull request #8: https://github.com/samyrius/rotation-app/pull/8
-- This branch adds GitHub Actions CI and smoke tests, corrects the seed to include CAC DBK and the five optional terrains, and has a durable requirements/continuity archive at `docs/PROJECT_ARCHIVE.md`. It has not been merged into main.
+- PR #8 merged into `main` in merge commit `52127b58aa1bcc7f86f320c34f7de35f0c63922e`. The changes include GitHub Actions CI, smoke/regression tests, the corrected CAC DBK seed and terrain classification, and this continuity archive.
 - First CI attempt failed during collection because pytest could not import `app`; the test import path was fixed in commit `c5d80651051ed254308b8177ea72c8730372086d`.
 - Historical baseline run for commit `c8774e679fcd34b4287026f1dc6d67a461bd588a` passed 7 initial tests. This has been superseded by the expanded verification recorded below.
 - Do not merge this branch until the tests pass and changes are reviewed. No database files or real resident data were committed.
@@ -89,7 +89,7 @@ This file is the durable project handover log for `samyrius/rotation-app`. Read 
   - SQLite-consistent backup and validated restore. Restore checks SQLite integrity and required tables and creates a separate pre-restore backup before replacement.
   - Academic-year format validation, four-period creation with previous periods retained, year-priority ordering, exact five optional terrain classification, audit records for key administrative changes, and French/Arabic/English navigation labels for the added workflows.
 - Updated `README.md` with local launch instructions, import limitations, backup/restore safety and branch status.
-- The work remains on `prototype/verification-2026-10-13`; PR #8 is not merged into `main`. The user-confirmed existing phone prototype and local database were not accessed or modified by these repository changes.
+- The reviewed work was merged from `prototype/verification-2026-10-13` through PR #8. The user-confirmed existing phone prototype and local database were not accessed or modified by these repository changes.
 - The CI test suite now covers the main rules, profile/objective workflows, first-year progression, DEMS archive, user roles, backup/restore, CSV/XLSX/DOCX import preview, CSV export, mandatory-year override/audit, priority, academic-year periods, photo upload, terrain deactivation, assignment cancellation, user deactivation, first-run setup and legacy password migration.
 
 ## Remaining real-world verification (do not claim complete until checked)
@@ -99,6 +99,13 @@ This file is the durable project handover log for `samyrius/rotation-app`. Read 
 4. Test real DOC/XLS/PDF examples in the target Termux environment. Legacy DOC needs antiword or LibreOffice, and scanned PDF OCR is not included.
 5. Review the final diff and CI status before deciding whether to merge PR #8. No new APK or hosted demo has been built or verified in this branch.
 6. Only after these original requirements and checks are addressed should the user's deferred critique/adjustments be discussed.
+
+## Post-merge status (2026-10-13)
+
+- PR #8 is merged into `main`; merge commit: `52127b58aa1bcc7f86f320c34f7de35f0c63922e`.
+- Before merge, the reviewed code commit `49924478a7ee81a5a0a81de6c4768dfa75b597e6` passed **25 automated tests in 8.38 seconds**. The archive-only branch commit also passed 25 tests in 6.93 seconds. The post-merge `main` CI run must be checked before reporting the merge build as verified.
+- No database, real resident records, backups, uploaded photos, passwords, or tokens were committed. Existing phone installation/data were not modified.
+- Remaining external checks are unchanged: test the merged code against a copy of the existing phone database after backing it up; create the two named Super Admin accounts with private passwords in the app; validate real input files and populate the official module/objective data; and do not claim a new APK or hosted demo until one is actually built and tested.
 
 ## Archive limitation
 This repository log captures durable project decisions and progress; it is not a verbatim recording of every voice call or every conversation. Do not store credentials, access tokens, personal secrets, or real resident records here.
