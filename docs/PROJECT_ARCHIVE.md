@@ -62,11 +62,11 @@ This file is the durable project handover log for `samyrius/rotation-app`. Read 
 - Pull request #8: https://github.com/samyrius/rotation-app/pull/8
 - This branch adds GitHub Actions CI and smoke tests, corrects the seed to include CAC DBK and the five optional terrains, and has a durable requirements/continuity archive at `docs/PROJECT_ARCHIVE.md`. It has not been merged into main.
 - First CI attempt failed during collection because pytest could not import `app`; the test import path was fixed in commit `c5d80651051ed254308b8177ea72c8730372086d`.
-- Latest verified GitHub Actions run for commit `431637a3b9807dc739299f9bd4047694efeac3d2` passed: **6 tests passed in 0.42 seconds**. Coverage currently includes login/protected route, resident creation in an isolated temporary database, 19 seeded terrains/four periods/optional classification, capacity required, same-period duplicate prevention, and capacity limit.
+- Latest verified GitHub Actions run for commit `c8774e679fcd34b4287026f1dc6d67a461bd588a` passed: **7 tests passed in 0.44 seconds**. Coverage includes login/protected route, resident creation in an isolated temporary database, 19 seeded terrains/four periods/optional classification, capacity required, same-period duplicate prevention, capacity limit, and blocking terrain repeats until all core/mandatory terrains have been completed.
 - Do not merge this branch until the tests pass and changes are reviewed. No database files or real resident data were committed.
 
 ## Next steps (continue without asking the user to repeat context)
-1. Continue adding isolated tests for repeat eligibility, mandatory-year overrides/audit, and role permissions.
+1. Continue adding isolated tests for mandatory-year overrides/audit, and role permissions.
 2. Inspect admin authorization and replace insecure shared/default credential behavior with a safe migration path that does not lock out the existing phone prototype or touch real database files.
 3. Implement/verify profile, exam progression, DEMS archive/import, objectives, audit log, and backup/restore requirements that are still absent.
 4. Validate priority ordering, four-period rollover, and annual advancement rules.
