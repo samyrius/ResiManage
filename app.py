@@ -366,7 +366,7 @@ def parse_import_file(path, extension):
   if extension==".xlsx":
    from openpyxl import load_workbook
    book=load_workbook(path,read_only=True,data_only=True)
-   rows=[list(row) for row in book.active.iterrow_numbers(values_only=True)]
+   rows=[list(row) for row in book.active.iter_rows(values_only=True)]
    book.close()
   else:
    import xlrd
@@ -389,8 +389,18 @@ def parse_import_file(path, extension):
   delimiter=";" if sum(x.count(";") for x in lines)>sum(x.count(",") for x in lines) else ("\t" if any("\t" in x for x in lines) else ",")
   rows=[next(csv.reader([line],delimiter=delimiter)) for line in lines]
  elif extension==".doc":
-  result=subprocess.run(["antiword",path],capture_output=True,text=True,check=True)
-  lines=[line.strip() for line in result.stdout.splitlines() if line.strip()]
+  try:
+   result=subprocess.run(["antiword",path],capture_output=True,text=True,check=True,timeout=20)
+   document_text=result.stdout
+  except FileNotFoundError:
+   try:
+    with tempfile.TemporaryDirectory(prefix="rotation_doc_") as converted_dir:
+     subprocess.run(["libreoffice","--headless","--convert-to","txt:Text","--outdir",converted_dir,path],capture_output=True,text=True,check=True,timeout=30)
+     converted_path=os.path.join(converted_dir,os.path.splitext(os.path.basename(path))[0]+".txt")
+     with open(converted_path,"r",encoding="utf-8",errors="replace") as handle: document_text=handle.read()
+   except (FileNotFoundError,subprocess.CalledProcessError,subprocess.TimeoutExpired) as exc:
+    raise ValueError("Legacy .doc requires antiword or LibreOffice; convert it to .docx if neither is installed.") from exc
+  lines=[line.strip() for line in document_text.splitlines() if line.strip()]
   rows=[re.split(r"\s*[,;\t]\s*",line) for line in lines]
  if not rows: raise ValueError("No table rows could be read from this file.")
  header=[normalize_header(x) for x in rows[0]]
