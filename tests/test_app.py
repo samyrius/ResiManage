@@ -45,6 +45,7 @@ def test_login_page_renders_password_field_without_disclosing_default(client):
         "/",
         "/residents",
         "/profiles",
+        "/import",
         "/promotions",
         "/dems-archive",
         "/terrains",
@@ -617,3 +618,56 @@ def test_resident_photo_is_private_and_included_in_backup(client):
         names = archive.namelist()
         assert "rotation.db" in names
         assert any(name.startswith("uploads/residents/") for name in names)
+
+
+def test_resident_import_shows_preview_and_validates_before_saving(client):
+    import io
+    import re
+
+    with client.session_transaction() as browser_session:
+        browser_session["user"] = "admin"
+        browser_session["role"] = "super_admin"
+        browser_session["lang"] = "en"
+
+    page = client.get("/import")
+    response = client.post(
+        "/import",
+        data={
+            "_csrf_token": csrf_token(page),
+            "action": "preview",
+            "file": (
+                io.BytesIO(
+                    "Nom,Prénom,Année,Téléphone\n"
+                    "Importé,Valide,1,0550000000\n"
+                    "Importé,Invalide,9,0550000001\n".encode("utf-8")
+                ),
+                "residents.csv",
+            ),
+        },
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200
+    assert "Importé".encode("utf-8") in response.data
+    assert b"valid rows" in response.data
+    with rotation_app.db() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM residents").fetchone()[0] == 0
+
+    token_match = re.search(rb'name="token" value="([^"]+)"', response.data)
+    assert token_match
+    response = client.post(
+        "/import",
+        data={
+            "_csrf_token": csrf_token(response),
+            "action": "confirm",
+            "token": token_match.group(1).decode(),
+        },
+    )
+    assert response.status_code == 200
+    with rotation_app.db() as connection:
+        rows = connection.execute(
+            "SELECT surname,firstname,year,phone FROM residents"
+        ).fetchall()
+        history_count = connection.execute("SELECT COUNT(*) FROM history").fetchone()[0]
+    assert len(rows) == 1
+    assert tuple(rows[0]) == ("Importé", "Valide", 1, "0550000000")
+    assert history_count == 0
