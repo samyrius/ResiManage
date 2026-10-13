@@ -555,8 +555,13 @@ def exams():
    if not module or not (0<=theory<=20 and 0<=practical<=20):
     flash("Module and marks from 0 to 20 are required")
    else:
-    c.execute("INSERT INTO exam_records(resident_id,study_year,module,theory,practical) VALUES(?,?,?,?,?)",(rid,sy,module,theory,practical))
-    audit_event(c,"exam.recorded",f"resident_id={rid}; year={sy}; module={module}")
+    existing=c.execute("SELECT id FROM exam_records WHERE resident_id=? AND study_year=? AND lower(module)=lower(?)",(rid,sy,module)).fetchone()
+    if existing:
+     c.execute("UPDATE exam_records SET theory=?,practical=?,created_at=CURRENT_TIMESTAMP WHERE id=?",(theory,practical,existing["id"]))
+     audit_event(c,"exam.updated",f"resident_id={rid}; year={sy}; module={module}")
+    else:
+     c.execute("INSERT INTO exam_records(resident_id,study_year,module,theory,practical) VALUES(?,?,?,?,?)",(rid,sy,module,theory,practical))
+     audit_event(c,"exam.recorded",f"resident_id={rid}; year={sy}; module={module}")
     c.commit(); flash(tr("done"))
   elif action=="evaluate_first_year" and request.form.get("all_modules_confirmed")!="yes":
    flash("Confirm that all first-year module results have been entered before evaluating progression.")
