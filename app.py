@@ -280,7 +280,7 @@ def resident_profile(resident_id):
    upload=request.files.get("photo")
    ext=os.path.splitext(upload.filename or "")[1].lower() if upload else ""
    header=upload.read(12) if upload else b""
-   valid=(ext in (".jpg",".jpeg") and header.startswith(b"\\xff\\xd8\\xff")) or (ext==".png" and header.startswith(b"\\x89PNG\\r\\n\\x1a\\n")) or (ext==".webp" and header.startswith(b"RIFF") and header[8:12]==b"WEBP")
+   valid=(ext in (".jpg",".jpeg") and header.startswith(b"\xff\xd8\xff")) or (ext==".png" and header.startswith(b"\x89PNG\r\n\x1a\n")) or (ext==".webp" and header.startswith(b"RIFF") and header[8:12]==b"WEBP")
    if not upload or not valid:
     flash(tr("photo_invalid"))
    else:
