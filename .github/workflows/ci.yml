@@ -2,7 +2,7 @@ name: Python checks
 
 on:
   push:
-    branches: [main, security/harden-authentication]
+    branches: [main, security/harden-authentication, release/rotation-app-verified]
   pull_request:
     branches: [main]
   workflow_dispatch:
