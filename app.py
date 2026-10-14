@@ -68,8 +68,6 @@ def init():
  # Additive migrations preserve existing resident and rotation-history records.
  for col, spec in {"birth_place":"TEXT DEFAULT ''","birth_date":"TEXT DEFAULT ''","photo_path":"TEXT DEFAULT ''","dems_status":"TEXT DEFAULT ''"}.items():
   ensure_column(c,"residents",col,spec)
- ensure_column(c,"users","email","TEXT DEFAULT ''")
- ensure_column(c,"users","email_verified","INTEGER NOT NULL DEFAULT 0")
  ensure_column(c,"terrains","active","INTEGER NOT NULL DEFAULT 1")
  ensure_column(c,"audit","actor","TEXT DEFAULT ''")
  c.executescript("""
@@ -80,6 +78,9 @@ def init():
  CREATE TABLE IF NOT EXISTS pending_registrations(id INTEGER PRIMARY KEY,username TEXT NOT NULL,email TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,code_hash TEXT NOT NULL,expires_at INTEGER NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE IF NOT EXISTS import_previews(id INTEGER PRIMARY KEY,owner TEXT NOT NULL,rows_json TEXT NOT NULL,errors_json TEXT NOT NULL,filename TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  """)
+ # Migrate user email fields only after the users table exists (fresh DB and legacy DB).
+ ensure_column(c,"users","email","TEXT DEFAULT ''")
+ ensure_column(c,"users","email_verified","INTEGER NOT NULL DEFAULT 0")
  y=str(datetime.now().year)+"-"+str(datetime.now().year+1)
  c.execute("INSERT OR IGNORE INTO settings VALUES('year',?)",(y,))
  initial_password=os.environ.get("ROTATION_INITIAL_PASSWORD")
