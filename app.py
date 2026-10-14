@@ -138,6 +138,50 @@ tbody tr:nth-child(even),table tr:nth-child(even){background:#f8fbfe}
 .rt-footer strong{color:#2d5877}.rt-footer .rt-sep{color:#ff986c;padding:0 4px}
 @media(max-width:600px){.main-nav{position:relative;border-radius:0 0 14px 14px;justify-content:flex-start}.rt-language{width:100%;justify-content:center;margin:3px 0 0}.main-nav>a,.nav-group summary{font-size:12px}.rt-footer{line-height:1.9}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* ResiTrack reference mockup: deep-navy clinical UI, cyan/mint highlights */
+:root{color-scheme:dark;--rt-bg:#041426;--rt-panel:#08223a;--rt-panel2:#0b2c49;--rt-cyan:#18d9ee;--rt-mint:#18e0c0;--rt-line:#155a80;--rt-text:#e8f7ff;--rt-muted:#91b8ce}
+html,body{background:#041426!important;color:var(--rt-text)!important}
+body{background:radial-gradient(ellipse at 12% 0%,#0a467055,transparent 34%),radial-gradient(ellipse at 90% 30%,#0a6a7250,transparent 32%),linear-gradient(150deg,#020d1c,#061a30 58%,#041426)!important;color:var(--rt-text)}
+header.brand-header{background:linear-gradient(115deg,#020d1c,#07375b 58%,#075a70)!important;border-bottom:2px solid var(--rt-cyan)!important;box-shadow:0 12px 36px #0008}
+.brand-tagline,.brand-year{color:#b7e6f8}
+main{max-width:1120px}
+.main-nav{background:#061a2be8!important;border:1px solid #0c4564!important;border-radius:0 0 18px 18px!important;box-shadow:0 10px 30px #0006!important}
+.main-nav>a,.nav-group summary{background:linear-gradient(135deg,#0b3557,#0b5572)!important;border:1px solid #17668a!important;color:#e9fbff!important;border-radius:11px!important}
+.main-nav>a:nth-of-type(1){background:linear-gradient(135deg,#075a8b,#087eaa)!important}
+.main-nav>a:nth-of-type(2){background:linear-gradient(135deg,#087c7d,#08a994)!important}
+.main-nav>a:nth-of-type(3){background:linear-gradient(135deg,#875a2a,#bb7b31)!important}
+.main-nav>a:nth-of-type(4){background:linear-gradient(135deg,#4a438b,#6965bd)!important}
+.nav-menu{background:#071d32f5!important;border-color:#155a80!important}
+.nav-menu a{background:#0a2b47!important;color:#dff8ff!important;border-color:#104765!important;border-inline-start-color:var(--rt-cyan)!important}
+.nav-menu a:hover{background:#0d4960!important}
+section,.rt-stat,.rt-action-card{background:linear-gradient(145deg,#08223aee,#061a30f5)!important;border:1px solid #125173!important;box-shadow:0 10px 28px #0003, inset 0 1px #ffffff08!important;color:var(--rt-text)!important;border-radius:17px!important}
+section{backdrop-filter:blur(12px)}
+h1,h2,h3,h4,strong,th{color:#eafaff}
+p,label,td,small,.muted{color:#a9ccdf}
+a,button{background:linear-gradient(110deg,#087f9f,#09b9bd)!important;color:#f3feff!important;border:1px solid #24cce0!important;border-radius:11px!important;box-shadow:0 4px 14px #00cde51c}
+button:hover,a:hover{filter:brightness(1.12);transform:translateY(-1px)}
+input,select,textarea{background:#04182b!important;color:#e8f7ff!important;border:1px solid #176083!important;border-radius:10px!important}
+input:focus,select:focus,textarea:focus{outline:2px solid #19c9e5;outline-offset:1px}
+table{border-collapse:separate;border-spacing:0 5px}
+td,th{border-bottom:1px solid #12415e!important}
+th{background:#0b3552!important;color:#70eaf2!important}
+td{background:#061d32}
+tr td:first-child{border-radius:9px 0 0 9px}tr td:last-child{border-radius:0 9px 9px 0}
+.msg{background:#3b2d12!important;color:#ffe5a6!important;border:1px solid #a97729}
+.good{color:#36e3b4!important}.bad{color:#ff8b9a!important}
+.rt-dot{background:var(--rt-mint)!important;box-shadow:0 0 12px #18e0c0}
+.rt-year-chip{background:#0b4c69!important;color:#8ff5f4!important;border:1px solid #137da0}
+.rt-progress{background:#123750!important}.rt-progress span{background:linear-gradient(90deg,#16d8bc,#16c8ed)!important}
+.rt-action-icon{color:#35e5ed!important}
+footer{color:#7baac1!important}
+.login-hero{background:radial-gradient(ellipse at 50% 0%,#0b6b8a55,transparent 55%)!important}
+.login-brand,.login-panel{background:linear-gradient(145deg,#08223aee,#04172a)!important;border:1px solid #155a80!important;box-shadow:0 18px 55px #0006!important;color:#e8f7ff!important;border-radius:22px!important}
+.login-emblem{color:#20e2e7!important;text-shadow:0 0 25px #16d8ed!important}
+.login-brand h1 span{color:#20d9e6!important}
+.login-subtitle,.login-security{color:#9ac8de!important}
+@media(max-width:600px){main{padding:8px}.main-nav{position:relative;top:auto;justify-content:flex-start}.main-nav>a,.nav-group summary{font-size:12px;padding:8px}.rt-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.rt-quick-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
 </style><header class="brand-header"><div class="brand-lockup"><img class="brand-icon" src="/static/resitrack-icon.svg" width="64" height="64" alt="ResiTrack"><div><h2>{{t('app')}}</h2><p class="brand-tagline">{% if lang=='ar' %}تسيير تربصات الأطباء المقيمين{% elif lang=='fr' %}Gestion des stages des médecins résidents{% else %}Resident rotation management{% endif %}</p><span class="brand-year">{{t('year')}}: {{year}}</span></div></div></header>{% if user %}<nav class="main-nav"><a href="/"><span class="nav-icon">⌂</span>{{t('home')}}</a><details class="nav-group"><summary><span class="nav-icon">♙</span>{{t('residents')}}</summary><div class="nav-menu"><a href="/residents">{{t('manage_residents')}}</a><a href="/objectives">{{t('objectives')}}</a><a href="/import">{{t('import_residents')}}</a><a href="/exams">{{t('promotion')}}</a><a href="/dems">{{t('dems_success')}}</a></div></details><a href="/terrains"><span class="nav-icon">✚</span>{{t('terrains')}}</a><a href="/capacities"><span class="nav-icon">▦</span>{{t('capacities')}}</a><a href="/assign"><span class="nav-icon">⇄</span>{{t('assign')}}</a><a href="/history"><span class="nav-icon">◷</span>{{t('history')}}</a><a href="/decisions"><span class="nav-icon">✓</span>{{t('decisions')}}</a><a href="/summary"><span class="nav-icon">▤</span>{{t('summary')}}</a><details class="nav-group"><summary><span class="nav-icon">⚙</span>{{t('settings')}}</summary><div class="nav-menu"><a href="/settings">{{t('settings_page')}}</a><a href="/users">{{t('users')}}</a><a href="/audit">{{t('audit')}}</a><a href="/backup">{{t('backup')}}</a><a href="/export">{{t('export')}}</a><a href="/restore">{{t('restore')}}</a><a href="/logout">{{t('logout')}}</a></div></details><div class="rt-language" aria-label="Language"><a href="/lang/ar" {% if lang=='ar' %}aria-current="page"{% endif %} title="العربية">ع</a><a href="/lang/fr" {% if lang=='fr' %}aria-current="page"{% endif %} title="Français">FR</a><a href="/lang/en" {% if lang=='en' %}aria-current="page"{% endif %} title="English">EN</a></div></nav>{% endif %}<main>{% for m in get_flashed_messages() %}<p class="msg">{{m}}</p>{% endfor %}{{body|safe}}</main><footer class="rt-footer">© <strong>Tous droits réservés · Dr Dris</strong><span class="rt-sep"> | </span><strong>All rights reserved · Dr Dris</strong><span class="rt-sep"> | </span><strong>جميع الحقوق محفوظة · Dr Dris</strong></footer></html>"""
  context={"t":tr,"lang":lang,"year":setting(db(),"year")}
  context.update(kw)
