@@ -118,3 +118,19 @@ This repository log captures durable project decisions and progress; it is not a
 - **Action taken:** updated the shared CSS in `app.py` on `main` at commit `a7833ab582a84b9d4828742a58d35006d8408bbf`. Added global box sizing and horizontal overflow protection, responsive padding and grid sizing, wrapping for labels/buttons, scroll containment for wide tables, image sizing, and RTL navigation handling.
 - **Status:** code change committed; **not yet runtime-verified on the user's phone**. Treat as pending verification, not confirmed fixed. Next: run automated tests/CI, inspect all rendered pages at narrow viewport widths, then install/build a test package only after the remaining recorded defects are addressed.
 - **Process rule confirmed by user:** every newly discovered defect must be added to this Resistage project log with a unique ID, observed behavior, fix, test evidence, and status. Do not declare a defect fixed until it has been tested. Do not produce a new app build for the user until all logged defects have been corrected and the required tests pass.
+
+
+## Navigation simplification — 2026-10-14
+
+### UX-NAV-001: Too many top-level navigation buttons
+- **Request:** keep Home, Departments/Services, Capacity/Seats, Assignments/Distribution, History, Decisions, and Resident Summary as primary navigation items. Group resident-related actions under a Residents dropdown: manage/add residents, objectives, import residents, promotion/exam decisions, and DEMS-success graduates. Group app/admin actions under Settings: app settings, admin accounts, audit log, database backup, CSV export, restore, and logout.
+- **Implementation:** updated the shared navigation in `app.py` at commit `093e075051b4cee2c25fa87904880be8456d153e`. Added native expandable `<details>/<summary>` menus and Arabic/French/English labels. Existing route URLs were retained; only navigation grouping/labels/styles changed.
+- **Design detail:** submenu entries are shown only after opening the corresponding dropdown, reducing top-level clutter. Mobile sizing and menu scroll limits are included; Arabic RTL is inherited from the page shell.
+- **Status:** implementation committed; automated tests and rendered/mobile viewport checks are **pending**. Do not call this verified until tests and smoke checks pass.
+
+### UX-NAV-001 test checklist
+- [ ] Run the complete automated test suite / inspect latest CI status.
+- [ ] Check authenticated navigation contains only the agreed primary buttons plus Residents and Settings dropdowns.
+- [ ] Open both dropdowns and verify all requested links preserve their original routes.
+- [ ] Verify Arabic RTL, French, and English labels.
+- [ ] Inspect narrow mobile viewport for clipping, overlap, and submenu reachability.
