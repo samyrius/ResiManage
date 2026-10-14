@@ -544,3 +544,40 @@ def test_user_deactivation_is_audited_and_blocks_login(tmp_path, monkeypatch):
     response = client.post("/login", data={"username":"temporary-user","password":"temporary-user-password-2026"}, follow_redirects=True)
     assert b"Temporary user" not in response.data
     assert client.get("/settings").status_code == 302
+
+
+def test_email_registration_requires_verification_code(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    sent = {}
+    monkeypatch.setattr(rotation_app, "send_verification_email", lambda recipient, code: sent.update(email=recipient, code=code))
+    response = client.get("/register")
+    assert response.status_code == 200
+    assert b'type="email"' in response.data
+
+    response = client.post("/register", data={
+        "username": "emailuser",
+        "email": "emailuser@example.com",
+        "password": "strong-test-password-2026",
+        "confirm_password": "strong-test-password-2026",
+    })
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/verify-email"
+    assert sent["email"] == "emailuser@example.com"
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT 1 FROM users WHERE username='emailuser'").fetchone() is None
+        pending = conn.execute("SELECT attempts FROM pending_registrations WHERE email=?", (sent["email"],)).fetchone()
+        assert pending is not None
+        assert pending["attempts"] == 0
+
+    wrong = client.post("/verify-email", data={"code": "000000"})
+    assert wrong.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT 1 FROM users WHERE username='emailuser'").fetchone() is None
+
+    verified = client.post("/verify-email", data={"code": sent["code"]})
+    assert verified.status_code == 302
+    assert verified.headers["Location"] == "/login"
+    with rotation_app.db() as conn:
+        account = conn.execute("SELECT username,email,email_verified,role FROM users WHERE username='emailuser'").fetchone()
+        assert tuple(account) == ("emailuser", "emailuser@example.com", 1, "user")
+        assert conn.execute("SELECT 1 FROM pending_registrations WHERE email=?", (sent["email"],)).fetchone() is None
