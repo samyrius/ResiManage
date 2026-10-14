@@ -18,7 +18,7 @@ def setup_client(tmp_path, monkeypatch):
 
 
 def login(client):
-    return client.post("/login", data={"password": "test-strong-password-2026"}, follow_redirects=True)
+    return client.post("/login", data={"email":"admin@example.com","password":"test-strong-password-2026"}, follow_redirects=True)
 
 
 def test_login_page_and_language_selector(tmp_path, monkeypatch):
@@ -289,12 +289,12 @@ def test_standard_user_cannot_access_super_admin_pages(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
     response = client.post("/users", data={
-        "username":"ordinary-user","password":"ordinary-password-2026","role":"user"
+        "username":"ordinary-user","email":"ordinary@example.com","password":"ordinary-password-2026","role":"user"
     }, follow_redirects=True)
     assert response.status_code == 200
     client.get("/logout")
     response = client.post("/login", data={
-        "username":"ordinary-user","password":"ordinary-password-2026"
+        "email":"ordinary@example.com","password":"ordinary-password-2026"
     }, follow_redirects=True)
     assert response.status_code == 200
     assert client.get("/settings").status_code == 403
@@ -465,7 +465,7 @@ def test_fresh_database_requires_admin_to_set_a_private_password(tmp_path, monke
     assert page.status_code == 200
     assert b"confirm_password" in page.data
     response = client.post("/login", data={
-        "username":"admin",
+        "email":"admin@example.com",
         "password":"fresh-private-password-2026",
         "confirm_password":"fresh-private-password-2026"
     }, follow_redirects=True)
@@ -486,7 +486,7 @@ def test_legacy_password_hash_is_upgraded_after_successful_login(tmp_path, monke
             conn.execute("UPDATE settings SET value=? WHERE key='password'",
                          (hashlib.sha256(b"legacy-test-password-2026").hexdigest(),))
     response = client.post("/login", data={
-        "username":"admin","password":"legacy-test-password-2026"
+        "email":"admin@example.com","password":"legacy-test-password-2026"
     }, follow_redirects=True)
     assert response.status_code == 200
     with rotation_app.db() as conn:
@@ -533,7 +533,7 @@ def test_assignment_cancellation_is_audited_and_does_not_delete_record(tmp_path,
 def test_user_deactivation_is_audited_and_blocks_login(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
-    client.post("/users", data={"username":"temporary-user","password":"temporary-user-password-2026","role":"user"})
+    client.post("/users", data={"username":"temporary-user","email":"temporary@example.com","password":"temporary-user-password-2026","role":"user"})
     with rotation_app.db() as conn:
         uid = conn.execute("SELECT id FROM users WHERE username='temporary-user'").fetchone()[0]
     client.post("/users", data={"action":"deactivate","user_id":str(uid)})
@@ -541,7 +541,7 @@ def test_user_deactivation_is_audited_and_blocks_login(tmp_path, monkeypatch):
         assert conn.execute("SELECT active FROM users WHERE id=?", (uid,)).fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='user.deactivated'").fetchone()[0] == 1
     client.get("/logout")
-    response = client.post("/login", data={"username":"temporary-user","password":"temporary-user-password-2026"}, follow_redirects=True)
+    response = client.post("/login", data={"email":"temporary@example.com","password":"temporary-user-password-2026"}, follow_redirects=True)
     assert b"Temporary user" not in response.data
     assert client.get("/settings").status_code == 302
 
