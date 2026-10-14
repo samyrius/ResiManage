@@ -109,3 +109,12 @@ This file is the durable project handover log for `samyrius/rotation-app`. Read 
 
 ## Archive limitation
 This repository log captures durable project decisions and progress; it is not a verbatim recording of every voice call or every conversation. Do not store credentials, access tokens, personal secrets, or real resident records here.
+
+
+## Bug log — 2026-10-14
+
+### BUG-UI-001: Mobile layout overflows screen (reported from phone screenshot)
+- **Observed:** content/header appear clipped horizontally; navigation and labels crowd/overlap; page does not adapt cleanly to a narrow phone viewport.
+- **Action taken:** updated the shared CSS in `app.py` on `main` at commit `a7833ab582a84b9d4828742a58d35006d8408bbf`. Added global box sizing and horizontal overflow protection, responsive padding and grid sizing, wrapping for labels/buttons, scroll containment for wide tables, image sizing, and RTL navigation handling.
+- **Status:** code change committed; **not yet runtime-verified on the user's phone**. Treat as pending verification, not confirmed fixed. Next: run automated tests/CI, inspect all rendered pages at narrow viewport widths, then install/build a test package only after the remaining recorded defects are addressed.
+- **Process rule confirmed by user:** every newly discovered defect must be added to this Resistage project log with a unique ID, observed behavior, fix, test evidence, and status. Do not declare a defect fixed until it has been tested. Do not produce a new app build for the user until all logged defects have been corrected and the required tests pass.
