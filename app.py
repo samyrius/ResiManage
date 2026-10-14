@@ -520,18 +520,19 @@ def manage_users():
   else:
    username=request.form.get("username","").strip()
    password=request.form.get("password","")
+   email=request.form.get("email","").strip().lower()
    role=request.form.get("role","user")
-   if len(username)<3 or len(password)<12 or role not in ("super_admin","user"):
+   if len(username)<3 or len(password)<12 or role not in ("super_admin","user") or "@" not in email or "." not in email.rsplit("@",1)[-1] or len(email)>254:
     flash("Username must have 3+ characters and password 12+ characters.")
    else:
     try:
-     c.execute("INSERT INTO users(username,password_hash,role) VALUES(?,?,?)",(username,hash_password(password),role))
+     c.execute("INSERT INTO users(username,email,email_verified,password_hash,role) VALUES(?,?,0,?,?)",(username,email,hash_password(password),role))
      audit_event(c,"user.created",f"username={username}; role={role}")
      c.commit(); flash(tr("done"))
     except sqlite3.IntegrityError:
-     flash("Username already exists.")
+     flash("Username or email already exists.")
  rows=c.execute("SELECT id,username,role,active,created_at FROM users ORDER BY role DESC,username").fetchall(); c.close()
- return page("""<section><h3>{{t('users')}}</h3><p>{{t('users_help')}}</p><form method="post"><input type="hidden" name="action" value="create"><label>{{t('username')}}</label><input name="username" minlength="3" required><label>{{t('password')}} (12+)</label><input name="password" type="password" minlength="12" required><label>{{t('role')}}</label><select name="role"><option value="user">{{t('standard_user')}}</option><option value="super_admin">{{t('super_admin')}}</option></select><button>{{t('add')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('username')}}</th><th>{{t('role')}}</th><th>{{t('active_col')}}</th><th>{{t('created')}}</th><th>Admin action</th></tr>{% for u in rows %}<tr><td>{{u.username}}</td><td>{{u.role}}</td><td>{{u.active}}</td><td>{{u.created_at}}</td><td>{% if u.username!=session.get('user') or u.active==0 %}<form method="post"><input type="hidden" name="user_id" value="{{u.id}}"><button name="action" value="{{'deactivate' if u.active else 'activate'}}">{{'Deactivate' if u.active else 'Activate'}}</button></form>{% else %}Current account{% endif %}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
+ return page("""<section><h3>{{t('users')}}</h3><p>{{t('users_help')}}</p><form method="post"><input type="hidden" name="action" value="create"><label>{{t('username')}}</label><input name="username" minlength="3" required><label>Email / البريد الإلكتروني</label><input name="email" type="email" maxlength="254" required><label>{{t('password')}} (12+)</label><input name="password" type="password" minlength="12" required><label>{{t('role')}}</label><select name="role"><option value="user">{{t('standard_user')}}</option><option value="super_admin">{{t('super_admin')}}</option></select><button>{{t('add')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('username')}}</th><th>{{t('role')}}</th><th>{{t('active_col')}}</th><th>{{t('created')}}</th><th>Admin action</th></tr>{% for u in rows %}<tr><td>{{u.username}}</td><td>{{u.role}}</td><td>{{u.active}}</td><td>{{u.created_at}}</td><td>{% if u.username!=session.get('user') or u.active==0 %}<form method="post"><input type="hidden" name="user_id" value="{{u.id}}"><button name="action" value="{{'deactivate' if u.active else 'activate'}}">{{'Deactivate' if u.active else 'Activate'}}</button></form>{% else %}Current account{% endif %}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
 @app.get("/audit")
 def audit_log():
  if super_guard(): return super_guard()
