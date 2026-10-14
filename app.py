@@ -138,6 +138,26 @@ tbody tr:nth-child(even),table tr:nth-child(even){background:#f8fbfe}
 .rt-footer strong{color:#2d5877}.rt-footer .rt-sep{color:#ff986c;padding:0 4px}
 @media(max-width:600px){.main-nav{position:relative;border-radius:0 0 14px 14px;justify-content:flex-start}.rt-language{width:100%;justify-content:center;margin:3px 0 0}.main-nav>a,.nav-group summary{font-size:12px}.rt-footer{line-height:1.9}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+/* ResiTrack dark navy mockup theme */
+:root{color-scheme:dark;--rt-cyan:#19d9e8;--rt-mint:#19dfbd;--rt-text:#e8f7ff}
+html,body{background:#041426!important;color:#e8f7ff!important}
+body{background:radial-gradient(ellipse at 10% 0%,#0a467055,transparent 34%),linear-gradient(150deg,#020d1c,#061a30 58%,#041426)!important;color:#e8f7ff}
+header.brand-header{background:linear-gradient(115deg,#020d1c,#07375b 58%,#075a70)!important;border-bottom:2px solid var(--rt-cyan)!important}
+main{max-width:1120px}
+.main-nav{background:#061a2be8!important;border:1px solid #0c4564!important;border-radius:0 0 18px 18px!important}
+.main-nav>a,.nav-group summary{background:linear-gradient(135deg,#0b3557,#0b5572)!important;border:1px solid #17668a!important;color:#e9fbff!important;border-radius:11px!important}
+.nav-menu{background:#071d32f5!important;border-color:#155a80!important}
+.nav-menu a{background:#0a2b47!important;color:#dff8ff!important;border-color:#104765!important}
+section,.rt-stat,.rt-action-card,.login-brand,.login-panel{background:linear-gradient(145deg,#08223aee,#061a30f5)!important;border:1px solid #125173!important;box-shadow:0 10px 28px #0004!important;color:#e8f7ff!important;border-radius:17px!important}
+h1,h2,h3,h4,strong,th{color:#eafaff}
+p,label,td,small,.muted{color:#a9ccdf}
+a,button{background:linear-gradient(110deg,#087f9f,#09b9bd)!important;color:#f3feff!important;border:1px solid #24cce0!important;border-radius:11px!important}
+input,select,textarea{background:#04182b!important;color:#e8f7ff!important;border:1px solid #176083!important;border-radius:10px!important}
+th{background:#0b3552!important;color:#70eaf2!important}td{background:#061d32;border-bottom:1px solid #12415e!important}
+.rt-dot{background:var(--rt-mint)!important}.rt-year-chip{background:#0b4c69!important;color:#8ff5f4!important}
+.rt-progress{background:#123750!important}.rt-progress span{background:linear-gradient(90deg,#16d8bc,#16c8ed)!important}
+.login-emblem{color:#20e2e7!important;text-shadow:0 0 25px #16d8ed!important}
+@media(max-width:600px){main{padding:8px}.main-nav{position:relative;top:auto;justify-content:flex-start}.rt-stats,.rt-quick-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style><header class="brand-header"><div class="brand-lockup"><img class="brand-icon" src="/static/resitrack-icon.svg" width="64" height="64" alt="ResiTrack"><div><h2>{{t('app')}}</h2><p class="brand-tagline">{% if lang=='ar' %}تسيير تربصات الأطباء المقيمين{% elif lang=='fr' %}Gestion des stages des médecins résidents{% else %}Resident rotation management{% endif %}</p><span class="brand-year">{{t('year')}}: {{year}}</span></div></div></header>{% if user %}<nav class="main-nav"><a href="/"><span class="nav-icon">⌂</span>{{t('home')}}</a><details class="nav-group"><summary><span class="nav-icon">♙</span>{{t('residents')}}</summary><div class="nav-menu"><a href="/residents">{{t('manage_residents')}}</a><a href="/objectives">{{t('objectives')}}</a><a href="/import">{{t('import_residents')}}</a><a href="/exams">{{t('promotion')}}</a><a href="/dems">{{t('dems_success')}}</a></div></details><a href="/terrains"><span class="nav-icon">✚</span>{{t('terrains')}}</a><a href="/capacities"><span class="nav-icon">▦</span>{{t('capacities')}}</a><a href="/assign"><span class="nav-icon">⇄</span>{{t('assign')}}</a><a href="/history"><span class="nav-icon">◷</span>{{t('history')}}</a><a href="/decisions"><span class="nav-icon">✓</span>{{t('decisions')}}</a><a href="/summary"><span class="nav-icon">▤</span>{{t('summary')}}</a><details class="nav-group"><summary><span class="nav-icon">⚙</span>{{t('settings')}}</summary><div class="nav-menu"><a href="/settings">{{t('settings_page')}}</a><a href="/users">{{t('users')}}</a><a href="/audit">{{t('audit')}}</a><a href="/backup">{{t('backup')}}</a><a href="/export">{{t('export')}}</a><a href="/restore">{{t('restore')}}</a><a href="/logout">{{t('logout')}}</a></div></details><div class="rt-language" aria-label="Language"><a href="/lang/ar" {% if lang=='ar' %}aria-current="page"{% endif %} title="العربية">ع</a><a href="/lang/fr" {% if lang=='fr' %}aria-current="page"{% endif %} title="Français">FR</a><a href="/lang/en" {% if lang=='en' %}aria-current="page"{% endif %} title="English">EN</a></div></nav>{% endif %}<main>{% for m in get_flashed_messages() %}<p class="msg">{{m}}</p>{% endfor %}{{body|safe}}</main><footer class="rt-footer">© <strong>Tous droits réservés · Dr Dris</strong><span class="rt-sep"> | </span><strong>All rights reserved · Dr Dris</strong><span class="rt-sep"> | </span><strong>جميع الحقوق محفوظة · Dr Dris</strong></footer></html>"""
  context={"t":tr,"lang":lang,"year":setting(db(),"year")}
  context.update(kw)
