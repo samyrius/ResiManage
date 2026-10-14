@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
-<title id="title">ResiTrack</title><desc id="desc">Three-dimensional medical shield with a cross, heartbeat, and rotation arrows</desc>
+<title id="title">ResiTrack</title><desc id="desc">Three-dimensional medical shield with an ECG heartbeat and rotation arrows</desc>
 <defs>
  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#12385d"/><stop offset=".55" stop-color="#167aa0"/><stop offset="1" stop-color="#32c3b1"/></linearGradient>
  <linearGradient id="shield" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#d7f6f5"/><stop offset="1" stop-color="#86d9d6"/></linearGradient>
@@ -13,7 +13,7 @@
  <path d="M128 43 190 66V116c0 43-25 70-62 91-37-21-62-48-62-91V66Z" fill="#0a3154" opacity=".65" transform="translate(5 7)"/>
  <path d="M128 38 190 61V111c0 43-25 70-62 91-37-21-62-48-62-91V61Z" fill="url(#shield)" stroke="url(#edge)" stroke-width="4" stroke-linejoin="round"/>
  <path d="M128 52 177 70v41c0 33-18 56-49 75-31-19-49-42-49-75V70Z" fill="#f7ffff" opacity=".65"/>
- <path d="M116 69h24v28h28v24h-28v28h-24v-28H88V97h28Z" fill="#14799a" stroke="#0d5d82" stroke-width="2" stroke-linejoin="round"/>
+ <path d="M76 118h24l10-17 15 38 17-53 13 32h26" fill="none" stroke="#14799a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M76 118h24l10-17 15 38 17-53 13 32h26" fill="none" stroke="#5eead4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
  <path d="M83 163h24l10-17 13 29 13-24 8 12h23" fill="none" stroke="#19a99e" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
 </g>
 <path d="M54 184a88 88 0 0 0 138-4" fill="none" stroke="#b9fff4" stroke-width="5" stroke-linecap="round" opacity=".95"/>
