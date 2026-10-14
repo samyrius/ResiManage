@@ -134,3 +134,12 @@ This repository log captures durable project decisions and progress; it is not a
 - [ ] Open both dropdowns and verify all requested links preserve their original routes.
 - [ ] Verify Arabic RTL, French, and English labels.
 - [ ] Inspect narrow mobile viewport for clipping, overlap, and submenu reachability.
+
+
+## ResiTrack branding — 2026-10-14
+
+### BRAND-001: Consistent application name and medical icon
+- **Request:** use the chosen name ResiTrack and give the application a polished, clearly dimensional medical identity focused on resident rotations, medicine, and anaesthesia/intensive care.
+- **Implementation:** added a scalable SVG icon at `static/resitrack-icon.svg` with a dimensional shield, medical cross, ECG line, gradient, and depth shadow; wired it as the browser favicon and the shared page-header icon. Updated the application name across Arabic, French, and English labels and added a localized descriptive tagline. Existing route names, database paths, and stored data are untouched.
+- **Verification:** GitHub Actions and browser/mobile rendering checks must be confirmed on this branch before the change is called verified. This is a web-app branding change, not an Android APK build.
+- **Status:** implementation submitted for automated checks; visual/runtime verification pending.
