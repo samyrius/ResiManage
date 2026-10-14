@@ -68,6 +68,8 @@ def init():
  # Additive migrations preserve existing resident and rotation-history records.
  for col, spec in {"birth_place":"TEXT DEFAULT ''","birth_date":"TEXT DEFAULT ''","photo_path":"TEXT DEFAULT ''","dems_status":"TEXT DEFAULT ''"}.items():
   ensure_column(c,"residents",col,spec)
+ ensure_column(c,"users","email","TEXT DEFAULT ''")
+ ensure_column(c,"users","email_verified","INTEGER NOT NULL DEFAULT 0")
  ensure_column(c,"terrains","active","INTEGER NOT NULL DEFAULT 1")
  ensure_column(c,"audit","actor","TEXT DEFAULT ''")
  c.executescript("""
