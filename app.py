@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, request, redirect, session, render_template_string, flash, send_file, send_from_directory
-import sqlite3, os, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess, secrets
+import sqlite3, os, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess, secrets, smtplib, time
 from datetime import datetime
 from werkzeug.utils import secure_filename
 
@@ -75,6 +75,7 @@ def init():
  CREATE TABLE IF NOT EXISTS objectives(id INTEGER PRIMARY KEY,terrain_id INTEGER NOT NULL,study_year INTEGER NOT NULL,objective TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS dems_archive(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL UNIQUE,success_date TEXT NOT NULL,profile_json TEXT NOT NULL,history_json TEXT NOT NULL,archived_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,username TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('super_admin','user')),active INTEGER NOT NULL DEFAULT 1,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+ CREATE TABLE IF NOT EXISTS pending_registrations(id INTEGER PRIMARY KEY,username TEXT NOT NULL,email TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,code_hash TEXT NOT NULL,expires_at INTEGER NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE IF NOT EXISTS import_previews(id INTEGER PRIMARY KEY,owner TEXT NOT NULL,rows_json TEXT NOT NULL,errors_json TEXT NOT NULL,filename TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  """)
  y=str(datetime.now().year)+"-"+str(datetime.now().year+1)
@@ -175,7 +176,101 @@ def login():
  else:
   c.close()
  setup_required=not p
- return page("""<section class="login-hero"><div class="login-language"><span>🌐</span> <a href="/lang/ar">العربية</a><a href="/lang/fr">🇫🇷 Français</a><a href="/lang/en">🇬🇧 English</a></div><div class="login-brand"><div class="login-emblem" aria-hidden="true">💓</div><p class="login-kicker">CHU Nedir Mohamed · Tizi Ouzou</p><h1>Resi<span>Track</span></h1><p class="login-subtitle">Gestion des rotations des résidents</p><p class="login-motto">Aujourd’hui, un pas de plus vers votre avenir</p></div><div class="login-panel"><h2>{{t('login')}}</h2><p class="login-hint">Accédez à votre espace sécurisé</p><form method="post"><label>Username / Identifiant / اسم المستخدم</label><input name="username" value="admin" autocomplete="username" required><label>{{t('password')}}</label><div class="password-wrap"><input id="login-password" name="password" type="password" autocomplete="current-password" minlength="{{12 if setup_required else 1}}" required><button class="password-toggle" type="button" onclick="const p=document.getElementById('login-password');p.type=p.type==='password'?'text':'password';this.setAttribute('aria-label',p.type==='password'?'Show password':'Hide password')">◉</button></div>{% if setup_required %}<label>Confirm password / Confirmer le mot de passe / تأكيد كلمة المرور</label><input name="confirm_password" type="password" autocomplete="new-password" minlength="12" required><p>Create the first administrator password (12+ characters).</p>{% endif %}<button class="login-submit">{{'Create administrator / Créer l’administrateur / إنشاء المسؤول' if setup_required else t('signin')}} <span>➜</span></button></form><p class="login-security">♧ Connexion sécurisée · Secure sign-in · دخول آمن</p></div><div class="login-feature-row"><span>🩺 Médecine</span><span>💓 Réanimation</span><span>✨ Anesthésie</span><span>📋 Formation</span></div><footer class="login-rights">Tous droits réservés · Dr Dris <span>|</span> All rights reserved · Dr Dris <span>|</span> جميع الحقوق محفوظة · Dr Dris</footer></section><style>.login-hero{position:relative;isolation:isolate;overflow:hidden;max-width:980px;margin:12px auto;padding:clamp(16px,4vw,38px);border-radius:28px;color:#f8fbff;background:radial-gradient(ellipse at 12% 15%,#ffb36b55,transparent 32%),radial-gradient(ellipse at 88% 24%,#ef65b755,transparent 30%),radial-gradient(ellipse at 80% 85%,#39dfb355,transparent 30%),linear-gradient(135deg,#101d3a,#17365b 48%,#382b55);box-shadow:0 24px 60px #152d4c35}.login-hero:before,.login-hero:after{content:'';position:absolute;z-index:-1;border-radius:50%;filter:blur(2px);animation:orbit 12s ease-in-out infinite alternate}.login-hero:before{width:230px;height:230px;right:-55px;top:-75px;background:linear-gradient(135deg,#47e4d8aa,#4c8bff44)}.login-hero:after{width:190px;height:190px;left:-65px;bottom:90px;background:linear-gradient(135deg,#ff9a68aa,#d85bc955);animation-delay:-4s}.login-language{display:flex;justify-content:center;align-items:center;gap:clamp(8px,2vw,20px);flex-wrap:wrap}.login-language a{color:#fff;text-decoration:none;border:1px solid #ffffff45;background:#ffffff12;border-radius:22px;padding:7px 12px}.login-brand{text-align:center;padding:20px 0 14px}.login-emblem{font-size:56px;color:#53e2c4;text-shadow:0 0 28px #53e2c477;animation:pulse 3s ease-in-out infinite}.login-brand h1{font-size:clamp(38px,8vw,68px);line-height:1;margin:4px 0;font-weight:800;letter-spacing:-2px}.login-brand h1 span{background:linear-gradient(90deg,#43e5d1,#6db6ff,#ffb36b);-webkit-background-clip:text;background-clip:text;color:transparent}.login-kicker,.login-subtitle,.login-motto{margin:7px 0}.login-kicker{color:#b8d8f0}.login-subtitle{font-size:clamp(15px,3vw,20px)}.login-motto{color:#ffcf91;font-style:italic}.login-panel{max-width:480px;margin:16px auto 10px;padding:clamp(18px,4vw,30px);border:1px solid #ffffff55;border-radius:22px;background:#ffffff13;backdrop-filter:blur(14px);box-shadow:0 15px 35px #050d2040}.login-panel h2{text-align:center;margin:0;font-size:26px}.login-hint,.login-security{text-align:center;color:#d0e3f4}.login-panel label{display:block;margin-top:12px}.login-panel input{width:100%;min-width:0;background:#ffffff17;color:white;border:1px solid #ffffff48;border-radius:14px;padding:13px}.login-panel input::placeholder{color:#d4e2f1}.password-wrap{display:flex;align-items:center;gap:8px}.password-wrap input{flex:1}.password-toggle{border:1px solid #ffffff55;background:#ffffff18;color:white;padding:10px 14px;border-radius:12px;cursor:pointer}.login-submit{width:100%;margin-top:18px;border:0;border-radius:15px;padding:14px;background:linear-gradient(100deg,#5ce7b0,#22c9e5 55%,#6697ff);color:#08223d;font-weight:800;font-size:17px;box-shadow:0 7px 22px #31d5cf44;cursor:pointer}.login-submit span{margin-inline-start:10px}.login-feature-row{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:22px 0 12px}.login-feature-row span{border:1px solid #ffffff35;background:#ffffff10;border-radius:12px;padding:9px 13px}.login-rights{text-align:center;color:#d6e5f3;border-top:1px solid #ffffff24;padding-top:13px;font-size:12px}.login-rights span{color:#ffbe83;padding:0 5px}@keyframes orbit{to{transform:translate3d(-18px,22px,0) scale(1.08)}}@keyframes pulse{50%{transform:scale(1.08);filter:drop-shadow(0 0 12px #5ce7b0)}}@media(prefers-reduced-motion:reduce){.login-hero:before,.login-hero:after,.login-emblem{animation:none}}@media(max-width:520px){.login-hero{margin:4px;padding:14px;border-radius:18px}.login-feature-row span{font-size:12px;padding:7px}.login-rights span{padding:0 2px}}</style>""",setup_required=setup_required)
+ return page("""<section class="login-hero"><div class="login-language"><span>🌐</span> <a href="/lang/ar">العربية</a><a href="/lang/fr">🇫🇷 Français</a><a href="/lang/en">🇬🇧 English</a></div><div class="login-brand"><div class="login-emblem" aria-hidden="true">💓</div><p class="login-kicker">CHU Nedir Mohamed · Tizi Ouzou</p><h1>Resi<span>Track</span></h1><p class="login-subtitle">Gestion des rotations des résidents</p><p class="login-motto">Aujourd’hui, un pas de plus vers votre avenir</p></div><div class="login-panel"><h2>{{t('login')}}</h2><p class="login-hint">Accédez à votre espace sécurisé</p><form method="post"><label>Username / Identifiant / اسم المستخدم</label><input name="username" value="admin" autocomplete="username" required><label>{{t('password')}}</label><div class="password-wrap"><input id="login-password" name="password" type="password" autocomplete="current-password" minlength="{{12 if setup_required else 1}}" required><button class="password-toggle" type="button" onclick="const p=document.getElementById('login-password');p.type=p.type==='password'?'text':'password';this.setAttribute('aria-label',p.type==='password'?'Show password':'Hide password')">◉</button></div>{% if setup_required %}<label>Confirm password / Confirmer le mot de passe / تأكيد كلمة المرور</label><input name="confirm_password" type="password" autocomplete="new-password" minlength="12" required><p>Create the first administrator password (12+ characters).</p>{% endif %}<button class="login-submit">{{'Create administrator / Créer l’administrateur / إنشاء المسؤول' if setup_required else t('signin')}} <span>➜</span></button></form><p class="login-security">♧ Connexion sécurisée · Secure sign-in · دخول آمن</p><p class="login-security"><a href="/register" style="color:#8df2df;text-decoration:underline">Créer un compte / Create account / إنشاء حساب</a></p></div><div class="login-feature-row"><span>🩺 Médecine</span><span>💓 Réanimation</span><span>✨ Anesthésie</span><span>📋 Formation</span></div><footer class="login-rights">Tous droits réservés · Dr Dris <span>|</span> All rights reserved · Dr Dris <span>|</span> جميع الحقوق محفوظة · Dr Dris</footer></section><style>.login-hero{position:relative;isolation:isolate;overflow:hidden;max-width:980px;margin:12px auto;padding:clamp(16px,4vw,38px);border-radius:28px;color:#f8fbff;background:radial-gradient(ellipse at 12% 15%,#ffb36b55,transparent 32%),radial-gradient(ellipse at 88% 24%,#ef65b755,transparent 30%),radial-gradient(ellipse at 80% 85%,#39dfb355,transparent 30%),linear-gradient(135deg,#101d3a,#17365b 48%,#382b55);box-shadow:0 24px 60px #152d4c35}.login-hero:before,.login-hero:after{content:'';position:absolute;z-index:-1;border-radius:50%;filter:blur(2px);animation:orbit 12s ease-in-out infinite alternate}.login-hero:before{width:230px;height:230px;right:-55px;top:-75px;background:linear-gradient(135deg,#47e4d8aa,#4c8bff44)}.login-hero:after{width:190px;height:190px;left:-65px;bottom:90px;background:linear-gradient(135deg,#ff9a68aa,#d85bc955);animation-delay:-4s}.login-language{display:flex;justify-content:center;align-items:center;gap:clamp(8px,2vw,20px);flex-wrap:wrap}.login-language a{color:#fff;text-decoration:none;border:1px solid #ffffff45;background:#ffffff12;border-radius:22px;padding:7px 12px}.login-brand{text-align:center;padding:20px 0 14px}.login-emblem{font-size:56px;color:#53e2c4;text-shadow:0 0 28px #53e2c477;animation:pulse 3s ease-in-out infinite}.login-brand h1{font-size:clamp(38px,8vw,68px);line-height:1;margin:4px 0;font-weight:800;letter-spacing:-2px}.login-brand h1 span{background:linear-gradient(90deg,#43e5d1,#6db6ff,#ffb36b);-webkit-background-clip:text;background-clip:text;color:transparent}.login-kicker,.login-subtitle,.login-motto{margin:7px 0}.login-kicker{color:#b8d8f0}.login-subtitle{font-size:clamp(15px,3vw,20px)}.login-motto{color:#ffcf91;font-style:italic}.login-panel{max-width:480px;margin:16px auto 10px;padding:clamp(18px,4vw,30px);border:1px solid #ffffff55;border-radius:22px;background:#ffffff13;backdrop-filter:blur(14px);box-shadow:0 15px 35px #050d2040}.login-panel h2{text-align:center;margin:0;font-size:26px}.login-hint,.login-security{text-align:center;color:#d0e3f4}.login-panel label{display:block;margin-top:12px}.login-panel input{width:100%;min-width:0;background:#ffffff17;color:white;border:1px solid #ffffff48;border-radius:14px;padding:13px}.login-panel input::placeholder{color:#d4e2f1}.password-wrap{display:flex;align-items:center;gap:8px}.password-wrap input{flex:1}.password-toggle{border:1px solid #ffffff55;background:#ffffff18;color:white;padding:10px 14px;border-radius:12px;cursor:pointer}.login-submit{width:100%;margin-top:18px;border:0;border-radius:15px;padding:14px;background:linear-gradient(100deg,#5ce7b0,#22c9e5 55%,#6697ff);color:#08223d;font-weight:800;font-size:17px;box-shadow:0 7px 22px #31d5cf44;cursor:pointer}.login-submit span{margin-inline-start:10px}.login-feature-row{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:22px 0 12px}.login-feature-row span{border:1px solid #ffffff35;background:#ffffff10;border-radius:12px;padding:9px 13px}.login-rights{text-align:center;color:#d6e5f3;border-top:1px solid #ffffff24;padding-top:13px;font-size:12px}.login-rights span{color:#ffbe83;padding:0 5px}@keyframes orbit{to{transform:translate3d(-18px,22px,0) scale(1.08)}}@keyframes pulse{50%{transform:scale(1.08);filter:drop-shadow(0 0 12px #5ce7b0)}}@media(prefers-reduced-motion:reduce){.login-hero:before,.login-hero:after,.login-emblem{animation:none}}@media(max-width:520px){.login-hero{margin:4px;padding:14px;border-radius:18px}.login-feature-row span{font-size:12px;padding:7px}.login-rights span{padding:0 2px}}</style>""",setup_required=setup_required)
+
+def send_verification_email(recipient, code):
+ host=os.environ.get("RESITRACK_SMTP_HOST","").strip()
+ port=int(os.environ.get("RESITRACK_SMTP_PORT","587"))
+ sender=os.environ.get("RESITRACK_SMTP_FROM","").strip()
+ username=os.environ.get("RESITRACK_SMTP_USER","").strip()
+ password=os.environ.get("RESITRACK_SMTP_PASSWORD","")
+ if not host or not sender or not username or not password:
+  raise RuntimeError("Email verification is not configured. Set RESITRACK_SMTP_HOST, RESITRACK_SMTP_PORT, RESITRACK_SMTP_FROM, RESITRACK_SMTP_USER and RESITRACK_SMTP_PASSWORD.")
+ from email.message import EmailMessage
+ message=EmailMessage()
+ message["Subject"]="ResiTrack — email verification code"
+ message["From"]=sender
+ message["To"]=recipient
+ message.set_content("Your ResiTrack verification code is: "+code+"\n\nIt expires in 10 minutes. If you did not request this, ignore this message.")
+ with smtplib.SMTP(host,port,timeout=15) as server:
+  server.starttls()
+  server.login(username,password)
+  server.send_message(message)
+
+@app.route("/register",methods=["GET","POST"])
+def register():
+ if session.get("user"): return redirect("/")
+ c=db()
+ if request.method=="POST":
+  username=request.form.get("username","").strip()
+  email=request.form.get("email","").strip().lower()
+  password=request.form.get("password","")
+  confirm=request.form.get("confirm_password","")
+  if not re.fullmatch(r"[A-Za-z0-9_.-]{3,40}",username):
+   flash("Username must be 3–40 letters, numbers, dots, underscores or hyphens.")
+  elif not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+",email) or len(email)>254:
+   flash("Enter a valid email address / أدخل بريدًا إلكترونيًا صالحًا.")
+  elif len(password)<12 or password!=confirm:
+   flash("Password must be 12+ characters and match confirmation / كلمة المرور يجب أن تكون 12 حرفًا على الأقل.")
+  elif c.execute("SELECT 1 FROM users WHERE username=?",(username,)).fetchone() or c.execute("SELECT 1 FROM users WHERE lower(email)=?",(email,)).fetchone() or c.execute("SELECT 1 FROM pending_registrations WHERE username=? OR email=?",(username,email)).fetchone():
+   flash("Username or email already registered / اسم المستخدم أو البريد مسجل مسبقًا.")
+  else:
+   code=("%06d" % secrets.randbelow(1000000))
+   c.execute("DELETE FROM pending_registrations WHERE expires_at<?",(int(time.time()),))
+   try:
+    c.execute("INSERT INTO pending_registrations(username,email,password_hash,code_hash,expires_at) VALUES(?,?,?,?,?)",(username,email,hash_password(password),hashlib.sha256(code.encode()).hexdigest(),int(time.time())+600))
+    c.commit()
+    try:
+     send_verification_email(email,code)
+    except Exception as exc:
+     c.execute("DELETE FROM pending_registrations WHERE email=?",(email,)); c.commit()
+     app.logger.error("ResiTrack verification email failed: %s",exc)
+     flash("Email could not be sent; SMTP setup is required / تعذر إرسال البريد، يلزم إعداد SMTP.")
+    else:
+     session["pending_email"]=email
+     flash("Verification code sent; valid for 10 minutes / أرسلنا رمز التأكيد، صالح لمدة 10 دقائق.")
+     c.close()
+     return redirect("/verify-email")
+   except sqlite3.IntegrityError:
+    flash("Username or email already registered / اسم المستخدم أو البريد مسجل مسبقًا.")
+ c.close()
+ return page("""<section class="login-hero"><div class="login-brand"><div class="login-emblem">💓</div><h1>Resi<span>Track</span></h1><h2>Create account / إنشاء حساب</h2><p class="login-subtitle">A valid email is required to confirm the account.</p></div><div class="login-panel"><form method="post"><label>Username / اسم المستخدم</label><input name="username" minlength="3" maxlength="40" pattern="[A-Za-z0-9_.-]{3,40}" autocomplete="username" required><label>Email / البريد الإلكتروني</label><input name="email" type="email" maxlength="254" autocomplete="email" required><label>Password (12+) / كلمة المرور</label><input name="password" type="password" minlength="12" autocomplete="new-password" required><label>Confirm password / تأكيد كلمة المرور</label><input name="confirm_password" type="password" minlength="12" autocomplete="new-password" required><button class="login-submit">Create account / إنشاء الحساب</button></form><p class="login-security"><a href="/login">Back to sign in / الرجوع إلى الدخول</a></p></div></section>""")
+
+@app.route("/verify-email",methods=["GET","POST"])
+def verify_email():
+ email=session.get("pending_email","").strip().lower()
+ if not email: return redirect("/register")
+ c=db()
+ if request.method=="POST":
+  code=request.form.get("code","").strip()
+  pending=c.execute("SELECT * FROM pending_registrations WHERE email=?",(email,)).fetchone()
+  if not pending:
+   session.pop("pending_email",None); flash("Registration expired; please register again / أعد التسجيل."); c.close(); return redirect("/register")
+  if pending["expires_at"]<int(time.time()):
+   c.execute("DELETE FROM pending_registrations WHERE email=?",(email,)); c.commit()
+   session.pop("pending_email",None); flash("Code expired; register again / انتهت صلاحية الرمز."); c.close(); return redirect("/register")
+  if pending["attempts"]>=5:
+   c.execute("DELETE FROM pending_registrations WHERE email=?",(email,)); c.commit()
+   session.pop("pending_email",None); flash("Too many attempts; register again / تجاوزت عدد المحاولات."); c.close(); return redirect("/register")
+  if not re.fullmatch(r"\d{6}",code) or not hmac.compare_digest(hashlib.sha256(code.encode()).hexdigest(),pending["code_hash"]):
+   c.execute("UPDATE pending_registrations SET attempts=attempts+1 WHERE email=?",(email,)); c.commit()
+   flash("Incorrect verification code / رمز غير صحيح.")
+  else:
+   try:
+    c.execute("INSERT INTO users(username,password_hash,role,email,email_verified) VALUES(?,?,'user',?,1)",(pending["username"],pending["password_hash"],pending["email"]))
+    c.execute("DELETE FROM pending_registrations WHERE email=?",(email,))
+    audit_event(c,"user.self_registered",f"username={pending['username']}; email_verified=1")
+    c.commit()
+    session.pop("pending_email",None)
+    flash("Email verified; account created. Please sign in / تم تأكيد البريد وإنشاء الحساب.")
+    c.close()
+    return redirect("/login")
+   except sqlite3.IntegrityError:
+    c.execute("DELETE FROM pending_registrations WHERE email=?",(email,)); c.commit()
+    flash("Account already exists / الحساب موجود مسبقًا.")
+ c.close()
+ return page("""<section class="login-hero"><div class="login-brand"><div class="login-emblem">✉</div><h1>Resi<span>Track</span></h1><h2>Email verification / تأكيد البريد</h2><p class="login-subtitle">Code sent to {{email}}</p></div><div class="login-panel"><form method="post"><label>6-digit code / رمز التأكيد</label><input name="code" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" required><button class="login-submit">Verify email / تأكيد البريد</button></form><p class="login-security">Code expires after 10 minutes / تنتهي صلاحية الرمز بعد 10 دقائق.</p></div></section>""",email=email)
+
 @app.get("/logout")
 def logout(): session.clear(); return redirect("/login")
 @app.get("/")
