@@ -891,7 +891,7 @@ def leave_management():
             for yr in range(start.year,end.year+1):
                 c.execute("INSERT OR IGNORE INTO leave_years(resident_id,year,earned_days,created_by) VALUES(?,?,30,?)",(rid,yr,session.get("user","")))
             earned=c.execute("SELECT COALESCE(SUM(earned_days),0) FROM leave_years WHERE resident_id=? AND year<=?",(rid,end.year)).fetchone()[0]
-            used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND end_date<=?",(rid,end.isoformat())).fetchone()[0]
+            used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND end_date<=?",(rid,date(end.year,12,31).isoformat())).fetchone()[0]
             if used+days>earned: raise ValueError("Insufficient accrued leave balance, including carry-forward.")
             c.execute("INSERT INTO leave_entries(resident_id,start_date,end_date,days,notes,created_by) VALUES(?,?,?,?,?,?)",(rid,start.isoformat(),end.isoformat(),days,request.form.get("notes","").strip(),session.get("user","")))
             audit_event(c,"leave.entry_created",f"resident_id={rid}; start={start}; end={end}; days={days}")
@@ -906,7 +906,7 @@ def leave_management():
         for yr in range(first,now.year+1):
             c.execute("INSERT OR IGNORE INTO leave_years(resident_id,year,earned_days,created_by) VALUES(?,?,30,?)",(r["id"],yr,session.get("user","")))
         earned=c.execute("SELECT COALESCE(SUM(earned_days),0) FROM leave_years WHERE resident_id=? AND year<=?",(r["id"],now.year)).fetchone()[0]
-        used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND end_date<=?",(r["id"],now.isoformat())).fetchone()[0]
+        used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND end_date<=?",(r["id"],date(now.year,12,31).isoformat())).fetchone()[0]
         balances.append({"name":r["surname"]+" "+r["firstname"],"earned":earned,"used":used,"remaining":earned-used})
     entries=c.execute("SELECT l.*,r.surname,r.firstname FROM leave_entries l JOIN residents r ON r.id=l.resident_id ORDER BY l.start_date DESC").fetchall()
     c.commit(); c.close()
