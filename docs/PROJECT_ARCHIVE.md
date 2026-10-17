@@ -433,3 +433,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** future-year marks and post-graduation marks create neither exam rows nor exam audit events.
 - **Branch:** `resimanage-2-exam-record-stage-guard`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / TERRAIN-CLASSIFICATION-IMMUTABILITY-001 — 2026-10-17
+
+- **Audit finding:** changing a terrain from mandatory/basic to optional (or changing its year requirement) after history or assignments exist rewrites the meaning of past records and changes repeat eligibility retroactively.
+- **Fix proposed on isolated branch:** reject changes to `kind` and `mandatory_year` once any history or assignment references the terrain. Renaming remains available. Existing terrain deactivation behavior is intentionally preserved because the current tests and workflow treat deactivation as an administrative retirement, not deletion.
+- **Regression test added:** after a resident has a history record for a terrain, an attempt to change its classification is rejected and the existing classification/history remain unchanged.
+- **Branch:** `resimanage-2-terrain-classification-history-guard`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
