@@ -499,3 +499,12 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** a future-dated vote returns a validation message and creates no DEMS vote, archive entry, or vote audit record.
 - **Branch:** `resimanage-2-dems-future-date-guard`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no resident data/database files/secrets/assets changed; no APK build or phone test started.
+
+
+### RESI-2 / ADMIN-RECORD-ID-VALIDATION-001 — 2026-10-17
+
+- **Audit finding:** malformed assignment-decision IDs and user-management IDs raised uncaught integer-conversion errors in Super Admin routes.
+- **Fix proposed on isolated branch:** parse these form IDs using Flask's typed form accessor so malformed values resolve to no matching record instead of raising a server error. No record or audit event is written for malformed IDs.
+- **Regression test added:** malformed decision and user IDs return normal responses and create no decision or audit records.
+- **Branch:** `resimanage-2-admin-id-validation`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real resident data/database files/secrets/assets changed; no APK build or phone test started.
