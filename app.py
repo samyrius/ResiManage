@@ -485,7 +485,8 @@ def check(c,rid,tid,pid,y):
   SELECT h.terrain_id FROM history h
   JOIN terrains t ON t.id=h.terrain_id
   WHERE h.resident_id=? AND t.kind IN ('mandatory','basic') AND t.active=1
- """,(rid,)).fetchall()}
+    AND (COALESCE(h.date_done,'')='' OR h.date_done<=?)
+ """,(rid,date.today().isoformat())).fetchall()}
  # A confirmed assignment is completion evidence only after its rotation period has ended.
  # Future/current assignments must not unlock repetition of mandatory terrains.
  completed_assignments=c.execute("""
@@ -573,7 +574,10 @@ def history():
    valid_periods={"01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"}
    if period and period not in valid_periods:
     raise ValueError("Choose one of the four official rotation periods.")
-   if date_done: date.fromisoformat(date_done)
+   if date_done:
+    parsed_date=date.fromisoformat(date_done)
+    if parsed_date>date.today():
+     raise ValueError("A historical rotation date cannot be in the future.")
    if not c.execute("SELECT 1 FROM residents WHERE id=?",(rid,)).fetchone():
     raise ValueError("Resident does not exist.")
    if not c.execute("SELECT 1 FROM terrains WHERE id=?",(tid,)).fetchone():

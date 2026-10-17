@@ -417,3 +417,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression tests:** prior-year confirmed assignment without a history row is blocked; the future-completion test excludes the terrain being tested so it specifically checks that future assignments do not count as completion evidence.
 - **Branch:** `resimanage-2-repeat-eligibility-cross-year-v2`; based on the latest `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / HISTORY-FUTURE-DATE-GUARD-001 — 2026-10-17
+
+- **Audit finding:** manual history entry accepted future completion dates, and the repeat-eligibility calculation treated every history row as completed regardless of its date. Incorrect future-dated records could unlock repeats prematurely.
+- **Fix proposed on isolated branch:** reject future completion dates in manual history entry and exclude future-dated legacy/history rows from completed mandatory/basic terrain evidence.
+- **Regression tests:** reject future-dated manual history; prove future-dated rows for all core terrains do not unlock a repeat.
+- **Branch:** `resimanage-2-history-future-date-guard-v2`; based on the latest `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
