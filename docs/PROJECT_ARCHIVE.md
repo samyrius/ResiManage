@@ -327,3 +327,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** start from a legacy database with one period, verify all four exist after initialization, and verify a second initialization does not duplicate them.
 - **Branch:** `resimanage-2-period-completion-migration`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / IMPORT-YEAR-VALIDATION-001 — 2026-10-17
+
+- **Audit finding:** import converted the supplied year to `int(float(value))`, silently truncating fractional values such as `2.5` to year 2 instead of rejecting the malformed row.
+- **Fix proposed on isolated branch:** require the imported year value to be an integer before checking it is in 1–4. Valid spreadsheet values such as `2` or `2.0` remain accepted.
+- **Regression test added:** a CSV row with year 2.5 must show a validation error and must not create a resident.
+- **Branch:** `resimanage-2-import-year-validation`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
