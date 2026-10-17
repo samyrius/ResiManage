@@ -353,3 +353,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
 
 - **Related UI issue found during verification:** role-based controls inside the page body were rendered without the `role` template variable. This hid assignment controls and other admin-only UI even for Super Admins. The shared page renderer now passes the active role into the body template context; regression tests for assignment controls cover this.
+
+### RESI-2 / ASSIGNMENT-PERMISSION-001 — 2026-10-17
+
+- **Audit finding:** the assignment route allowed a standard user to create rotation assignments even though the form already displayed administrative actions only to Super Admins.
+- **Fix proposed on isolated branch:** only Super Admins can submit assignment creation; standard users receive a read-only explanation and do not see the creation form. Existing assignments remain visible.
+- **Regression test added:** standard users cannot POST an assignment, no assignment/audit row is written, and the creation form is absent from their read-only page.
+- **Branch:** `resimanage-2-assignment-permission-guard`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
