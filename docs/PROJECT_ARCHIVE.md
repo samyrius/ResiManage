@@ -369,3 +369,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression tests added:** reject malformed academic year and unknown period; accept one valid entry; reject a duplicate without adding a second row or audit event.
 - **Branch:** `resimanage-2-history-validation-guard`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / COMPLETION-EVIDENCE-001 — 2026-10-17
+
+- **Audit finding:** mandatory/basic terrain completion counted every confirmed assignment, including assignments in future rotation periods. A crafted or bulk-created set of future confirmed assignments could therefore make the resident appear to have completed all core terrains and unlock a repeat prematurely.
+- **Fix proposed on isolated branch:** only documented history records and confirmed assignments whose rotation period has already ended count as completion evidence. Current/future assignments do not unlock repeats.
+- **Regression test added:** a resident with history for one core terrain and confirmed assignments for all core terrains in academic year 2099–2100 must still be blocked from repeating the historical terrain.
+- **Branch:** `resimanage-2-completion-evidence-guard`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
