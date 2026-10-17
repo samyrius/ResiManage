@@ -657,3 +657,103 @@ def test_external_rotation_form_requires_all_destination_details(tmp_path, monke
     with rotation_app.db() as conn:
         row = conn.execute("SELECT supervisor,hospital,country,rotation_type FROM external_rotations WHERE resident_id=?", (rid,)).fetchone()
         assert tuple(row) == ("Dr Test", "CHU Test", "France", "Observation")
+
+def test_leave_carries_unused_days_forward_and_blocks_overdraw(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)", ("Carry", "Leave", 2, "active"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Carry'").fetchone()[0]
+        conn.commit()
+
+    first = client.post("/leave", data={"resident_id": rid, "start_date": "2024-01-01", "end_date": "2024-01-10"}, follow_redirects=True)
+    assert first.status_code == 200
+    second = client.post("/leave", data={"resident_id": rid, "start_date": "2025-01-01", "end_date": "2025-01-25"}, follow_redirects=True)
+    assert second.status_code == 200
+    with rotation_app.db() as conn:
+        years = conn.execute("SELECT SUM(earned_days) FROM leave_years WHERE resident_id=? AND year IN (2024,2025)", (rid,)).fetchone()[0]
+        used = conn.execute("SELECT SUM(days) FROM leave_entries WHERE resident_id=?", (rid,)).fetchone()[0]
+    assert years == 60
+    assert used == 35
+    rejected = client.post("/leave", data={"resident_id": rid, "start_date": "2025-02-01", "end_date": "2025-02-26"}, follow_redirects=True)
+    assert rejected.status_code == 200
+    assert b"Insufficient accrued leave balance" in rejected.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT SUM(days) FROM leave_entries WHERE resident_id=?", (rid,)).fetchone()[0] == 35
+
+
+def test_leave_rejects_overlapping_entries(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)", ("Overlap", "Leave", 1, "active"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Overlap'").fetchone()[0]
+        conn.commit()
+    client.post("/leave", data={"resident_id": rid, "start_date": "2026-01-01", "end_date": "2026-01-10"}, follow_redirects=True)
+    rejected = client.post("/leave", data={"resident_id": rid, "start_date": "2026-01-05", "end_date": "2026-01-12"}, follow_redirects=True)
+    assert rejected.status_code == 200
+    assert b"Leave dates overlap an existing entry" in rejected.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM leave_entries WHERE resident_id=?", (rid,)).fetchone()[0] == 1
+
+
+def test_external_rotation_returned_record_still_blocks_overlapping_period(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)", ("Returned", "Away", 2, "active"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Returned'").fetchone()[0]
+        tid = conn.execute("SELECT id FROM terrains WHERE name='Réanimation chirurgicale'").fetchone()[0]
+        period = conn.execute("SELECT id,year_label,name FROM periods WHERE name LIKE '%Août%' OR name LIKE '%Aout%'").fetchone()
+        assert period is not None
+        conn.execute("INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,status) VALUES(?,?,?,?,?,?,?,?,?)",
+                     (rid, "Dr Test", "Paris", "CHU Test", "France", "Observation", "2026-08-01", "2026-10-30", "returned"))
+        conn.commit()
+        allowed, message, _ = rotation_app.check(conn, rid, tid, period["id"], period["year_label"])
+    assert allowed is False
+    assert "External rotation" in message
+
+
+def test_assignment_resident_options_mark_external_period_conflicts(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)", ("Blocked", "Resident", 2, "active"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Blocked'").fetchone()[0]
+        period = conn.execute("SELECT id FROM periods WHERE name LIKE '%Août%' OR name LIKE '%Aout%'").fetchone()
+        assert period is not None
+        conn.execute("INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,status) VALUES(?,?,?,?,?,?,?,?,?)",
+                     (rid, "Dr Test", "Paris", "CHU Test", "France", "Observation", "2026-08-01", "2026-10-30", "returned"))
+        conn.commit()
+    response = client.get("/assign")
+    assert response.status_code == 200
+    assert f'data-blocked-periods="{period["id"]}"'.encode() in response.data
+    assert b"o.disabled=blocked" in response.data
+
+
+def test_external_rotation_can_be_edited_and_cancelled_with_audit(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)", ("Edit", "External", 3, "active"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Edit'").fetchone()[0]
+        conn.execute("INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,status) VALUES(?,?,?,?,?,?,?,?,?)",
+                     (rid, "Dr Old", "Paris", "CHU Old", "France", "Observation", "2026-11-01", "2026-12-01", "active"))
+        xid = conn.execute("SELECT id FROM external_rotations WHERE resident_id=?", (rid,)).fetchone()[0]
+        conn.commit()
+    edit = client.post(f"/external-rotations/{xid}/edit", data={
+        "resident_id": str(rid), "supervisor": "Dr New", "destination": "Lyon",
+        "hospital": "CHU New", "country": "France", "rotation_type": "Clinical",
+        "start_date": "2026-11-10", "end_date": "2026-12-10", "notes": "updated"
+    }, follow_redirects=True)
+    assert edit.status_code == 200
+    with rotation_app.db() as conn:
+        row = conn.execute("SELECT supervisor,destination,hospital,rotation_type,status FROM external_rotations WHERE id=?", (xid,)).fetchone()
+        assert tuple(row) == ("Dr New", "Lyon", "CHU New", "Clinical", "active")
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='external_rotation.updated'").fetchone()[0] == 1
+    cancelled = client.post(f"/external-rotations/{xid}/cancel", follow_redirects=True)
+    assert cancelled.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT status FROM external_rotations WHERE id=?", (xid,)).fetchone()[0] == "cancelled"
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='external_rotation.cancelled'").fetchone()[0] == 1
+
