@@ -930,8 +930,10 @@ def exams():
     c.close(); return ("Only the official Super Admins Dr Dris and Pr Benhocine may vote on progression.",403)
    if outcome not in ("approve","reject") or not reason:
     flash("Choose approve/reject and enter the decision reason.")
+   elif resident["status"]!="active":
+    flash("Inactive residents cannot be advanced; no progression vote was recorded.")
    elif sy not in (2,3) or resident["year"]!=sy:
-    flash("Only year 2 or 3 residents can use the dual-official progression vote.")
+    flash("Only active year 2 or 3 residents can use the dual-official progression vote.")
    else:
     c.execute("INSERT INTO promotion_votes(resident_id,from_year,decision,reason,actor) VALUES(?,?,?,?,?) ON CONFLICT(resident_id,from_year,actor) DO UPDATE SET decision=excluded.decision,reason=excluded.reason,created_at=CURRENT_TIMESTAMP",(rid,sy,outcome,reason,actor))
     audit_event(c,"promotion.vote_recorded",f"resident_id={rid}; from_year={sy}; decision={outcome}; reason={reason}")
