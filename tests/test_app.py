@@ -363,7 +363,7 @@ def test_first_year_progression_does_not_advance_inactive_resident(tmp_path, mon
         ).fetchone()[0] == 0
         assert conn.execute(
             "SELECT COUNT(*) FROM decisions WHERE details LIKE ?",
-            (f"%resident_id={rid}%",),
+            ("%InactivePass Resident — first-year exams%",),
         ).fetchone()[0] == 0
         assert conn.execute(
             "SELECT COUNT(*) FROM audit WHERE action='exam.first_year_evaluated' AND details LIKE ?",
