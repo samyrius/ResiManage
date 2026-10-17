@@ -361,3 +361,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** standard users cannot POST an assignment, no assignment/audit row is written, and the creation form is absent from their read-only page.
 - **Branch:** `resimanage-2-assignment-permission-guard`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / HISTORICAL-ROTATION-VALIDATION-001 — 2026-10-17
+
+- **Audit finding:** manual history entry accepted arbitrary academic-year labels and period text and allowed exact duplicate history records. These records affect mandatory-terrain completion and could incorrectly block or permit repeat assignments.
+- **Fix proposed on isolated branch:** validate consecutive `YYYY-YYYY` academic years, restrict period to the four official periods (or blank for legacy-unspecified periods), validate ISO completion dates, require existing resident/terrain records, and reject exact duplicates. The form now offers the four canonical periods.
+- **Regression tests added:** reject malformed academic year and unknown period; accept one valid entry; reject a duplicate without adding a second row or audit event.
+- **Branch:** `resimanage-2-history-validation-guard`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
