@@ -40,6 +40,25 @@ def login(client):
     return client.post("/login", data={"password": "test-strong-password-2026"}, follow_redirects=True)
 
 
+
+def test_internal_navigation_is_grouped_responsive_and_marks_current_page(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.get("/")
+    assert response.status_code == 200
+    assert b'class="rt-app-shell"' in response.data
+    assert b'aria-label="Main navigation"' in response.data or b'aria-label="\xd8\xa7\xd9\x84\xd8\xaa\xd9\x86\xd9\x82\xd9\x84 \xd8\xa7\xd9\x84\xd8\xb1\xd8\xa6\xd9\x8a\xd8\xb3\xd9\x8a"' in response.data
+    assert b'href="/leave"' in response.data
+    assert b'href="/external-rotations"' in response.data
+    assert "التربصات والتخطيط".encode() in response.data or b'Rotations &amp; planning' in response.data or b'Rotations & planning' in response.data
+    assert b'class="nav-home is-active"' in response.data
+    assert b'grid-template-columns:260px minmax(0,1fr)' in response.data
+    assert b'@media(max-width:680px)' in response.data
+    residents = client.get("/residents")
+    assert residents.status_code == 200
+    assert b'href="/residents" class="is-active"' in residents.data
+
+
 def test_login_page_and_language_selector(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     response = client.get("/login")
@@ -946,3 +965,23 @@ def test_dems_archive_is_blocked_if_either_official_rejects(tmp_path, monkeypatc
         ).fetchone()
         assert decision is not None
         assert decision["decision"] == "Not approved by official vote"
+
+
+def test_assignment_page_has_priority_filters_and_clear_conflict_feedback(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)", ("Priority", "Four", 4, "active"))
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)", ("Search", "One", 1, "active"))
+        conn.commit()
+    response = client.get("/assign")
+    assert response.status_code == 200
+    assert b'id="assignment-search"' in response.data
+    assert b'id="assignment-year-filter"' in response.data
+    assert b'value="4"' in response.data and ("السنة".encode() in response.data or b'Year 4' in response.data)
+    assert "تخطيط التربصات وتعيين المقيمين".encode() in response.data or b'Rotation planning &amp; resident assignment' in response.data or b'Rotation planning & resident assignment' in response.data
+    assert b'rt-assignment-stats' in response.data
+    assert b'rt-assignment-notice' in response.data
+    assert b'External rotation conflict' in response.data
+    assert b'rt-assignment-table' in response.data
+
