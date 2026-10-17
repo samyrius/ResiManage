@@ -405,12 +405,18 @@ def residents():
     c.close(); return ("Forbidden — Super Admin only",403)
    surname=request.form.get("surname","").strip()
    firstname=request.form.get("firstname","").strip()
+   phone=request.form.get("phone","").strip()
+   repeat_year=request.form.get("repeat_year","0")
    try: year=int(request.form.get("year","0"))
    except (TypeError,ValueError): year=0
-   if not surname or not firstname or year not in (1,2,3,4):
-    flash("Surname, first name and a valid study year are required.")
+   if not surname or not firstname or len(surname)>100 or len(firstname)>100 or year not in (1,2,3,4):
+    flash("Surname and first name are required (max 100 characters) and a valid study year is required.")
+   elif len(phone)>40 or repeat_year not in ("0","1"):
+    flash("Phone must be at most 40 characters and repeat flag must be 0 or 1.")
+   elif c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=?",(surname,firstname,year)).fetchone():
+    flash("A resident with the same name and study year already exists.")
    else:
-    c.execute("INSERT INTO residents(surname,firstname,year,phone,repeat_year,status) VALUES(?,?,?,?,?,?)",(surname,firstname,year,request.form.get("phone","").strip(),int(request.form.get("repeat_year","0")),"active"))
+    c.execute("INSERT INTO residents(surname,firstname,year,phone,repeat_year,status) VALUES(?,?,?,?,?,?)",(surname,firstname,year,phone,int(repeat_year),"active"))
     audit_event(c,"resident.created",surname+" "+firstname)
     c.commit(); flash(tr("done"))
  rows=c.execute("SELECT * FROM residents ORDER BY status DESC,year DESC,surname").fetchall(); c.close()
