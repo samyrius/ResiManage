@@ -1742,3 +1742,35 @@ def test_future_dated_history_does_not_unlock_core_terrain_repeats(tmp_path, mon
     assert allowed is False
     assert status is None
 
+def test_exam_recording_rejects_future_year_and_graduated_resident(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        future_id = conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,2,'active') RETURNING id",
+            ("FutureYear", "Exam"),
+        ).fetchone()[0]
+        graduated_id = conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status,dems_status) VALUES(?, ?,4,'graduated','success') RETURNING id",
+            ("Graduated", "Exam"),
+        ).fetchone()[0]
+        conn.commit()
+
+    future = client.post("/exams", data={
+        "action":"record","resident":str(future_id),"study_year":"3",
+        "module":"Future Module","theory":"15","practical":"15"
+    }, follow_redirects=True)
+    assert future.status_code == 200
+    assert b"Cannot record marks for a future study year" in future.data
+
+    graduated = client.post("/exams", data={
+        "action":"record","resident":str(graduated_id),"study_year":"4",
+        "module":"Late Module","theory":"15","practical":"15"
+    }, follow_redirects=True)
+    assert graduated.status_code == 200
+    assert b"Cannot record marks for a future study year" in graduated.data
+
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM exam_records WHERE resident_id IN (?,?)", (future_id,graduated_id)).fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action IN ('exam.recorded','exam.updated')").fetchone()[0] == 0
+
