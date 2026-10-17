@@ -197,3 +197,14 @@ This repository log captures durable project decisions and progress; it is not a
 - **Observed:** CSV export did not include the new leave/external-rotation/official-vote tables. The database backup did not package resident photos, so restoring it on another device could leave profile photo paths broken.
 - **Fix applied on branch:** CSV export includes leave balances, leave entries, external rotations, and pending/final official vote tables while continuing to exclude user password records. The backup is now a ZIP containing a consistent SQLite snapshot and all files in `resident_photos/`; restore accepts both this ZIP and legacy .db/.sqlite backups, validates archive paths and database integrity, creates a pre-restore full ZIP and DB copy, and restores photos only when the ZIP includes the photo folder. Added tests for database and photo restoration, and expanded export coverage.
 - **Status:** awaiting CI. This does not build an APK or touch real resident data in the repository.
+
+
+### RESI-1 CANDIDATE / PHOTO-UPLOAD-UX-001 — 2026-10-17
+
+- **Safety boundary:** work is isolated on `resimanage-1-photo-ui-candidate`, branched from `resimanage-1-backup`. The backup branch itself is unchanged; this candidate is not merged.
+- **Finding:** the profile form exposed a manually editable photo path, and the upload check only inspected a few file-signature bytes. A truncated or corrupt file could be stored as if it were a real image. Upload names could also collide within the same second.
+- **Proposed fix:** preserve the existing photo unless a valid replacement is uploaded; decode/verify and normalize PNG/JPG/WEBP images with Pillow; cap uploads at 4 MB and resize to 1200×1200; use unique names and atomic file writes.
+- **UI changes:** structured profile header/avatar, responsive identity fields, clearer photo picker/help text, live preview before save, visible existing-photo preservation behavior, and improved keyboard focus/mobile styling.
+- **Regression tests added:** valid real image uploads and is served as an image; corrupt image is rejected without replacing the existing photo; profile saves without a new upload preserve the photo path.
+- **Validation status:** pending GitHub Actions on the exact candidate PR head. No APK build, phone experiment, database changes, resident data, or secrets were touched.
+- **Porting rule:** after CI passes, port the tested code and regression tests to `resimanage-2-work` on a separate branch; do not merge this candidate into the backup branch.
