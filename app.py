@@ -875,32 +875,37 @@ def exams():
    flash("Confirm that all first-year module results have been entered before evaluating progression.")
   elif action=="evaluate_first_year":
    if session.get("role")!="super_admin": c.close(); return ("Forbidden — Super Admin only",403)
-   records=c.execute("SELECT theory,practical FROM exam_records WHERE resident_id=? AND study_year=1",(rid,)).fetchall()
-   if not records:
-    flash("Enter first-year exam modules before evaluation")
+   if resident["year"]!=1:
+    flash("Only current first-year residents can be evaluated for first-year progression.")
+   elif resident["status"]!="active":
+    flash("Inactive residents cannot be evaluated for progression.")
    else:
-    average=sum((x["theory"]+x["practical"])/2 for x in records)/len(records)
-    passed=average>=10 and all(x["theory"]>=10 and x["practical"]>=10 for x in records)
-    c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — first-year exams","Passed" if passed else "Failed",f"Average={average:.2f}/20; all theory/practical marks >=10: {all(x['theory']>=10 and x['practical']>=10 for x in records)}",session["user"]))
-    audit_event(c,"exam.first_year_evaluated",f"resident_id={rid}; average={average:.2f}; passed={passed}")
-    advanced=False
-    if passed and resident["year"]==1 and resident["status"]=="active":
-     c.execute("UPDATE residents SET year=2 WHERE id=? AND year=1 AND status='active'",(rid,))
-     advanced=c.execute("SELECT changes()").fetchone()[0]==1
-     if advanced:
-      audit_event(c,"resident.year_advanced",f"resident_id={rid}; from=1; to=2")
-    c.commit()
-    if not passed:
-     flash("Failed: average must be at least 10/20 and every theory/practical mark must be at least 10/20")
-    elif resident["year"]!=1:
-     flash("Exam criteria passed; no year change because the resident is not currently in year 1.")
-    elif resident["status"]!="active":
-     flash("Exam criteria passed, but the resident is inactive; no progression was applied.")
-    elif advanced:
-     flash("Passed; resident advanced to year 2.")
+    records=c.execute("SELECT theory,practical FROM exam_records WHERE resident_id=? AND study_year=1",(rid,)).fetchall()
+    if not records:
+     flash("Enter first-year exam modules before evaluation")
     else:
-     flash("Exam criteria passed, but progression was not applied; review the resident record.")
-  elif action=="approve_advance":
+     average=sum((x["theory"]+x["practical"])/2 for x in records)/len(records)
+     passed=average>=10 and all(x["theory"]>=10 and x["practical"]>=10 for x in records)
+     c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — first-year exams","Passed" if passed else "Failed",f"Average={average:.2f}/20; all theory/practical marks >=10: {all(x['theory']>=10 and x['practical']>=10 for x in records)}",session["user"]))
+     audit_event(c,"exam.first_year_evaluated",f"resident_id={rid}; average={average:.2f}; passed={passed}")
+     advanced=False
+     if passed and resident["year"]==1 and resident["status"]=="active":
+      c.execute("UPDATE residents SET year=2 WHERE id=? AND year=1 AND status='active'",(rid,))
+      advanced=c.execute("SELECT changes()").fetchone()[0]==1
+      if advanced:
+       audit_event(c,"resident.year_advanced",f"resident_id={rid}; from=1; to=2")
+     c.commit()
+     if not passed:
+      flash("Failed: average must be at least 10/20 and every theory/practical mark must be at least 10/20")
+     elif resident["year"]!=1:
+      flash("Exam criteria passed; no year change because the resident is not currently in year 1.")
+     elif resident["status"]!="active":
+      flash("Exam criteria passed, but the resident is inactive; no progression was applied.")
+     elif advanced:
+      flash("Passed; resident advanced to year 2.")
+     else:
+      flash("Exam criteria passed, but progression was not applied; review the resident record.")
+   elif action=="approve_advance":
    actor=session.get("user","").lower()
    outcome=request.form.get("outcome","approve")
    reason=request.form.get("reason","").strip()
