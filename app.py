@@ -437,9 +437,6 @@ def terrains():
     tid=int(request.form["tid"]); active=0 if action=="deactivate" else 1
     current=c.execute("SELECT * FROM terrains WHERE id=?",(tid,)).fetchone()
     if not current: raise ValueError("Terrain not found.")
-    has_records=c.execute("SELECT (SELECT COUNT(*) FROM history WHERE terrain_id=?)+(SELECT COUNT(*) FROM assignments WHERE terrain_id=?)",(tid,tid)).fetchone()[0]>0
-    if action=="deactivate" and has_records:
-     raise ValueError("A terrain with rotation history or assignments cannot be deactivated; preserve completion rules and records.")
     c.execute("UPDATE terrains SET active=? WHERE id=?",(active,tid))
     audit_event(c,"terrain.deactivated" if not active else "terrain.activated",f"terrain_id={tid}")
    else:
