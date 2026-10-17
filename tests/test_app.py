@@ -1411,3 +1411,18 @@ def test_startup_fills_missing_periods_in_partial_legacy_academic_year(tmp_path,
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM periods WHERE year_label='2026-2027'").fetchone()[0] == 4
 
+def test_import_rejects_fractional_study_year_instead_of_truncating(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    source = b"surname,firstname,year,phone\nFractional,Resident,2.5,0550000000\n"
+    response = client.post(
+        "/import",
+        data={"file":(io.BytesIO(source),"fractional-year.csv")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Year must be 1, 2, 3 or 4." in response.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM residents WHERE surname='Fractional'").fetchone()[0] == 0
+
