@@ -449,3 +449,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** invalid identity input is rejected without changing the record, and a valid partial profile update preserves the existing photo.
 - **Branch:** `resimanage-2-profile-input-validation`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / RESIDENT-INPUT-VALIDATION-001 — 2026-10-17
+
+- **Audit finding:** resident creation converted the repeat-year flag to an integer without validating it, accepted overlong phone values, and did not consistently block case-insensitive duplicate name/year records outside the import workflow.
+- **Fix proposed on isolated branch:** validate required names (maximum 100 characters), phone (maximum 40 characters), year 1–4 and repeat flag 0/1; reject a duplicate case-insensitive surname/first-name/year combination.
+- **Regression tests added:** malformed repeat flag and overlong phone are rejected, and duplicate resident rows are not inserted.
+- **Branch:** `resimanage-2-resident-input-validation`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
