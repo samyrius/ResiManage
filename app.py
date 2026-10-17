@@ -636,7 +636,7 @@ def decisions():
  if super_guard():return super_guard()
  c=db()
  if request.method=="POST":
-  aid=int(request.form["aid"]); outcome=request.form["outcome"]; reason=request.form.get("reason","").strip()
+  aid=request.form.get("aid",type=int); outcome=request.form.get("outcome",""); reason=request.form.get("reason","").strip()
   if outcome not in ("approve","reject"): c.close(); return ("Invalid decision",400)
   a=c.execute("SELECT a.*,r.surname,r.firstname,r.status resident_status,t.name terrain,t.active terrain_active,p.name period,p.year_label FROM assignments a JOIN residents r ON r.id=a.resident_id JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id WHERE a.id=? AND a.status='pending'",(aid,)).fetchone()
   if a and reason:
@@ -702,7 +702,7 @@ def manage_users():
  if request.method=="POST":
   action=request.form.get("action","create")
   if action in ("deactivate","activate"):
-   uid=int(request.form["user_id"])
+   uid=request.form.get("user_id",type=int)
    target=c.execute("SELECT * FROM users WHERE id=?",(uid,)).fetchone()
    if not target: flash("User not found.")
    elif action=="deactivate" and target["username"].lower() in ("benhocine","drdris"): flash("Official accounts cannot be deactivated.")
