@@ -542,3 +542,13 @@ This repository log captures durable project decisions and progress; it is not a
 3. After PR #71 passes and the patch is reviewed, verify that PR #72 is a clean port onto the latest `resimanage-2-work`; run its tests/CI on the exact head before considering merge.
 4. Keep photo upload round-trip, corrupt-file handling, preservation of existing photos, and mobile file-picker verification as separate evidence items. CI can verify Flask upload handling, but cannot by itself prove Android/WebView picker behavior.
 5. Continue the broader application audit only on isolated branches and keep this archive updated with exact SHA/run links and factual statuses.
+
+
+## Photo/profile candidate verification checkpoint — 2026-10-17
+
+- Re-fetched PR #71 (ResiManage 1 candidate). Its current head is `528d2c03e8e244f12879818fd05f471bf8c6b9d1`; GitHub Actions Python application checks completed successfully for this exact head (run **39043289602**). This establishes automated CI success for the candidate, not successful Android/WebView photo-picker operation.
+- PR #71 remains open/unmerged. The protected `resimanage-1-backup` branch has not been modified.
+- Re-fetched PR #72 (ResiManage 2 port). Its current head is `d52b7802484774c3a3036bab456d9cd35b38107e`; the previously mentioned passing run was for earlier SHA `88d59c36b02a8becd051ccf5f303977c0e84b605`, not this current head. The current-head workflow/status lookup returned no qualifying PR workflow run/status, so **PR #72 is not yet verified on its exact head**. It is open and GitHub currently reports it as not mergeable; investigate/rebase against latest `resimanage-2-work` and obtain CI on the exact resulting head before merge.
+- `docs/UX_BENCHMARK.md` exists on the ResiManage 1 candidate and lists 10 comparable platforms, 14 related websites, and UX principles. Treat this as a documented desk review, not proof of hands-on testing of each product/site. The current candidate is profile-focused; a full redesign of all app screens is not yet complete.
+- **Install/phone test decision:** do not ask the user to install yet. First resolve PR #72's base/CI state and review the port. When a clean ResiManage 2 candidate has passing exact-head CI and code review, ask the user for one controlled phone test specifically covering selecting a resident photo from Android storage, preview/save, profile reload, and image persistence. This is the point where device verification is genuinely required; do not build an APK unless the user explicitly authorizes it.
+- No APK was built and no phone/database/real resident data was touched during this checkpoint.
