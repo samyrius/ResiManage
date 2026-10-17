@@ -1835,3 +1835,27 @@ def test_profile_rejects_invalid_identity_and_preserves_photo_when_omitted(tmp_p
         assert row["surname"] == "Updated"
         assert row["photo_path"] == "/photos/resident_1.png"
 
+def test_resident_creation_validates_repeat_flag_lengths_and_duplicate_names(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    invalid_flag = client.post("/residents", data={
+        "surname":"Valid","firstname":"Flag","year":"1","repeat_year":"yes"
+    }, follow_redirects=True)
+    assert invalid_flag.status_code == 200
+    assert b"repeat flag must be 0 or 1" in invalid_flag.data
+
+    long_phone = client.post("/residents", data={
+        "surname":"Valid","firstname":"Phone","year":"1","phone":"x"*41
+    }, follow_redirects=True)
+    assert long_phone.status_code == 200
+    assert b"Phone must be at most 40 characters" in long_phone.data
+
+    payload = {"surname":"Test","firstname":"Resident","year":"2","phone":"0550000000","repeat_year":"0"}
+    first = client.post("/residents", data=payload, follow_redirects=True)
+    assert first.status_code == 200
+    second = client.post("/residents", data={**payload,"surname":" test "}, follow_redirects=True)
+    assert second.status_code == 200
+    assert b"A resident with the same name and study year already exists" in second.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM residents WHERE lower(surname)='test' AND lower(firstname)='resident' AND year=2").fetchone()[0] == 1
+
