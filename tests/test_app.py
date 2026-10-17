@@ -1663,5 +1663,5 @@ def test_repeat_of_core_terrain_is_blocked_across_academic_years(tmp_path, monke
                 conn,rid,target,current_period["id"],current_year
             )
     assert allowed is False
-    assert "التربص منجز سابقاً" in message or "same_terrain_year" in message
+    assert status is None
 
