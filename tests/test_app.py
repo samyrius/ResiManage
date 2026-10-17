@@ -2004,3 +2004,47 @@ def test_exam_route_rejects_malformed_ids_and_scores_without_server_error(tmp_pa
             "SELECT COUNT(*) FROM audit WHERE action IN ('exam.recorded','exam.updated')"
         ).fetchone()[0] == 0
 
+
+
+def test_dems_rejects_future_exam_date_without_vote_or_audit(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    for username in ("benhocine", "drdris"):
+        client.post("/users", data={
+            "username": username,
+            "password": "strong-test-password-2026",
+            "role": "super_admin",
+        }, follow_redirects=True)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,4)",
+            ("FutureDEMS", "Resident"),
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='FutureDEMS'"
+        ).fetchone()[0]
+        conn.commit()
+
+    future_date = (rotation_app.date.today() + timedelta(days=1)).isoformat()
+    with client.session_transaction() as sess:
+        sess["user"] = "benhocine"
+        sess["role"] = "super_admin"
+    response = client.post("/dems", data={
+        "resident": str(rid),
+        "success_date": future_date,
+        "outcome": "approve",
+        "reason": "Should not be accepted",
+    }, follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b"DEMS exam date cannot be in the future" in response.data
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM dems_votes WHERE resident_id=?", (rid,)
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM dems_archive WHERE resident_id=?", (rid,)
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM audit WHERE action='dems.vote_recorded'"
+        ).fetchone()[0] == 0
