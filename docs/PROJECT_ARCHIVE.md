@@ -238,3 +238,12 @@ This repository log captures durable project decisions and progress; it is not a
 - **Commits:** implementation `06401822f78bc56f82884143b5320e3faa9eea55`; test `4f127db73c08496697ee3e9d8bc8d083fe657696`.
 - **CI evidence:** the earlier PR run #347 succeeded after the inactive-progression fix; that run predates the resident-creation permission fix. The updated head's CI run #349 is in progress at the time of this archive update. Do not treat run #347 as verification of the latest head.
 - **Current review:** draft PR #29 remains open against `resimanage-2-work`; latest head at this point is `4f127db73c08496697ee3e9d8bc8d083fe657696`. No merge to `main`, no APK build, and no changes to user databases or visual assets.
+
+
+### RESI-2 / AUTH-EXAMS-001: Restrict exam mark changes — 2026-10-17
+
+- **Issue found in code review:** exam evaluation and dual-official votes were role-guarded, but the `action=record` branch accepted exam mark creation/updates from any signed-in user. This could let a standard user alter academic records.
+- **Fix committed:** recording or updating exam marks now returns HTTP 403 unless the signed-in account is a Super Admin. Existing dual-official progression voting remains restricted to the two named official administrators.
+- **Regression coverage added:** a standard-user session attempts to post 20/20 marks; the request must be rejected and neither an exam row nor an exam-recorded audit event may be created.
+- **Commits:** implementation `2351b99ca233d4cd4a44aec29b94de5be2a06ae4`; test `7d4dd99f07a1073fa8fe2e877765a1a9db0fc9e4`.
+- **CI status:** earlier run #347 passed before the resident-create and exam-write permission fixes. Run #350 was launched for the preceding branch head; the newest commit after this update still requires its own CI result. Do not merge until the latest head's CI is green.
