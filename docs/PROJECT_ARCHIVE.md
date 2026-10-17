@@ -197,3 +197,34 @@ This repository log captures durable project decisions and progress; it is not a
 - **Observed:** CSV export did not include the new leave/external-rotation/official-vote tables. The database backup did not package resident photos, so restoring it on another device could leave profile photo paths broken.
 - **Fix applied on branch:** CSV export includes leave balances, leave entries, external rotations, and pending/final official vote tables while continuing to exclude user password records. The backup is now a ZIP containing a consistent SQLite snapshot and all files in `resident_photos/`; restore accepts both this ZIP and legacy .db/.sqlite backups, validates archive paths and database integrity, creates a pre-restore full ZIP and DB copy, and restores photos only when the ZIP includes the photo folder. Added tests for database and photo restoration, and expanded export coverage.
 - **Status:** awaiting CI. This does not build an APK or touch real resident data in the repository.
+
+
+### RESI-1 CANDIDATE / PHOTO-UPLOAD-UX-001 — 2026-10-17
+
+- **Safety boundary:** work is isolated on `resimanage-1-photo-ui-candidate`, branched from `resimanage-1-backup`. The backup branch itself is unchanged; this candidate is not merged.
+- **Finding:** the profile form exposed a manually editable photo path, and the upload check only inspected a few file-signature bytes. A truncated or corrupt file could be stored as if it were a real image. Upload names could also collide within the same second.
+- **Proposed fix:** preserve the existing photo unless a valid replacement is uploaded; decode/verify and normalize PNG/JPG/WEBP images with Pillow; cap uploads at 4 MB and resize to 1200×1200; use unique names and atomic file writes.
+- **UI changes:** structured profile header/avatar, responsive identity fields, clearer photo picker/help text, live preview before save, visible existing-photo preservation behavior, and improved keyboard focus/mobile styling.
+- **Regression tests added:** valid real image uploads and is served as an image; corrupt image is rejected without replacing the existing photo; profile saves without a new upload preserve the photo path.
+- **Validation status:** pending GitHub Actions on the exact candidate PR head. No APK build, phone experiment, database changes, resident data, or secrets were touched.
+- **Porting rule:** after CI passes, port the tested code and regression tests to `resimanage-2-work` on a separate branch; do not merge this candidate into the backup branch.
+
+
+### BRAND-3D-ICON-002 — 2026-10-17 — User-requested launcher/icon image integration
+
+- **User request:** integrate the previously supplied glossy 3D medical/ICU badge image into the app now and record the work in this archive.
+- **Source asset recovered:** the user's Library image "3500.png" (glossy blue/cyan clinician + ICU monitor + ECG badge, no cross). An optimized 128×128 JPEG derivative is stored at `static/resimanage-3d-icon.jpg` and as the Android drawable `android/app/src/main/res/drawable-nodpi/resimanage_3d_launcher.jpg`; the original image in Library remains unmodified.
+- **Integration:** shared in-app brand/header image and Android launcher icon point to the recovered artwork; Android launcher label remains `ResiManage`. The prior vector launcher asset is retained, not deleted.
+- **Branding caveat:** the supplied artwork has the embedded wordmark "ResiTrack" while the application/launcher label is ResiManage. This commit preserves the supplied image rather than silently editing its logo lettering.
+- **Safety:** isolated on `resimanage-1-photo-ui-candidate`, not the protected `resimanage-1-backup`; no DB/resident data/secrets touched. No APK build or phone test.
+- **Regression check:** confirms the static image is served as JPEG and referenced by the rendered app header; manifest points at the bitmap drawable.
+- **Verification:** CI pending on this exact commit. If it passes, port the same icon integration to the isolated ResiManage 2 work candidate; do not merge into `main` or the protected backup as part of this task.
+
+
+## User-confirmed execution order and pending validation — 2026-10-17
+
+- **User instruction (recorded):** implement the requested improvements on the isolated ResiManage 1 candidate first; test and verify them; only after verification port the same verified changes to ResiManage 2 so both remain at the same progress level. Preserve the ResiManage 1 backup branch; do not edit it directly.
+- **Photo upload bug is a priority:** previous profile photo selection/upload reportedly failed in the user's phone test. Candidate repair now validates decoded PNG/JPEG/WEBP images with Pillow, applies EXIF orientation, enforces a 4 MiB limit and 1200 px maximum, writes uniquely and atomically, keeps the old photo on invalid/no replacement, and adds regression tests. Python CI is evidence for backend handling only; actual Android/WebView picker behavior still requires a later user-authorized phone check.
+- **Interior UI request:** modern, elegant, future-facing, organized and ergonomic; Arabic RTL plus French/English; responsive mobile controls, accessible focus/reduced motion, useful resident profile/avatar and status/progress cues. The benchmark document records 10 comparable platforms and 14 relevant websites and summarizes patterns. This candidate is a profile/navigation foundation, not yet a complete redesign of every screen.
+- **Candidate links/status:** ResiManage 1 PR #71 (candidate, not merged): https://github.com/samyrius/ResiManage/pull/71 . Its current archive-update head `298c68135dd0fcf9099f9b430377813bf1c6cbed` has a successful Python application check (Actions run `39043216236`). ResiManage 2 port PR #72 (not merged): https://github.com/samyrius/ResiManage/pull/72 . The documented passing ResiManage 2 SHA `88d59c36b02a8becd051ccf5f303977c0e84b605` is earlier than the latest PR head `84ccdf25669705253c254d5123326bd623e7c064` (archive update); no matching workflow run was returned for that latest head, so **the port is not yet verified at its latest SHA**.
+- **No APK build, phone test, real resident database, real resident records, or secrets were used.** Do not merge either candidate or claim photo upload works on-device until the exact candidate CI passes and the later supervised device check is completed.
