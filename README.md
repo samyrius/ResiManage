@@ -25,9 +25,15 @@ This Codespace creates its own ignored `rotation.db` and `.rotation_secret`; it 
 
 The reviewed changes from `prototype/verification-2026-10-13` were merged into `main` through PR #8 (merge commit `52127b58aa1bcc7f86f320c34f7de35f0c63922e`). The code includes 19 seeded terrains, capacity and assignment rules, individual roles, resident profiles, exam progression, objectives, DEMS archive, validated resident-list import, CSV export, and backup/restore with a pre-restore safety copy.
 
-The import preview supports CSV, XLS/XLSX, DOC/DOCX and text-based PDF. Legacy `.doc` files require `antiword` or LibreOffice. Scanned PDFs without extractable text need OCR before import. Imported lists never fabricate previous rotations.
+The import preview supports CSV, XLS/XLSX, DOC/DOCX and text-based PDF. Legacy `.doc` files require `antiword` or LibreOffice. Scanned PDFs without extractable text need OCR before import. Choose either **Residents** or **Documented stage history** in the import form. History import requires an existing resident, an existing terrain, and an academic-year label; period and completion date are optional. It validates all rows in a preview and refuses to write while any row is invalid. It imports only explicitly supplied history records and never invents missing rotations.
 
 Keep the local secret key, database, backups, uploaded resident photos, and personal data out of Git. GitHub Actions runs the automated test suite against isolated temporary databases.
+
+## ResiManage 2 work status
+
+- `resimanage-1-backup` is the frozen baseline; current implementation work is isolated on `resimanage-2-requirements-completion` and is intended to flow into `resimanage-2-work` after CI passes.
+- The current update adds a guarded first-year progression rule for inactive residents and validated, preview-first import of documented rotation history.
+- No APK has been built in this task. The Android build workflow remains manual-only and must not be started until explicitly requested.
 
 ## ملاحظة بالعربية
 
