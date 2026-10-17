@@ -953,3 +953,14 @@ def test_year_progression_is_not_approved_if_either_official_rejects(tmp_path, m
         decision = conn.execute("SELECT decision FROM decisions WHERE details LIKE '%Reject Resident — year 3%'").fetchone()
         assert decision[0] == "Rejected by official vote"
 
+
+
+def test_resimanage_3d_icon_is_served_and_used_in_app_header():
+    client = rotation_app.app.test_client()
+    icon_response = client.get("/static/resimanage-3d-icon.jpg")
+    assert icon_response.status_code == 200
+    assert icon_response.mimetype == "image/jpeg"
+    assert len(icon_response.data) > 5000
+    page_response = client.get("/", follow_redirects=True)
+    assert page_response.status_code == 200
+    assert b"/static/resimanage-3d-icon.jpg" in page_response.data

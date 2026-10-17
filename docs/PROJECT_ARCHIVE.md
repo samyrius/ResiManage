@@ -208,3 +208,14 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression tests added:** valid real image uploads and is served as an image; corrupt image is rejected without replacing the existing photo; profile saves without a new upload preserve the photo path.
 - **Validation status:** pending GitHub Actions on the exact candidate PR head. No APK build, phone experiment, database changes, resident data, or secrets were touched.
 - **Porting rule:** after CI passes, port the tested code and regression tests to `resimanage-2-work` on a separate branch; do not merge this candidate into the backup branch.
+
+
+### BRAND-3D-ICON-002 — 2026-10-17 — User-requested launcher/icon image integration
+
+- **User request:** integrate the previously supplied glossy 3D medical/ICU badge image into the app now and record the work in this archive.
+- **Source asset recovered:** the user's Library image "3500.png" (glossy blue/cyan clinician + ICU monitor + ECG badge, no cross). An optimized 128×128 JPEG derivative is stored at `static/resimanage-3d-icon.jpg` and as the Android drawable `android/app/src/main/res/drawable-nodpi/resimanage_3d_launcher.jpg`; the original image in Library remains unmodified.
+- **Integration:** shared in-app brand/header image and Android launcher icon point to the recovered artwork; Android launcher label remains `ResiManage`. The prior vector launcher asset is retained, not deleted.
+- **Branding caveat:** the supplied artwork has the embedded wordmark "ResiTrack" while the application/launcher label is ResiManage. This commit preserves the supplied image rather than silently editing its logo lettering.
+- **Safety:** isolated on `resimanage-1-photo-ui-candidate`, not the protected `resimanage-1-backup`; no DB/resident data/secrets touched. No APK build or phone test.
+- **Regression check:** confirms the static image is served as JPEG and referenced by the rendered app header; manifest points at the bitmap drawable.
+- **Verification:** CI pending on this exact commit. If it passes, port the same icon integration to the isolated ResiManage 2 work candidate; do not merge into `main` or the protected backup as part of this task.
