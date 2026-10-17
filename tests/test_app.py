@@ -2133,3 +2133,14 @@ def test_admin_routes_handle_malformed_record_ids_without_server_error(tmp_path,
         assert conn.execute(
             "SELECT COUNT(*) FROM audit WHERE action IN ('assignment.override_approved','assignment.override_rejected','user.deactivated','user.activated')"
         ).fetchone()[0] == 0
+
+
+def test_resimanage_3d_icon_is_served_and_used_in_app_header():
+    client = rotation_app.app.test_client()
+    icon_response = client.get("/static/resimanage-3d-icon.jpg")
+    assert icon_response.status_code == 200
+    assert icon_response.mimetype == "image/jpeg"
+    assert len(icon_response.data) > 5000
+    page_response = client.get("/", follow_redirects=True)
+    assert page_response.status_code == 200
+    assert b"/static/resimanage-3d-icon.jpg" in page_response.data
