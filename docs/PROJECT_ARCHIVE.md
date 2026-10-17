@@ -311,3 +311,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Branch:** `resimanage-2-first-year-evaluation-guard`; based on `resimanage-2-work`. CI pending.
 - **Remaining dependency:** the app still needs the official first-year module list/weights before it can independently verify that every required module was entered; do not invent that curriculum.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / PROMOTION-STATE-BYPASS-001 — 2026-10-17
+
+- **Audit finding:** resident management still allowed an administrator to jump a resident directly from year 1/2/3 to any other study year, bypassing automatic first-year exam evaluation or the required dual-official promotion votes for years 2–4.
+- **Fix proposed on isolated branch:** year is now displayed read-only in resident management, and the server rejects any attempted year change there. Only the exam/promotion workflow can change study year; status and repeat-year edits remain available for non-graduated residents.
+- **Regression coverage updated:** ordinary status edit persists without changing year; a direct year change is rejected and leaves year/status unchanged.
+- **Branch:** `resimanage-2-promotion-state-guard`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.

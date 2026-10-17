@@ -1332,12 +1332,21 @@ def test_resident_edit_persists_and_cannot_bypass_or_reverse_dems_graduation(tmp
         bypass = conn.execute("SELECT id FROM residents WHERE surname='Attempt'").fetchone()[0]
 
     saved = client.post("/residents", data={
-        "action":"edit","rid":str(editable),"year":"3","repeat_year":"0","status":"inactive"
+        "action":"edit","rid":str(editable),"year":"2","repeat_year":"0","status":"inactive"
     }, follow_redirects=True)
     assert saved.status_code == 200
     with rotation_app.db() as conn:
         row = conn.execute("SELECT year,status FROM residents WHERE id=?", (editable,)).fetchone()
-        assert tuple(row) == (3,"inactive")
+        assert tuple(row) == (2,"inactive")
+
+    year_change = client.post("/residents", data={
+        "action":"edit","rid":str(editable),"year":"3","repeat_year":"0","status":"active"
+    }, follow_redirects=True)
+    assert year_change.status_code == 200
+    assert b"Study-year changes must use the official exam/promotion workflow" in year_change.data
+    with rotation_app.db() as conn:
+        row = conn.execute("SELECT year,status FROM residents WHERE id=?", (editable,)).fetchone()
+        assert tuple(row) == (2,"inactive")
 
     bypass_response = client.post("/residents", data={
         "action":"edit","rid":str(bypass),"year":"4","repeat_year":"0","status":"graduated"
