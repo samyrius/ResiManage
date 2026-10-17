@@ -58,6 +58,11 @@ public class MainActivity extends Activity {
                     intent.addCategory(Intent.CATEGORY_OPENABLE);
                     intent.setType("*/*");
                     intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
+                        // Resident profile photos must be selectable in the same Android picker.
+                        "image/*",
+                        "image/png",
+                        "image/jpeg",
+                        "image/webp",
                         "text/csv",
                         "application/csv",
                         "text/comma-separated-values",
