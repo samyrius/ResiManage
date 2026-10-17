@@ -1237,3 +1237,25 @@ def test_legacy_terrain_classification_migrates_once_without_rewriting_later_adm
     with rotation_app.db() as conn:
         assert conn.execute("SELECT kind FROM terrains WHERE name='Sédation'").fetchone()[0] == "mandatory"
 
+def test_settings_rejects_password_shorter_than_twelve_characters(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        before = conn.execute(
+            "SELECT password_hash FROM users WHERE username='admin'"
+        ).fetchone()[0]
+        year = conn.execute("SELECT value FROM settings WHERE key='year'").fetchone()[0]
+
+    response = client.post(
+        "/settings",
+        data={"lang":"ar","year":year,"director":"","new_password":"weak"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "at least 12 characters".encode() in response.data
+    with rotation_app.db() as conn:
+        after = conn.execute(
+            "SELECT password_hash FROM users WHERE username='admin'"
+        ).fetchone()[0]
+        assert after == before
+
