@@ -343,3 +343,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** log in as a standard user, deactivate that account from the admin session, then verify the existing session is redirected to login and cleared.
 - **Branch:** `resimanage-2-session-revocation-guard`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / ASSIGNMENT-PERMISSION-001 — 2026-10-17
+
+- **Audit finding:** standard users could create ordinary confirmed assignments through `/assign`; the route checked authentication but not the role. Other assignment administration and override actions were restricted.
+- **Fix proposed on isolated branch:** assignment creation now requires Super Admin on the server, and the creation form is hidden from standard users while the assignment list remains viewable.
+- **Regression test added:** a standard user can view assignments but cannot see or submit the assignment form; a forged POST returns 403 and creates no assignment/audit event.
+- **Branch:** `resimanage-2-assignment-permission-guard`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
