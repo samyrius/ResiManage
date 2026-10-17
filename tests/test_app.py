@@ -429,23 +429,84 @@ def test_mandatory_year_override_requires_reason_and_records_audit(tmp_path, mon
 
 
 def test_uploaded_resident_photo_is_stored_and_served_safely(tmp_path, monkeypatch):
+    from PIL import Image
+
     client = setup_client(tmp_path, monkeypatch)
     login(client)
     with rotation_app.db() as conn:
         conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,1)", ("Photo", "Resident"))
         rid = conn.execute("SELECT id FROM residents WHERE surname='Photo'").fetchone()[0]
-    png = b"\x89PNG\r\n\x1a\n" + b"test"
+
+    image_bytes = io.BytesIO()
+    Image.new("RGB", (32, 24), (20, 140, 180)).save(image_bytes, format="PNG")
+    image_bytes.seek(0)
     response = client.post("/profile/" + str(rid), data={
-        "birth_place":"", "birth_date":"", "phone":"",
-        "photo":(io.BytesIO(png),"portrait.png")
+        "birth_place": "", "birth_date": "", "phone": "",
+        "photo": (image_bytes, "portrait.png")
     }, content_type="multipart/form-data", follow_redirects=True)
     assert response.status_code == 200
+    assert b"resident-photo-input" in response.data
     with rotation_app.db() as conn:
         path = conn.execute("SELECT photo_path FROM residents WHERE id=?", (rid,)).fetchone()[0]
     assert path.startswith("/photos/resident_")
+    stored = tmp_path / "resident_photos" / path.rsplit("/", 1)[-1]
+    assert stored.is_file()
+    with Image.open(stored) as decoded:
+        assert decoded.format == "PNG"
+        assert decoded.size == (32, 24)
     photo_response = client.get(path)
     assert photo_response.status_code == 200
-    assert photo_response.data.startswith(b"\x89PNG")
+    assert photo_response.mimetype == "image/png"
+    with Image.open(io.BytesIO(photo_response.data)) as decoded:
+        assert decoded.size == (32, 24)
+
+
+def test_invalid_photo_is_rejected_and_existing_photo_is_preserved(tmp_path, monkeypatch):
+    from PIL import Image
+
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    photo_dir = tmp_path / "resident_photos"
+    photo_dir.mkdir(exist_ok=True)
+    existing = photo_dir / "resident_1_existing.png"
+    Image.new("RGB", (16, 16), (200, 50, 50)).save(existing, format="PNG")
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,photo_path) VALUES(?,?,1,?)",
+            ("PhotoKeep", "Resident", "/photos/resident_1_existing.png"),
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='PhotoKeep'").fetchone()[0]
+
+    response = client.post("/profile/" + str(rid), data={
+        "surname": "PhotoKeep", "firstname": "Resident",
+        "photo": (io.BytesIO(b"\\x89PNG\\r\\n\\x1a\\nnot-a-real-image"), "broken.png")
+    }, content_type="multipart/form-data", follow_redirects=True)
+    assert response.status_code == 200
+    assert b"not a readable PNG/JPG/WEBP" in response.data
+    with rotation_app.db() as conn:
+        row = conn.execute("SELECT photo_path FROM residents WHERE id=?", (rid,)).fetchone()
+    assert row["photo_path"] == "/photos/resident_1_existing.png"
+    assert client.get(row["photo_path"]).status_code == 200
+
+
+def test_profile_save_without_new_photo_keeps_existing_photo_path(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,photo_path) VALUES(?,?,1,?)",
+            ("Keep", "Photo", "/photos/resident_1_saved.webp"),
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Keep'").fetchone()[0]
+    response = client.post("/profile/" + str(rid), data={
+        "surname": "Keep", "firstname": "Photo", "birth_place": "Tizi Ouzou",
+        "birth_date": "1998-05-02", "phone": "0550000000"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        row = conn.execute("SELECT photo_path,birth_place FROM residents WHERE id=?", (rid,)).fetchone()
+    assert row["photo_path"] == "/photos/resident_1_saved.webp"
+    assert row["birth_place"] == "Tizi Ouzou"
 
 def test_assignment_resident_choices_are_sorted_by_year_priority(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
