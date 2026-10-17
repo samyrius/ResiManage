@@ -254,3 +254,11 @@ This repository log captures durable project decisions and progress; it is not a
 - Verified latest PR CI run #354 (`39027903216`) completed successfully: **45 passed in 20.66 seconds**. The tested head contains all three fixes and regression tests.
 - `main` and frozen `resimanage-1-backup` were not changed by this merge. No APK was built, no phone-side experiments were run, and no user database/backups/secrets/assets were modified.
 - Continue requirement-by-requirement code review against `resimanage-2-work`; the passing suite is useful evidence, not proof that every product requirement or physical-device behavior is complete.
+
+### RESI-2 / ELIGIBILITY-INACTIVE-TERRAIN-001 — 2026-10-17
+
+- **Audit finding:** repeat eligibility counted every mandatory/basic terrain, including terrains deactivated by an administrator. Because inactive terrains are excluded from new assignments, a resident who could never complete that terrain could remain blocked from repeating a previously completed terrain.
+- **Fix proposed on isolated branch:** the required core-terrain count and the completed-terrain count now use active core terrains only. Historical rows are retained; no resident data or database was changed.
+- **Regression test added:** deactivate an uncompleted core terrain, complete every remaining active core terrain, then verify a repeat assignment passes the eligibility check.
+- **Branch:** `resimanage-2-inactive-terrain-eligibility`; based on `resimanage-2-work`. CI is pending; do not describe this fix as verified until the workflow completes successfully on the final branch head.
+- **Safety:** no APK build, no phone/database access, no asset/theme edits, and no change to `main` or `resimanage-1-backup`.
