@@ -759,20 +759,28 @@ def import_residents():
      if not terrain_name: row_errors.append("Terrain name is required.")
      if not re.fullmatch(r"\d{4}-\d{4}",year_label) or (year_label and int(year_label.split("-")[1])!=int(year_label.split("-")[0])+1):
       row_errors.append("Academic year must use YYYY-YYYY with consecutive years.")
-     resident_matches=c.execute("SELECT id,surname,firstname FROM residents WHERE lower(trim(surname||' '||firstname))=lower(?) OR lower(trim(firstname||' '||surname))=lower(?) OR lower(trim(surname||', '||firstname))=lower(?)",(resident_name,resident_name,resident_name)).fetchall()
+     resident_pool=c.execute("SELECT id,surname,firstname FROM residents").fetchall()
+     resident_key=resident_name.casefold().strip()
+     resident_matches=[r for r in resident_pool if resident_key in {
+      (r["surname"]+" "+r["firstname"]).casefold().strip(),
+      (r["firstname"]+" "+r["surname"]).casefold().strip(),
+      (r["surname"]+", "+r["firstname"]).casefold().strip()
+     }]
      if len(resident_matches)!=1:
       row_errors.append("Resident must match exactly one existing resident (use 'Surname Firstname').")
      else:
       row["resident_id"]=resident_matches[0]["id"]
       row["resident_display"]=resident_matches[0]["surname"]+" "+resident_matches[0]["firstname"]
-     terrain_matches=c.execute("SELECT id,name FROM terrains WHERE lower(trim(name))=lower(?)",(terrain_name,)).fetchall()
+     terrain_pool=c.execute("SELECT id,name FROM terrains").fetchall()
+     terrain_matches=[t for t in terrain_pool if t["name"].casefold().strip()==terrain_name.casefold().strip()]
      if len(terrain_matches)!=1:
       row_errors.append("Terrain must match exactly one existing terrain.")
      else:
       row["terrain_id"]=terrain_matches[0]["id"]; row["terrain_display"]=terrain_matches[0]["name"]
      period=row.get("period","").strip(); date_done=row.get("date_done","").strip()
-     if date_done and not re.fullmatch(r"\d{4}-\d{2}-\d{2}",date_done):
-      row_errors.append("Date must use YYYY-MM-DD when supplied.")
+     if date_done:
+      try: datetime.strptime(date_done,"%Y-%m-%d")
+      except ValueError: row_errors.append("Date must be a real calendar date in YYYY-MM-DD format.")
      row["period"]=period; row["date_done"]=date_done
      key=(row.get("resident_id"),row.get("terrain_id"),year_label,period,date_done)
      if key in seen: row_errors.append("Duplicate stage-history row in this file.")
