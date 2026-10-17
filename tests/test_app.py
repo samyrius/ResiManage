@@ -1591,3 +1591,39 @@ def test_future_confirmed_rotations_do_not_count_as_completed_for_repeat_eligibi
     assert allowed is False
     assert "التربص منجز سابقاً" in message
 
+def test_capacity_rejects_negative_and_cross_academic_year_periods(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        terrain_id = conn.execute(
+            "SELECT id FROM terrains WHERE active=1 ORDER BY id LIMIT 1"
+        ).fetchone()[0]
+        current = conn.execute("SELECT id,year_label FROM periods ORDER BY id LIMIT 1").fetchone()
+        other_period_id = conn.execute(
+            "INSERT INTO periods(year_label,name) VALUES(?,?) RETURNING id",
+            ("2099-2100","01 Fév - 30 Avr"),
+        ).fetchone()[0]
+        conn.commit()
+
+    negative = client.post("/capacities", data={
+        "terrain":str(terrain_id),"period":str(current["id"]),"places":"-1"
+    }, follow_redirects=True)
+    assert negative.status_code == 200
+    assert b"Invalid capacity input" in negative.data
+
+    wrong_year = client.post("/capacities", data={
+        "terrain":str(terrain_id),"period":str(other_period_id),"places":"3"
+    }, follow_redirects=True)
+    assert wrong_year.status_code == 200
+    assert b"Invalid capacity input" in wrong_year.data
+
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM capacities WHERE terrain_id=? AND period_id=?",
+            (terrain_id,other_period_id),
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM capacities WHERE terrain_id=? AND period_id=? AND places<0",
+            (terrain_id,current["id"]),
+        ).fetchone()[0] == 0
+
