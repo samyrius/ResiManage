@@ -182,3 +182,8 @@ This repository log captures durable project decisions and progress; it is not a
 - The first CI run for PR #21 exposed a source-refactor boundary error: the annual-leave route's final response template had been truncated while replacing the following external-rotation route. This was caught before merge; no changes reached main.
 - Restored the complete annual-leave route verbatim from the current main baseline, then rechecked the boundary between the leave and external-rotation routes. The latest branch head is `097ed46032323368b82d5ab650ee785af02c0164`.
 - **Status:** a fresh CI run on this corrected head is still required. Do not merge based on the earlier failed runs.
+
+### SEC-001: CSRF protection and official administrator safeguards
+- **Observed:** current main had no CSRF validation on state-changing POST requests, and the user-management route allowed the official accounts named `benhocine` and `drdris` to be created with a normal-user role or deactivated.
+- **Fix applied on branch:** add session-bound CSRF tokens to POST forms at render time, validate tokens before POST handlers, and reject missing/invalid tokens. Require official accounts to be created as Super Admins and prevent deactivation. Test client now obtains a real rendered token for ordinary form submissions; a separate test explicitly submits without a token.
+- **Status:** awaiting CI; no merge until the full suite passes. No APK build started.
