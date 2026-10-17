@@ -1548,3 +1548,46 @@ def test_inactive_resident_cannot_receive_promotion_votes(tmp_path, monkeypatch)
         assert conn.execute("SELECT COUNT(*) FROM promotion_votes WHERE resident_id=?", (rid,)).fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='promotion.vote_recorded'").fetchone()[0] == 0
 
+def test_future_confirmed_rotations_do_not_count_as_completed_for_repeat_eligibility(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        rid = conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,4) RETURNING id",
+            ("Future", "Rotations"),
+        ).fetchone()[0]
+        current_period = conn.execute("SELECT * FROM periods ORDER BY id LIMIT 1").fetchone()
+        target = conn.execute(
+            "SELECT id FROM terrains WHERE name='Réanimation chirurgicale'"
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,2)",
+            (current_period["year_label"],target,current_period["id"]),
+        )
+        conn.execute(
+            "INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+            (rid,target,"2025-2026","01 Fév - 30 Avr","2026-04-30"),
+        )
+        future_terrains = conn.execute(
+            "SELECT id FROM terrains WHERE active=1 AND kind IN ('mandatory','basic')"
+        ).fetchall()
+        for index, terrain_row in enumerate(future_terrains):
+            start_year = 2099 + index
+            future_period_id = conn.execute(
+                "INSERT INTO periods(year_label,name) VALUES(?,?) RETURNING id",
+                (f"{start_year}-{start_year+1}","01 Fév - 30 Avr"),
+            ).fetchone()[0]
+            conn.execute(
+                "INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",
+                (rid,terrain_row["id"],future_period_id),
+            )
+        conn.commit()
+
+    with rotation_app.app.test_request_context("/"):
+        with rotation_app.db() as conn:
+            allowed, message, status = rotation_app.check(
+                conn,rid,target,current_period["id"],current_period["year_label"]
+            )
+    assert allowed is False
+    assert "التربص منجز سابقاً" in message
+

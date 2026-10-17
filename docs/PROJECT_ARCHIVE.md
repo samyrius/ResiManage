@@ -377,3 +377,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** a Super Admin POST for an inactive year-2 resident produces no promotion vote and no vote audit record.
 - **Branch:** `resimanage-2-promotion-active-resident-guard-v2`; based on the latest `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / COMPLETION-EVIDENCE-001 — 2026-10-17
+
+- **Audit finding:** mandatory/basic terrain completion counted every confirmed assignment, including assignments in future rotation periods. Future assignments could therefore make the resident appear to have completed all core terrains and unlock a repeat prematurely.
+- **Fix proposed on isolated branch:** only documented history records and confirmed assignments whose rotation period has already ended count as completion evidence. Current/future assignments do not unlock repeats.
+- **Regression test added:** a resident with history for one core terrain and confirmed assignments for all core terrains in academic years starting in 2099 or later must still be blocked from repeating the historical terrain.
+- **Branch:** `resimanage-2-completion-evidence-guard-v2`; based on the latest `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
