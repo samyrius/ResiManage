@@ -435,18 +435,18 @@ def check(c,rid,tid,pid,y):
   (rid,tid,y,pid)
  ).fetchone()
  total=c.execute(
-  "SELECT COUNT(*) FROM terrains WHERE kind IN ('mandatory','basic')"
+  "SELECT COUNT(*) FROM terrains WHERE kind IN ('mandatory','basic') AND active=1"
  ).fetchone()[0]
  done=c.execute("""
   SELECT COUNT(DISTINCT terrain_id) FROM (
    SELECT h.terrain_id FROM history h
    JOIN terrains t ON t.id=h.terrain_id
-   WHERE h.resident_id=? AND t.kind IN ('mandatory','basic')
+   WHERE h.resident_id=? AND t.kind IN ('mandatory','basic') AND t.active=1
    UNION
    SELECT a.terrain_id FROM assignments a
    JOIN terrains t ON t.id=a.terrain_id
    WHERE a.resident_id=? AND a.status='confirmed'
-   AND t.kind IN ('mandatory','basic')
+   AND t.kind IN ('mandatory','basic') AND t.active=1
   )
  """,(rid,rid)).fetchone()[0]
  if repeat and done<total:
