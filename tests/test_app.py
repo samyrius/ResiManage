@@ -1486,3 +1486,39 @@ def test_standard_user_cannot_create_rotation_assignments(tmp_path, monkeypatch)
         assert conn.execute("SELECT COUNT(*) FROM assignments WHERE resident_id=?", (rid,)).fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='assignment.created'").fetchone()[0] == 0
 
+def test_history_rejects_invalid_year_period_and_duplicate_records(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,1)", ("History", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='History'").fetchone()[0]
+        tid = conn.execute("SELECT id FROM terrains WHERE name='Réanimation chirurgicale'").fetchone()[0]
+        conn.commit()
+
+    invalid_year = client.post("/history", data={
+        "resident":str(rid),"terrain":str(tid),"year_label":"2025-2027",
+        "period":"01 Fév - 30 Avr","date_done":"2026-03-01"
+    }, follow_redirects=True)
+    assert invalid_year.status_code == 200
+    assert b"Academic year must be YYYY-YYYY" in invalid_year.data
+
+    invalid_period = client.post("/history", data={
+        "resident":str(rid),"terrain":str(tid),"year_label":"2025-2026",
+        "period":"invented period","date_done":"2026-03-01"
+    }, follow_redirects=True)
+    assert invalid_period.status_code == 200
+    assert b"Choose one of the four official rotation periods" in invalid_period.data
+
+    payload = {
+        "resident":str(rid),"terrain":str(tid),"year_label":"2025-2026",
+        "period":"01 Fév - 30 Avr","date_done":"2026-03-01"
+    }
+    first = client.post("/history", data=payload, follow_redirects=True)
+    assert first.status_code == 200
+    second = client.post("/history", data=payload, follow_redirects=True)
+    assert second.status_code == 200
+    assert b"This historical rotation already exists" in second.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM history WHERE resident_id=? AND terrain_id=?", (rid,tid)).fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='history.created'").fetchone()[0] == 1
+
