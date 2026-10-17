@@ -372,7 +372,7 @@ def check(c,rid,tid,pid,y):
  r=c.execute("SELECT * FROM residents WHERE id=? AND status='active'",(rid,)).fetchone(); t=c.execute("SELECT * FROM terrains WHERE id=?",(tid,)).fetchone(); p=c.execute("SELECT * FROM periods WHERE id=? AND year_label=?",(pid,y)).fetchone()
  if not r or not t or not t["active"] or not p: return False,tr("none"),None
  start_day, end_day = rotation_period_bounds(p["year_label"], p["name"])
- external = c.execute("SELECT hospital,country,start_date,end_date FROM external_rotations WHERE resident_id=? AND status='active' AND start_date<=? AND end_date>=? LIMIT 1",(rid,end_day.isoformat(),start_day.isoformat())).fetchone()
+ external = c.execute("SELECT hospital,country,start_date,end_date FROM external_rotations WHERE resident_id=? AND status<>'cancelled' AND start_date<=? AND end_date>=? LIMIT 1",(rid,end_day.isoformat(),start_day.isoformat())).fetchone()
  if external: return False,("External rotation blocks local assignment: "+external["hospital"]+", "+external["country"]+" ("+external["start_date"]+" to "+external["end_date"]+")"),None
  dup=c.execute("SELECT t.name FROM assignments a JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=? AND a.period_id=? AND a.status IN ('confirmed','pending')",(rid,pid)).fetchone()
  if dup:return False,tr("duplicate")+dup["name"],None
@@ -426,8 +426,17 @@ def assign():
      c.commit(); flash(msg)
   except Exception: c.rollback(); flash("Invalid assignment / Affectation invalide / تعيين غير صالح")
  rs=c.execute("SELECT * FROM residents WHERE status='active' ORDER BY year DESC,surname").fetchall(); ts=c.execute("SELECT * FROM terrains WHERE active=1 ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END, name").fetchall(); ps=c.execute("SELECT * FROM periods WHERE year_label=? ORDER BY id",(y,)).fetchall()
+ external_records=c.execute("SELECT resident_id,start_date,end_date FROM external_rotations WHERE status<>'cancelled'").fetchall()
+ blocked_periods_by_resident={}
+ for r in rs:
+  blocked=[]
+  for p in ps:
+   pstart,pend=rotation_period_bounds(p["year_label"],p["name"])
+   if any(e["resident_id"]==r["id"] and e["start_date"]<=pend.isoformat() and e["end_date"]>=pstart.isoformat() for e in external_records):
+    blocked.append(str(p["id"]))
+  blocked_periods_by_resident[r["id"]]=",".join(blocked)
  rows=c.execute("SELECT a.*,r.surname,r.firstname,r.year,t.name terrain,p.name period FROM assignments a JOIN residents r ON r.id=a.resident_id JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id WHERE p.year_label=? ORDER BY p.id,r.year DESC",(y,)).fetchall(); c.close()
- return page("""<section><h3>{{t('assign_now')}}</h3><p>{{t('priority')}}</p><form method="post"><label>{{t('resident')}}</label><select name="resident">{% for r in rs %}<option value="{{r.id}}">{{r.year}} — {{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>{{t('terrain')}}</label><select name="terrain">{% for x in ts %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select><label>{{t('period')}}</label><select name="period">{% for x in ps %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select><button>{{t('check_save')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('period')}}</th><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('terrain')}}</th><th>{{t('status')}}</th><th>Admin action</th></tr>{% for a in rows %}<tr><td>{{a.period}}</td><td>{{a.surname}} {{a.firstname}}</td><td>{{a.year}}</td><td>{{a.terrain}}</td><td>{{t(a.status) if a.status in ['confirmed','pending','rejected'] else a.status}}</td><td>{% if role=='super_admin' and a.status not in ['cancelled','rejected'] %}<form method="post" action="/assignments/{{a.id}}/cancel"><button>Cancel</button></form>{% endif %}</td></tr>{% endfor %}</table></div></section>""",rs=rs,ts=ts,ps=ps,rows=rows)
+ return page("""<section><h3>{{t('assign_now')}}</h3><p>{{t('priority')}}</p><form method="post"><label>{{t('resident')}}</label><select name="resident" id="assignment-resident">{% for r in rs %}<option value="{{r.id}}" data-blocked-periods="{{blocked_periods_by_resident[r.id]}}" data-base-label="{{r.year}} — {{r.surname}} {{r.firstname}}">{{r.year}} — {{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>{{t('terrain')}}</label><select name="terrain">{% for x in ts %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select><label>{{t('period')}}</label><select name="period" id="assignment-period">{% for x in ps %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select><button>{{t('check_save')}}</button></form><script>(function(){const p=document.getElementById("assignment-period"),r=document.getElementById("assignment-resident");if(!p||!r)return;function update(){const pid=p.value;Array.from(r.options).forEach(o=>{const blocked=(o.dataset.blockedPeriods||"").split(",").includes(pid);o.disabled=blocked;o.textContent=o.dataset.baseLabel+(blocked?" — External rotation conflict":"");});if(r.selectedOptions.length&&r.selectedOptions[0].disabled){const next=Array.from(r.options).find(o=>!o.disabled);if(next)r.value=next.value;}}p.addEventListener("change",update);update();})();</script></section><section><div class="wrap"><table><tr><th>{{t('period')}}</th><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('terrain')}}</th><th>{{t('status')}}</th><th>Admin action</th></tr>{% for a in rows %}<tr><td>{{a.period}}</td><td>{{a.surname}} {{a.firstname}}</td><td>{{a.year}}</td><td>{{a.terrain}}</td><td>{{t(a.status) if a.status in ['confirmed','pending','rejected'] else a.status}}</td><td>{% if role=='super_admin' and a.status not in ['cancelled','rejected'] %}<form method="post" action="/assignments/{{a.id}}/cancel"><button>Cancel</button></form>{% endif %}</td></tr>{% endfor %}</table></div></section>""",rs=rs,ts=ts,ps=ps,rows=rows)
 @app.post("/assignments/<int:aid>/cancel")
 def cancel_assignment(aid):
  if super_guard(): return super_guard()
@@ -928,9 +937,6 @@ def leave_management():
         used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND end_date<=?",(r["id"],date(now.year,12,31).isoformat())).fetchone()[0]
         balances.append({"name":r["surname"]+" "+r["firstname"],"earned":earned,"used":used,"remaining":earned-used})
     entries=c.execute("SELECT l.*,r.surname,r.firstname FROM leave_entries l JOIN residents r ON r.id=l.resident_id ORDER BY l.start_date DESC").fetchall()
-    c.commit(); c.close()
-    return page("""<section><h3>الإجازات / Congés / Annual leave</h3><p>30 calendar days per year. Unused days carry forward.</p><form method="post"><label>Resident <select name="resident_id" required>{% for r in residents %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}}</option>{% endfor %}</select></label><div class="grid"><label>Start <input type="date" name="start_date" required></label><label>End <input type="date" name="end_date" required></label></div><label>Notes <input name="notes" maxlength="500"></label><button>Record leave</button></form></section><section><h3>Balances</h3><div class="wrap"><table><tr><th>Resident</th><th>Accrued</th><th>Used</th><th>Remaining</th></tr>{% for b in balances %}<tr><td>{{b.name}}</td><td>{{b.earned}}</td><td>{{b.used}}</td><td>{{b.remaining}}</td></tr>{% endfor %}</table></div></section><section><h3>History</h3><div class="wrap"><table><tr><th>Resident</th><th>Start</th><th>End</th><th>Days</th><th>Notes</th></tr>{% for e in entries %}<tr><td>{{e.surname}} {{e.firstname}}</td><td>{{e.start_date}}</td><td>{{e.end_date}}</td><td>{{e.days}}</td><td>{{e.notes}}</td></tr>{% endfor %}</table></div></section>""",residents=residents,balances=balances,entries=entries)
-
 @app.route("/external-rotations", methods=["GET","POST"])
 def external_rotations():
     if guard(): return redirect("/login")
@@ -939,14 +945,17 @@ def external_rotations():
         if super_guard(): c.close(); return ("Forbidden — Super Admin only",403)
         try:
             rid=int(request.form["resident_id"])
+            resident=c.execute("SELECT id FROM residents WHERE id=?",(rid,)).fetchone()
+            if not resident: raise ValueError("Resident does not exist.")
             supervisor=request.form["supervisor"].strip(); destination=request.form["destination"].strip()
             hospital=request.form["hospital"].strip(); country=request.form["country"].strip(); kind=request.form["rotation_type"].strip()
             start=date.fromisoformat(request.form["start_date"]); end=date.fromisoformat(request.form["end_date"])
             if not all([supervisor,destination,hospital,country,kind]): raise ValueError("All external rotation fields are required.")
             if end<start: raise ValueError("Return date must not precede start date.")
-            overlap=c.execute("SELECT id FROM external_rotations WHERE resident_id=? AND status='active' AND start_date<=? AND end_date>=?",(rid,end.isoformat(),start.isoformat())).fetchone()
+            overlap=c.execute("SELECT id FROM external_rotations WHERE resident_id=? AND status<>'cancelled' AND start_date<=? AND end_date>=?",(rid,end.isoformat(),start.isoformat())).fetchone()
             if overlap: raise ValueError("External rotations for this resident cannot overlap.")
-            c.execute("INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,notes,created_by) VALUES(?,?,?,?,?,?,?,?,?,?)",(rid,supervisor,destination,hospital,country,kind,start.isoformat(),end.isoformat(),request.form.get("notes","").strip(),session.get("user","")))
+            status="returned" if end<date.today() else "active"
+            c.execute("INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,notes,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?)",(rid,supervisor,destination,hospital,country,kind,start.isoformat(),end.isoformat(),request.form.get("notes","").strip(),status,session.get("user","")))
             audit_event(c,"external_rotation.created",f"resident_id={rid}; hospital={hospital}; country={country}; start={start}; end={end}")
             c.commit(); flash("External rotation saved; overlapping local assignments are blocked.")
         except Exception as exc: c.rollback(); flash("External rotation not saved: "+str(exc)[:220])
@@ -955,9 +964,58 @@ def external_rotations():
     today=date.today().isoformat()
     c.execute("UPDATE external_rotations SET status='returned',updated_at=CURRENT_TIMESTAMP WHERE status='active' AND end_date<?",(today,))
     rows=c.execute("SELECT x.*,r.surname,r.firstname FROM external_rotations x JOIN residents r ON r.id=x.resident_id ORDER BY x.start_date DESC").fetchall()
-    active={x[0] for x in c.execute("SELECT DISTINCT resident_id FROM external_rotations WHERE status='active' AND start_date<=? AND end_date>=?",(today,today)).fetchall()}
     c.commit(); c.close()
-    return page("""<section><h3>التربصات في الخارج / Stages à l’étranger / External rotations</h3><p>Residents are blocked from local assignments for any overlapping internal period and become eligible after the return date.</p><form method="post"><label>Resident <select name="resident_id" required>{% for r in residents %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}} ({{r.year}})</option>{% endfor %}</select></label><div class="grid"><label>Responsible employee / Supervisor <input name="supervisor" required></label><label>Destination <input name="destination" required></label><label>Hospital <input name="hospital" required></label><label>Country <input name="country" required></label><label>Rotation type <input name="rotation_type" required></label><label>Start date <input type="date" name="start_date" required></label><label>Return date <input type="date" name="end_date" required></label></div><label>Notes <input name="notes"></label><button>Save external rotation</button></form></section><section><h3>External rotation history</h3><div class="wrap"><table><tr><th>Resident</th><th>Supervisor</th><th>Destination</th><th>Hospital</th><th>Country</th><th>Type</th><th>Dates</th><th>Status</th></tr>{% for x in rows %}<tr><td>{{x.surname}} {{x.firstname}}</td><td>{{x.supervisor}}</td><td>{{x.destination}}</td><td>{{x.hospital}}</td><td>{{x.country}}</td><td>{{x.rotation_type}}</td><td>{{x.start_date}} – {{x.end_date}}</td><td>{{x.status}}</td></tr>{% endfor %}</table></div></section>""",residents=residents,rows=rows)
+    return page("""<section><h3>التربصات في الخارج / Stages à l’étranger / External rotations</h3><p>Residents are blocked from local assignments for any overlapping internal period and become eligible after the return date.</p><form method="post"><label>Resident <select name="resident_id" required>{% for r in residents %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}} ({{r.year}})</option>{% endfor %}</select></label><div class="grid"><label>Responsible employee / Supervisor <input name="supervisor" required maxlength="160"></label><label>Destination <input name="destination" required maxlength="160"></label><label>Hospital <input name="hospital" required maxlength="160"></label><label>Country <input name="country" required maxlength="100"></label><label>Rotation type <input name="rotation_type" required maxlength="100"></label><label>Start date <input type="date" name="start_date" required></label><label>Return date <input type="date" name="end_date" required></label></div><label>Notes <input name="notes" maxlength="1000"></label><button>Save external rotation</button></form></section><section><h3>External rotation history</h3><div class="wrap"><table><tr><th>Resident</th><th>Supervisor</th><th>Destination</th><th>Hospital</th><th>Country</th><th>Type</th><th>Dates</th><th>Status</th><th>Actions</th></tr>{% for x in rows %}<tr><td>{{x.surname}} {{x.firstname}}</td><td>{{x.supervisor}}</td><td>{{x.destination}}</td><td>{{x.hospital}}</td><td>{{x.country}}</td><td>{{x.rotation_type}}</td><td>{{x.start_date}} – {{x.end_date}}</td><td>{{x.status}}</td><td><a href="/external-rotations/{{x.id}}/edit">Edit</a>{% if role=='super_admin' and x.status!='cancelled' %}<form method="post" action="/external-rotations/{{x.id}}/cancel" style="display:inline"><button>Cancel</button></form>{% endif %}</td></tr>{% endfor %}</table></div></section>""",residents=residents,rows=rows)
+
+@app.route("/external-rotations/<int:xid>/edit", methods=["GET","POST"])
+def edit_external_rotation(xid):
+    if guard(): return redirect("/login")
+    denied=super_guard()
+    if denied: return denied
+    c=db()
+    row=c.execute("SELECT * FROM external_rotations WHERE id=?",(xid,)).fetchone()
+    if not row:
+        c.close(); return ("External rotation not found",404)
+    if row["status"]=="cancelled":
+        c.close(); return ("Cancelled external rotations are immutable",409)
+    if request.method=="POST":
+        try:
+            rid=int(request.form["resident_id"])
+            if not c.execute("SELECT 1 FROM residents WHERE id=?",(rid,)).fetchone(): raise ValueError("Resident does not exist.")
+            supervisor=request.form["supervisor"].strip(); destination=request.form["destination"].strip()
+            hospital=request.form["hospital"].strip(); country=request.form["country"].strip(); kind=request.form["rotation_type"].strip()
+            start=date.fromisoformat(request.form["start_date"]); end=date.fromisoformat(request.form["end_date"])
+            if not all([supervisor,destination,hospital,country,kind]): raise ValueError("All external rotation fields are required.")
+            if end<start: raise ValueError("Return date must not precede start date.")
+            overlap=c.execute("SELECT id FROM external_rotations WHERE resident_id=? AND id<>? AND status<>'cancelled' AND start_date<=? AND end_date>=?",(rid,xid,end.isoformat(),start.isoformat())).fetchone()
+            if overlap: raise ValueError("External rotations for this resident cannot overlap.")
+            old=f"resident_id={row['resident_id']}; hospital={row['hospital']}; country={row['country']}; start={row['start_date']}; end={row['end_date']}"
+            status="returned" if end<date.today() else "active"
+            c.execute("UPDATE external_rotations SET resident_id=?,supervisor=?,destination=?,hospital=?,country=?,rotation_type=?,start_date=?,end_date=?,notes=?,status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",(rid,supervisor,destination,hospital,country,kind,start.isoformat(),end.isoformat(),request.form.get("notes","").strip(),status,xid))
+            audit_event(c,"external_rotation.updated",f"id={xid}; old=({old}); new_resident_id={rid}; hospital={hospital}; country={country}; start={start}; end={end}")
+            c.commit(); c.close(); flash("External rotation updated and audited."); return redirect("/external-rotations")
+        except Exception as exc:
+            c.rollback(); flash("External rotation not updated: "+str(exc)[:220])
+    residents=c.execute("SELECT id,surname,firstname,year FROM residents ORDER BY year DESC,surname").fetchall()
+    c.close()
+    return page("""<section><h3>Edit external rotation / Modifier le stage externe / تعديل التربص الخارجي</h3><form method="post"><label>Resident <select name="resident_id" required>{% for r in residents %}<option value="{{r.id}}" {% if r.id==row.resident_id %}selected{% endif %}>{{r.surname}} {{r.firstname}} ({{r.year}})</option>{% endfor %}</select></label><div class="grid"><label>Responsible employee / Supervisor <input name="supervisor" required maxlength="160" value="{{row.supervisor}}"></label><label>Destination <input name="destination" required maxlength="160" value="{{row.destination}}"></label><label>Hospital <input name="hospital" required maxlength="160" value="{{row.hospital}}"></label><label>Country <input name="country" required maxlength="100" value="{{row.country}}"></label><label>Rotation type <input name="rotation_type" required maxlength="100" value="{{row.rotation_type}}"></label><label>Start date <input type="date" name="start_date" required value="{{row.start_date}}"></label><label>Return date <input type="date" name="end_date" required value="{{row.end_date}}"></label></div><label>Notes <input name="notes" maxlength="1000" value="{{row.notes}}"></label><button>Save changes</button></form><p><a href="/external-rotations">Back to external rotations</a></p></section>""",residents=residents,row=row)
+
+@app.post("/external-rotations/<int:xid>/cancel")
+def cancel_external_rotation(xid):
+    if guard(): return redirect("/login")
+    denied=super_guard()
+    if denied: return denied
+    c=db()
+    row=c.execute("SELECT status FROM external_rotations WHERE id=?",(xid,)).fetchone()
+    if not row:
+        c.close(); return ("External rotation not found",404)
+    if row["status"]=="cancelled":
+        c.close(); flash("External rotation already cancelled."); return redirect("/external-rotations")
+    c.execute("UPDATE external_rotations SET status='cancelled',updated_at=CURRENT_TIMESTAMP WHERE id=?",(xid,))
+    audit_event(c,"external_rotation.cancelled",f"id={xid}; previous_status={row['status']}")
+    c.commit(); c.close(); flash("External rotation cancelled; its audit history is retained.")
+    return redirect("/external-rotations")
+ required>{% for r in residents %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}} ({{r.year}})</option>{% endfor %}</select></label><div class="grid"><label>Responsible employee / Supervisor <input name="supervisor" required></label><label>Destination <input name="destination" required></label><label>Hospital <input name="hospital" required></label><label>Country <input name="country" required></label><label>Rotation type <input name="rotation_type" required></label><label>Start date <input type="date" name="start_date" required></label><label>Return date <input type="date" name="end_date" required></label></div><label>Notes <input name="notes"></label><button>Save external rotation</button></form></section><section><h3>External rotation history</h3><div class="wrap"><table><tr><th>Resident</th><th>Supervisor</th><th>Destination</th><th>Hospital</th><th>Country</th><th>Type</th><th>Dates</th><th>Status</th></tr>{% for x in rows %}<tr><td>{{x.surname}} {{x.firstname}}</td><td>{{x.supervisor}}</td><td>{{x.destination}}</td><td>{{x.hospital}}</td><td>{{x.country}}</td><td>{{x.rotation_type}}</td><td>{{x.start_date}} – {{x.end_date}}</td><td>{{x.status}}</td></tr>{% endfor %}</table></div></section>""",residents=residents,rows=rows)
 
 if __name__=="__main__":
  init(); app.run(host="127.0.0.1",port=int(os.environ.get("PORT","5000")),debug=False)
