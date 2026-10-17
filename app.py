@@ -951,11 +951,19 @@ def manage_objectives():
  if super_guard(): return super_guard()
  c=db()
  if request.method=="POST":
-  tid=int(request.form["terrain"]); sy=int(request.form["study_year"]); obj=request.form["objective"].strip()
-  if obj:
+  try:
+   tid=int(request.form["terrain"]); sy=int(request.form["study_year"]); obj=request.form.get("objective","").strip()
+   terrain=c.execute("SELECT id FROM terrains WHERE id=? AND active=1",(tid,)).fetchone()
+   if not terrain: raise ValueError("Choose an active terrain.")
+   if sy not in (1,2,3,4): raise ValueError("Objective study year must be 1, 2, 3 or 4.")
+   if not obj or len(obj)>1000: raise ValueError("Objective text is required and must be at most 1000 characters.")
+   duplicate=c.execute("SELECT 1 FROM objectives WHERE terrain_id=? AND study_year=? AND lower(objective)=lower(?)",(tid,sy,obj)).fetchone()
+   if duplicate: raise ValueError("This objective already exists for the selected terrain and year.")
    c.execute("INSERT INTO objectives(terrain_id,study_year,objective) VALUES(?,?,?)",(tid,sy,obj))
    audit_event(c,"objective.created",f"terrain_id={tid}; study_year={sy}")
    c.commit(); flash(tr("done"))
+  except (ValueError,TypeError,KeyError,sqlite3.IntegrityError) as exc:
+   c.rollback(); flash(str(exc) or "Invalid objective input.")
  ts=c.execute("SELECT * FROM terrains WHERE active=1 ORDER BY name").fetchall()
  rows=c.execute("SELECT o.*,t.name terrain FROM objectives o JOIN terrains t ON t.id=o.terrain_id ORDER BY study_year,t.name").fetchall(); c.close()
  return page("""<section><h3>{{t('objectives')}}</h3><form method="post"><label>{{t('terrain')}}</label><select name="terrain">{% for t in ts %}<option value="{{t.id}}">{{t.name}}</option>{% endfor %}</select><label>{{t('study_year')}}</label><select name="study_year">{% for y in range(1,5) %}<option>{{y}}</option>{% endfor %}</select><label>{{t('objective')}}</label><input name="objective" required><button>{{t('save')}}</button></form></section><section>{% for o in rows %}<p>Year {{o.study_year}} — {{o.terrain}}: {{o.objective}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",ts=ts,rows=rows)
