@@ -510,55 +510,54 @@ This repository log captures durable project decisions and progress; it is not a
 - **Safety:** no real resident data/database files/secrets/assets changed; no APK build or phone test started.
 
 
-### RESI-2 / PHOTO-UPLOAD-UX-001 — 2026-10-17
+## User-approved delivery workflow — 2026-10-17 (highest priority)
 
-- **Finding:** resident photo upload accepted file-signature prefixes rather than verifying that the image could be decoded; a corrupt image could be stored but not displayed. The profile form also allowed direct editing of the stored photo path, and saving a form without that field could detach a photo.
-- **Verified candidate:** `resimanage-1-photo-ui-candidate` passed Python application checks on exact code/test head `01aaac6dd1f12a38ca8ea8298d0cdc86c20626aa` (run `39036901714`, conclusion success).
-- **Ported changes on this branch:** Pillow decode/verify and normalization, EXIF orientation handling, 1200×1200 resize, 4 MB limit, unique filenames, atomic writes, preserve-existing-photo behavior, profile photo preview and responsive profile card.
-- **Regression tests:** actual PNG upload and served image decode; corrupt PNG rejected without overwriting the current photo; profile save without replacement keeps the stored path.
-- **UI benchmark:** `docs/UX_BENCHMARK.md` records 10 comparable platforms and 14 related websites plus the design patterns selected for ResiManage.
-- **Status:** ResiManage 2 port is isolated on `resimanage-2-photo-ui-port`; its own CI must pass before considering the fix verified on ResiManage 2. The `resimanage-1-backup` branch remains unchanged. No APK build or phone test.
+### WORKFLOW-ORDER-001: Verify in ResiManage 1 first, then synchronize ResiManage 2
+- **Explicit user instruction:** implement proposed changes on the ResiManage 1 candidate, run automated checks and controlled functional verification, and only after the changes are shown to work, port the same verified changes to ResiManage 2 so both lines remain at the same level of progress.
+- `resimanage-1-backup` is a protected reference/backup branch: do not commit changes directly to it. Make candidate changes on a separate branch based on that backup; keep the backup branch itself unchanged.
+- Do not port unverified code to ResiManage 2. A matching PR may be prepared for comparison, but it must remain unmerged/on hold until ResiManage 1's exact candidate head passes CI and the code/test diff is reviewed. Then port the verified patch onto the latest `resimanage-2-work` without dropping its newer safeguards, add/run regression tests, and verify CI on the exact ResiManage 2 PR head.
+- "Verified" means: CI passes on the exact head SHA; relevant regression tests pass; diff reviewed for unintended changes. Phone/WebView behavior remains explicitly unverified until the user authorizes a controlled phone test. Do not build an APK unless the user explicitly requests one.
+- Protect real data: no real database, resident records, stage history, photos, backups, passwords or tokens in Git. No destructive changes to either backup branch.
 
+### PHOTO-001: Resident profile photo upload and profile usability
+- **User report:** the resident photo upload previously failed in a phone test and must be investigated rather than assumed fixed.
+- **ResiManage 1 candidate:** PR #71 — https://github.com/samyrius/ResiManage/pull/71, branch `resimanage-1-photo-ui-candidate`, based on `resimanage-1-backup` without modifying the backup branch.
+- **Candidate changes described in PR:** decode and verify uploaded image content with Pillow (not signature-only checking); normalize EXIF orientation; resize to maximum 1200×1200; save with unique names and atomic writes; preserve an existing photo if no valid replacement is selected; remove manual photo-path editing; provide photo picker, preview/status feedback, responsive profile layout and visible keyboard focus.
+- **Candidate regression tests described in PR:** valid image upload-and-serve round trip; corrupt image rejected without replacing the current photo; saving profile fields without a new photo preserves the existing photo.
+- **Benchmark artifact:** `docs/UX_BENCHMARK.md` records a review of 10 comparable platforms and 14 related websites to inform an ergonomic, modern and practical internal interface. Review the actual document and candidate diff before claiming the benchmark findings are complete.
+- **Current evidence recorded in PR #71 description:** automated CI was requested; the description does not establish the current latest run status. Confirm the exact head SHA and CI result before calling the ResiManage 1 candidate verified. Android/WebView file-picker behavior still requires a later controlled phone test.
+- **ResiManage 2 port:** PR #72 — https://github.com/samyrius/ResiManage/pull/72, branch `resimanage-2-photo-ui-port`, is already prepared as a port candidate. Per WORKFLOW-ORDER-001, keep it unmerged and do not call it verified until PR #71 passes on its exact final head, then compare the patch and run CI on the exact final PR #72 head.
+- **No APK build or phone test was started as part of this work.**
 
-### BRAND-3D-UX-001 — 2026-10-17 — User-approved visual direction (implementation pending)
+### UX-ORDER-001: Internal interface redesign
+- **Goal:** a polished, future-facing, elegant, modern, ergonomic, well-organized, practical and easy-to-use interface, especially on mobile and in Arabic RTL, without sacrificing core workflow speed.
+- **Research requirement from user:** assess at least 10 known comparable applications/platforms and at least 10 relevant websites in the same domain; summarize patterns and trade-offs in `docs/UX_BENCHMARK.md` before choosing design changes.
+- **Implementation order:** benchmark and document findings; prototype the interface on the ResiManage 1 candidate; verify responsive layout/navigation and regression tests; only then port the reviewed design to ResiManage 2. Do not start a build or phone test unless explicitly requested.
+- **Acceptance checklist:** clear information hierarchy; minimal top-level navigation with related tasks grouped; prominent daily actions (resident search, assignment, capacity and period); readable status/eligibility indicators that do not rely on color alone; responsive resident cards/profile photo; accessible form labels, errors and keyboard focus; safe confirmation for destructive/admin actions; Arabic RTL plus French/English consistency; no horizontal overflow on narrow screens; existing URLs and data behavior preserved.
+- **Status at time of entry:** requirement and workflow recorded; visual usability on an actual phone is not yet verified. Inspect `docs/UX_BENCHMARK.md` and the PR diff before claiming the 10-app/10-site review or redesign is complete.
 
-- **User instruction:** use the two image references attached in the conversation (glossy dimensional medical/ECG ResiTrack badge and mobile UI concept) to refine the app identity and interface. The product name must be **ResiManage**, replacing any remaining “ResiTrack” wordmarks.
-- **Requested visual direction:** polished 3D-inspired medical icon, futuristic navy/blue/cyan/teal theme, restrained luminous/flash-like motion, and a modern, organized, ergonomic interface. Motion must remain subtle, accessible, and disabled/reduced for users who prefer reduced motion; it must not distract from operational tasks.
-- **Research/benchmark:** candidate includes `docs/UX_BENCHMARK.md`, covering 10 comparable residency/scheduling platforms and 14 related websites. Findings favor role-aware concise navigation, resident profile cards, clear status/capacity/conflict signals, mobile-first touch targets, multilingual RTL/LTR, and restrained animation. Current code changes focus on the resident profile; full application-wide redesign is not yet implemented.
-- **Sequence confirmed by user:** implement first on the ResiManage 1 candidate, run automated checks and review the results; only then port verified changes to ResiManage 2, keeping the two work streams aligned. Do not change the protected `resimanage-1-backup` branch itself.
-- **Asset note:** the two reference images were supplied in chat; they are design references, not yet committed app assets. No launcher-icon/image asset replacement or animated theme has been implemented by this entry.
-- **Verification status:** photo/profile candidate PR #71 and ResiManage 2 port PR #72 are open. PR #71's current head has a successful Python application check; PR #72's earlier code/test head passed, but the currently reported PR head has no matching workflow run in the available check result. Recheck CI on the exact latest head before considering the port verified. Neither branch is merged by this archive entry. No APK build or phone test.
-
-
-### BRAND-3D-ICON-003 — 2026-10-17 — ResiManage 2 icon port after ResiManage 1 CI
-
-- **Porting gate:** the identical icon/header/launcher integration passed Python CI on the ResiManage 1 candidate exact commit `f2721c9b553c7e11e5eef094ad8a7847774294a5` (Actions run `39039772026`, success). This is now ported to isolated branch `resimanage-2-photo-ui-port`, targeting `resimanage-2-work`; the protected `resimanage-1-backup` and ResiManage 2 base branch are not modified by this commit.
-- **Files:** app header/favicon references, Android manifest launcher resource, optimized user-provided 3D icon binary in static and drawable-nodpi, regression test, and archive entry.
-- **Asset/brand caveat:** the artwork itself includes the old wordmark "ResiTrack"; launcher label remains ResiManage. Original image is retained in Library.
-- **Status:** port code commit `d69015236ac712a43c5d350342bedbcc72708f0f` is included in candidate head `88d59c36b02a8becd051ccf5f303977c0e84b605`; Python CI passed on that exact head (Actions run `39040002013`, success). The follow-up archive/CI-trigger commit did not alter app runtime code or tests. No APK build or phone test.
-
-
-### CI-CANDIDATE-PUSH-001 — 2026-10-17
-
-- **Reason:** GitHub Actions had not launched a run for the latest isolated ResiManage 2 photo/icon candidate commit, although the same tests passed on an earlier PR head. The workflow's push filter only named `resimanage-2-work`, excluding candidate branches.
-- **Change:** broaden the CI push filter to `resimanage-2-**` so isolated ResiManage 2 candidate branches are tested on their exact pushed SHA as well as PR base checks.
-- **Scope:** workflow configuration and archive only; no production/runtime behavior or resident data changed. This commit is on `resimanage-2-photo-ui-port`, not on `resimanage-2-work` or `main`.
-- **Status:** CI passed on the exact candidate head `88d59c36b02a8becd051ccf5f303977c0e84b605` (Actions run `39040002013`, success).
+### Immediate next verification steps
+1. Fetch PR #71 and PR #72 current metadata, compare their latest head SHAs, and inspect the benchmark document and changed-file patches.
+2. Check GitHub Actions for the exact PR #71 head. If it fails, fix and rerun only on the candidate branch; never change `resimanage-1-backup`.
+3. After PR #71 passes and the patch is reviewed, verify that PR #72 is a clean port onto the latest `resimanage-2-work`; run its tests/CI on the exact head before considering merge.
+4. Keep photo upload round-trip, corrupt-file handling, preservation of existing photos, and mobile file-picker verification as separate evidence items. CI can verify Flask upload handling, but cannot by itself prove Android/WebView picker behavior.
+5. Continue the broader application audit only on isolated branches and keep this archive updated with exact SHA/run links and factual statuses.
 
 
-## User-confirmed execution order and pending validation — 2026-10-17
+## Photo/profile candidate verification checkpoint — 2026-10-17
 
-- **User instruction (recorded):** implement the requested improvements on the isolated ResiManage 1 candidate first; test and verify them; only after verification port the same verified changes to ResiManage 2 so both remain at the same progress level. Preserve the ResiManage 1 backup branch; do not edit it directly.
-- **Photo upload bug is a priority:** previous profile photo selection/upload reportedly failed in the user's phone test. Candidate repair now validates decoded PNG/JPEG/WEBP images with Pillow, applies EXIF orientation, enforces a 4 MiB limit and 1200 px maximum, writes uniquely and atomically, keeps the old photo on invalid/no replacement, and adds regression tests. Python CI is evidence for backend handling only; actual Android/WebView picker behavior still requires a later user-authorized phone check.
-- **Interior UI request:** modern, elegant, future-facing, organized and ergonomic; Arabic RTL plus French/English; responsive mobile controls, accessible focus/reduced motion, useful resident profile/avatar and status/progress cues. The benchmark document records 10 comparable platforms and 14 relevant websites and summarizes patterns. This candidate is a profile/navigation foundation, not yet a complete redesign of every screen.
-- **Candidate links/status:** ResiManage 1 PR #71 (candidate, not merged): https://github.com/samyrius/ResiManage/pull/71 . Its currently reported head `95c45c4aa11b909e1fef4d0b3cf1b5a0e7366aca` has a successful Python application check (Actions run `39040106470`). ResiManage 2 port PR #72 (not merged): https://github.com/samyrius/ResiManage/pull/72 . The documented passing ResiManage 2 SHA `88d59c36b02a8becd051ccf5f303977c0e84b605` is earlier than the currently reported PR head `386ec0705d492a1c25625245cf8a8bbf22de95c8`; no matching workflow run was returned for the latest head, so **the port is not yet verified at its latest SHA**.
-- **No APK build, phone test, real resident database, real resident records, or secrets were used.** Do not merge either candidate or claim photo upload works on-device until the exact candidate CI passes and the later supervised device check is completed.
+- Re-fetched PR #71 (ResiManage 1 candidate). Its current head is `528d2c03e8e244f12879818fd05f471bf8c6b9d1`; GitHub Actions Python application checks completed successfully for this exact head (run **39043289602**). This establishes automated CI success for the candidate, not successful Android/WebView photo-picker operation.
+- PR #71 remains open/unmerged. The protected `resimanage-1-backup` branch has not been modified.
+- Re-fetched PR #72 (ResiManage 2 port). Its current head is `d52b7802484774c3a3036bab456d9cd35b38107e`; the previously mentioned passing run was for earlier SHA `88d59c36b02a8becd051ccf5f303977c0e84b605`, not this current head. The current-head workflow/status lookup returned no qualifying PR workflow run/status, so **PR #72 is not yet verified on its exact head**. It is open and GitHub currently reports it as not mergeable; investigate/rebase against latest `resimanage-2-work` and obtain CI on the exact resulting head before merge.
+- `docs/UX_BENCHMARK.md` exists on the ResiManage 1 candidate and lists 10 comparable platforms, 14 related websites, and UX principles. Treat this as a documented desk review, not proof of hands-on testing of each product/site. The current candidate is profile-focused; a full redesign of all app screens is not yet complete.
+- **Install/phone test decision:** do not ask the user to install yet. First resolve PR #72's base/CI state and review the port. When a clean ResiManage 2 candidate has passing exact-head CI and code review, ask the user for one controlled phone test specifically covering selecting a resident photo from Android storage, preview/save, profile reload, and image persistence. This is the point where device verification is genuinely required; do not build an APK unless the user explicitly authorizes it.
+- No APK was built and no phone/database/real resident data was touched during this checkpoint.
 
 
-## Current verification checkpoint — 2026-10-17 (follow-up)
+## User-directed photo-fix sequence and live GitHub check — 2026-10-17 (follow-up)
 
-- Rechecked PR #71 head `528d2c03e8e244f12879818fd05f471bf8c6b9d1`: GitHub Actions run `39043289602` reports Python application checks **success** on that PR head. PR remains open; no merge into the protected ResiManage 1 backup branch.
-- Rechecked PR #72 head `84ccdf25669705253c254d5123326bd623e7c064`, base `resimanage-2-work` at `4157aabb3e4ede0f8bdc6c91ee638db7f7e6be7e`: comparison reports branch diverged (12 commits ahead, 1 behind), GitHub reports `mergeable=false`, and no workflow run is returned for that exact head. The earlier passing candidate SHA is not evidence for this current head.
-- Photo backend regression tests visible in the candidate include upload-and-serve round trip, corrupt-image rejection while preserving the previous photo, and saving profile fields without replacing the photo. CI success validates server-side tests only; Android/WebView picker interaction remains untested.
-- UX benchmark document contains 10 comparable platforms and 14 relevant websites and adoption recommendations. The candidate redesign is profile/navigation focused and is not a completed end-to-end redesign of all screens.
-- **Next gate:** resolve PR #72's one-commit divergence/conflict without dropping the latest ResiManage 2 safeguards, then run CI on the exact resulting PR head. Do not merge either PR or build/test an APK until user explicitly requests the device phase. No real DB/data/secrets were used.
+- User reaffirmed the order: first implement and verify the resident-photo/profile fix on the ResiManage 1 candidate; then keep ResiManage 2 aligned by porting the same reviewed fix. This sequence is now the active acceptance gate.
+- PR #71 current exact head `528d2c03e8e244f12879818fd05f471bf8c6b9d1` has Python CI success, run [39043289602](https://github.com/samyrius/ResiManage/actions/runs/39043289602). This is automated Flask/Python evidence only; it does not establish Android/WebView gallery-picker behavior. PR #71 remains open; protected `resimanage-1-backup` remains untouched.
+- PR #72 is open on head `d52b7802484774c3a3036bab456d9cd35b38107e`, and GitHub currently reports it non-mergeable. Its previously cited successful run was for older SHA `88d59c36b02a8becd051ccf5f303977c0e84b605`; no qualifying PR workflow run was found for the current head. A compare of its base `79d1e400b20cfa9f59a8e243b43a70d591d5ef3d` against current `resimanage-2-work` head `763bb85883822808dc9871bb15e1da96ac75a4e4` shows the two intervening commits changed only `docs/PROJECT_ARCHIVE.md`. Resolve that documentation conflict cleanly, then rerun CI on the exact refreshed port head before merge.
+- The UX desk-review artifact `docs/UX_BENCHMARK.md` is present on both candidate branches and lists 10 comparable GME/residency scheduling platforms and 14 related websites. This fulfills the research-count/documentation requirement as a desk review; it is not hands-on usability testing, and the current UI work is a resident-profile/photo first pass, not a complete redesign of every screen.
+- Still pending: explicit user-authorized APK/device test of Android/WebView file selection, preview, save and reload/persistence; do not build an APK before the user requests it. No real DB/photos/secrets were touched.
