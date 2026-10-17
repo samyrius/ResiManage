@@ -586,7 +586,11 @@ def test_uploaded_resident_photo_is_stored_and_served_safely(tmp_path, monkeypat
     with rotation_app.db() as conn:
         conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,1)", ("Photo", "Resident"))
         rid = conn.execute("SELECT id FROM residents WHERE surname='Photo'").fetchone()[0]
-    png = b"\x89PNG\r\n\x1a\n" + b"test"
+    from PIL import Image
+    image = Image.new("RGB", (8, 8), (30, 120, 180))
+    image_buffer = io.BytesIO()
+    image.save(image_buffer, format="PNG")
+    png = image_buffer.getvalue()
     response = client.post("/profile/" + str(rid), data={
         "birth_place":"", "birth_date":"", "phone":"",
         "photo":(io.BytesIO(png),"portrait.png")
