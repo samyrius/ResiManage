@@ -1387,3 +1387,27 @@ def test_first_year_evaluation_does_not_record_decision_for_resident_in_later_ye
         assert conn.execute("SELECT COUNT(*) FROM decisions WHERE details LIKE ?", (f"%LaterYear Resident — first-year exams%",)).fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='exam.first_year_evaluated'").fetchone()[0] == 0
 
+def test_startup_fills_missing_periods_in_partial_legacy_academic_year(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    legacy = sqlite3.connect(rotation_app.DB)
+    legacy.execute(
+        "CREATE TABLE periods(id INTEGER PRIMARY KEY,year_label TEXT NOT NULL,name TEXT NOT NULL,UNIQUE(year_label,name))"
+    )
+    legacy.execute("INSERT INTO periods(year_label,name) VALUES(?,?)", ("2026-2027","01 Fév - 30 Avr"))
+    legacy.execute("CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT NOT NULL)")
+    legacy.execute("INSERT INTO settings(key,value) VALUES('year','2026-2027')")
+    legacy.commit()
+    legacy.close()
+
+    assert client.get("/login").status_code == 200
+    expected = {"01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"}
+    with rotation_app.db() as conn:
+        names = {row[0] for row in conn.execute("SELECT name FROM periods WHERE year_label='2026-2027'")}
+        assert names == expected
+        assert conn.execute("SELECT COUNT(*) FROM periods WHERE year_label='2026-2027'").fetchone()[0] == 4
+
+    monkeypatch.setattr(rotation_app.app, "_ready", False, raising=False)
+    assert client.get("/login").status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM periods WHERE year_label='2026-2027'").fetchone()[0] == 4
+
