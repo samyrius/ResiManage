@@ -393,3 +393,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** negative capacity and a period from academic year 2099–2100 are rejected and create no invalid capacity rows.
 - **Branch:** `resimanage-2-capacity-input-validation`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / CAPACITY-INPUT-VALIDATION-001 — 2026-10-17
+
+- **Audit finding:** capacity updates coerced negative values to zero and did not verify that the selected period belonged to the chosen academic year or that the terrain remained active.
+- **Fix proposed on isolated branch:** reject negative/non-integer capacity values, inactive/missing terrains, and periods outside the selected academic year; retain the existing guard that prevents capacity from dropping below confirmed/pending assignments.
+- **Regression tests added:** negative capacity and cross-year period are rejected without writing capacity rows.
+- **Branch:** `resimanage-2-capacity-input-validation`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
