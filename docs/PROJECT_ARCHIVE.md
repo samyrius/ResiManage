@@ -262,3 +262,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** deactivate an uncompleted core terrain, complete every remaining active core terrain, then verify a repeat assignment passes the eligibility check.
 - **Branch:** `resimanage-2-inactive-terrain-eligibility`; based on `resimanage-2-work`. CI is pending; do not describe this fix as verified until the workflow completes successfully on the final branch head.
 - **Safety:** no APK build, no phone/database access, no asset/theme edits, and no change to `main` or `resimanage-1-backup`.
+
+### RESI-2 / PENDING-APPROVAL-REVALIDATION-001 — 2026-10-17
+
+- **Audit finding:** a pending assignment could be approved after the resident became inactive, its terrain was deactivated, or an external rotation was subsequently recorded for the same period. Approval previously rechecked capacity and duplicates only.
+- **Fix proposed on isolated branch:** before confirming a pending assignment, re-check resident active status, terrain active status, and overlap with any non-cancelled external rotation. If any condition fails, keep the assignment pending and do not write an approval audit event.
+- **Regression tests added:** deactivated terrain and newly overlapping external rotation each prevent confirmation.
+- **Branch:** `resimanage-2-pending-assignment-revalidation`; based on the updated `resimanage-2-work`. CI pending; verify the final head before merging.
+- **Safety:** no database/real resident data/secrets/assets changed; no APK build or phone test started.

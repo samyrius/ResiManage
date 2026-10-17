@@ -532,17 +532,27 @@ def decisions():
  if request.method=="POST":
   aid=int(request.form["aid"]); outcome=request.form["outcome"]; reason=request.form.get("reason","").strip()
   if outcome not in ("approve","reject"): c.close(); return ("Invalid decision",400)
-  a=c.execute("SELECT a.*,r.surname,r.firstname,t.name terrain,p.name period,p.year_label FROM assignments a JOIN residents r ON r.id=a.resident_id JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id WHERE a.id=? AND a.status='pending'",(aid,)).fetchone()
+  a=c.execute("SELECT a.*,r.surname,r.firstname,r.status resident_status,t.name terrain,t.active terrain_active,p.name period,p.year_label FROM assignments a JOIN residents r ON r.id=a.resident_id JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id WHERE a.id=? AND a.status='pending'",(aid,)).fetchone()
   if a and reason:
    if outcome=="approve":
-    cap=c.execute("SELECT places FROM capacities WHERE year_label=? AND terrain_id=? AND period_id=?",(a["year_label"],a["terrain_id"],a["period_id"])).fetchone()
-    used=c.execute("SELECT COUNT(*) FROM assignments WHERE terrain_id=? AND period_id=? AND status='confirmed'",(a["terrain_id"],a["period_id"])).fetchone()[0]
-    dup=c.execute("SELECT id FROM assignments WHERE resident_id=? AND period_id=? AND id<>? AND status IN ('confirmed','pending')",(a["resident_id"],a["period_id"],aid)).fetchone()
-    if not cap or used>=cap["places"] or dup: flash(tr("full") if not dup else tr("duplicate"))
+    if a["resident_status"]!="active":
+     flash("Cannot approve: the resident is no longer active.")
+    elif not a["terrain_active"]:
+     flash("Cannot approve: the terrain has been deactivated.")
     else:
-     c.execute("UPDATE assignments SET status='confirmed' WHERE id=?",(aid,)); c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(a["surname"]+" "+a["firstname"]+" — "+a["terrain"],tr("approve"),reason,session["user"]))
-     audit_event(c,"assignment.override_approved",f"assignment_id={aid}; reason={reason}")
-     c.commit(); flash(tr("done"))
+     start_day,end_day=rotation_period_bounds(a["year_label"],a["period"])
+     external=c.execute("SELECT hospital,country,start_date,end_date FROM external_rotations WHERE resident_id=? AND status<>'cancelled' AND start_date<=? AND end_date>=? LIMIT 1",(a["resident_id"],end_day.isoformat(),start_day.isoformat())).fetchone()
+     if external:
+      flash("Cannot approve: an external rotation overlaps this period.")
+     else:
+      cap=c.execute("SELECT places FROM capacities WHERE year_label=? AND terrain_id=? AND period_id=?",(a["year_label"],a["terrain_id"],a["period_id"])).fetchone()
+      used=c.execute("SELECT COUNT(*) FROM assignments WHERE terrain_id=? AND period_id=? AND status='confirmed'",(a["terrain_id"],a["period_id"])).fetchone()[0]
+      dup=c.execute("SELECT id FROM assignments WHERE resident_id=? AND period_id=? AND id<>? AND status IN ('confirmed','pending')",(a["resident_id"],a["period_id"],aid)).fetchone()
+      if not cap or used>=cap["places"] or dup: flash(tr("full") if not dup else tr("duplicate"))
+      else:
+       c.execute("UPDATE assignments SET status='confirmed' WHERE id=?",(aid,)); c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(a["surname"]+" "+a["firstname"]+" — "+a["terrain"],tr("approve"),reason,session["user"]))
+       audit_event(c,"assignment.override_approved",f"assignment_id={aid}; reason={reason}")
+       c.commit(); flash(tr("done"))
    else:
     c.execute("UPDATE assignments SET status='rejected' WHERE id=?",(aid,)); c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(a["surname"]+" "+a["firstname"]+" — "+a["terrain"],tr("reject"),reason,session["user"]))
     audit_event(c,"assignment.override_rejected",f"assignment_id={aid}; reason={reason}")
