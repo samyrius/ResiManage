@@ -548,10 +548,28 @@ def history():
  c=db()
  if request.method=="POST":
   if session.get("role")!="super_admin": c.close(); return ("Forbidden — Super Admin only",403)
-  rid=int(request.form["resident"]); tid=int(request.form["terrain"])
-  c.execute("INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",(rid,tid,request.form["year_label"],request.form.get("period",""),request.form.get("date_done","")))
-  audit_event(c,"history.created",f"resident_id={rid}; terrain_id={tid}; year={request.form['year_label']}")
-  c.commit(); flash(tr("done"))
+  try:
+   rid=int(request.form["resident"]); tid=int(request.form["terrain"])
+   year_label=request.form.get("year_label","").strip()
+   period=request.form.get("period","").strip()
+   date_done=request.form.get("date_done","").strip()
+   if not re.fullmatch(r"\d{4}-\d{4}",year_label) or int(year_label.split("-")[1])!=int(year_label.split("-")[0])+1:
+    raise ValueError("Academic year must be YYYY-YYYY with consecutive years.")
+   valid_periods={"01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"}
+   if period and period not in valid_periods:
+    raise ValueError("Choose one of the four official rotation periods.")
+   if date_done: date.fromisoformat(date_done)
+   if not c.execute("SELECT 1 FROM residents WHERE id=?",(rid,)).fetchone():
+    raise ValueError("Resident does not exist.")
+   if not c.execute("SELECT 1 FROM terrains WHERE id=?",(tid,)).fetchone():
+    raise ValueError("Terrain does not exist.")
+   duplicate=c.execute("SELECT 1 FROM history WHERE resident_id=? AND terrain_id=? AND year_label=? AND period=? AND COALESCE(date_done,'')=?",(rid,tid,year_label,period,date_done)).fetchone()
+   if duplicate: raise ValueError("This historical rotation already exists.")
+   c.execute("INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",(rid,tid,year_label,period,date_done))
+   audit_event(c,"history.created",f"resident_id={rid}; terrain_id={tid}; year={year_label}; period={period}")
+   c.commit(); flash(tr("done"))
+  except (TypeError,ValueError,sqlite3.IntegrityError) as exc:
+   c.rollback(); flash(str(exc) or "Invalid historical rotation.")
  rs=c.execute("SELECT * FROM residents ORDER BY year DESC,surname").fetchall(); ts=c.execute("SELECT * FROM terrains WHERE active=1 ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END, name").fetchall(); rows=c.execute("SELECT h.*,r.surname,r.firstname,t.name terrain FROM history h JOIN residents r ON r.id=h.resident_id JOIN terrains t ON t.id=h.terrain_id ORDER BY h.id DESC").fetchall(); c.close()
  return page("""<section><h3>{{t('history_add')}}</h3><form method="post"><label>{{t('resident')}}</label><select name="resident">{% for r in rs %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}} — {{r.year}}</option>{% endfor %}</select><label>{{t('terrain')}}</label><select name="terrain">{% for x in ts %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select><label>{{t('academic_year')}}</label><input name="year_label" required placeholder="2025-2026"><label>{{t('period')}}</label><input name="period"><label>{{t('date')}}</label><input type="date" name="date_done"><button>{{t('save')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('terrain')}}</th><th>{{t('academic_year')}}</th><th>{{t('period')}}</th><th>{{t('date')}}</th></tr>{% for h in rows %}<tr><td>{{h.surname}} {{h.firstname}}</td><td>{{h.terrain}}</td><td>{{h.year_label}}</td><td>{{h.period}}</td><td>{{h.date_done}}</td></tr>{% endfor %}</table></div></section>""",rs=rs,ts=ts,rows=rows)
 @app.get("/summary")
