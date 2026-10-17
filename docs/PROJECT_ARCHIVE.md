@@ -143,3 +143,12 @@ This repository log captures durable project decisions and progress; it is not a
 - **Implementation:** added a scalable SVG icon at `static/resitrack-icon.svg` with a dimensional shield, medical cross, ECG line, gradient, and depth shadow; wired it as the browser favicon and the shared page-header icon. Updated the application name across Arabic, French, and English labels and added a localized descriptive tagline. Existing route names, database paths, and stored data are untouched.
 - **Verification:** GitHub Actions and browser/mobile rendering checks must be confirmed on this branch before the change is called verified. This is a web-app branding change, not an Android APK build.
 - **Status:** implementation submitted for automated checks; visual/runtime verification pending.
+
+## Continuity update — 2026-10-17
+
+- Confirmed current working baseline was `main` at `2e737efe` before the no-cross icon change.
+- PR #17 merged as `ef02c485647aca35a273f8d58320390554b272c3`: updated the Android launcher vector and `static/resitrack-icon.svg` with the ResiManage name and clinician/ICU-monitor/ECG design without a cross. No database or resident-history files changed.
+- GitHub's Android APK workflow ran automatically on that merge and succeeded, even though no manual build was requested. To respect the standing instruction, `.github/workflows/android-apk.yml` was changed in commit `81a242c757f61192fb028537825fc94c6105e71d` to `workflow_dispatch` only. Future APK builds must be explicitly started by the user; ordinary pushes and PRs no longer trigger that workflow.
+- Annual leave and external rotation functionality was ported from the stale PR #12 branch onto a fresh branch based on current main, without copying its obsolete icon assets or old UI styles. It adds tables only (no existing rows are deleted), 30-day annual leave tracking with carry-forward and overlap checks, external-rotation records, server-side blocking of overlapping local assignments, dashboard shortcuts, and regression tests.
+- PR #18: `https://github.com/samyrius/ResiManage/pull/18`. Python GitHub Actions test suite passed on the current PR head before this archive update; recheck the latest run before merge.
+- Outstanding validation: test the new leave/external-rotation screens on a phone; visually verify the launcher icon on-device. Do not claim the APK was manually built or installed. Continue preserving `rotation.db`, resident and stage histories, DEMS archive, photos and backups; never commit personal data or secrets.
