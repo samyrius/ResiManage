@@ -1108,3 +1108,55 @@ def test_assignment_page_has_priority_filters_and_clear_conflict_feedback(tmp_pa
     assert b'External rotation conflict' in response.data
     assert b'rt-assignment-table' in response.data
 
+def test_inactive_core_terrain_does_not_block_repeat_eligibility(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,4)",
+            ("InactiveCore", "Resident"),
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='InactiveCore'"
+        ).fetchone()[0]
+        target = conn.execute(
+            "SELECT id FROM terrains WHERE name='Réanimation chirurgicale'"
+        ).fetchone()[0]
+        inactive = conn.execute(
+            "SELECT id FROM terrains WHERE name='Urologie'"
+        ).fetchone()[0]
+        period_id = conn.execute(
+            "SELECT id FROM periods ORDER BY id LIMIT 1"
+        ).fetchone()[0]
+        year_label = conn.execute(
+            "SELECT year_label FROM periods WHERE id=?", (period_id,)
+        ).fetchone()[0]
+        conn.execute("UPDATE terrains SET active=0 WHERE id=?", (inactive,))
+        conn.execute(
+            "INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,2)",
+            (year_label, target, period_id),
+        )
+        conn.execute(
+            "INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+            (rid, target, year_label, "01 Fév - 30 Avr", "2026-04-30"),
+        )
+        conn.execute(
+            """
+            INSERT INTO history(resident_id,terrain_id,year_label,period,date_done)
+            SELECT ?, id, ?, 'historique', '2026-04-30'
+            FROM terrains
+            WHERE active=1 AND kind IN ('mandatory','basic') AND id<>?
+            """,
+            (rid, year_label, target),
+        )
+
+    with rotation_app.app.test_request_context("/"):
+        with rotation_app.db() as conn:
+            allowed, message, status = rotation_app.check(
+                conn, rid, target, period_id, year_label
+            )
+
+    assert allowed is True
+    assert status == "confirmed"
+    assert "يمكن التكرار" in message
+
