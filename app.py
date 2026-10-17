@@ -86,6 +86,7 @@ def init():
  # Migrate user email fields only after the users table exists (fresh DB and legacy DB).
  ensure_column(c,"users","email","TEXT DEFAULT ''")
  ensure_column(c,"users","email_verified","INTEGER NOT NULL DEFAULT 0")
+ ensure_column(c,"import_previews","import_type","TEXT NOT NULL DEFAULT 'residents'")
  y=str(datetime.now().year)+"-"+str(datetime.now().year+1)
  c.execute("INSERT OR IGNORE INTO settings VALUES('year',?)",(y,))
  initial_password=os.environ.get("ROTATION_INITIAL_PASSWORD")
