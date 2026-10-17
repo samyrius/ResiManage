@@ -321,6 +321,45 @@ def test_first_year_progression_requires_every_component_at_least_ten(tmp_path, 
         assert conn.execute("SELECT year FROM residents WHERE id=?", (fail_id,)).fetchone()[0] == 1
 
 
+
+
+def test_inactive_first_year_resident_is_not_advanced_after_passing_exams(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,1,'inactive')",
+            ("Inactive", "Resident"),
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='Inactive'"
+        ).fetchone()[0]
+    for module, theory, practical in [("Module A", 12, 12), ("Module B", 10, 10)]:
+        client.post("/exams", data={
+            "action": "record", "resident": str(rid), "study_year": "1",
+            "module": module, "theory": str(theory), "practical": str(practical),
+        })
+    response = client.post("/exams", data={
+        "action": "evaluate_first_year", "resident": str(rid),
+        "study_year": "1", "all_modules_confirmed": "yes",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"resident is not active" in response.data
+    with rotation_app.db() as conn:
+        resident = conn.execute(
+            "SELECT year,status FROM residents WHERE id=?", (rid,)
+        ).fetchone()
+        assert tuple(resident) == (1, "inactive")
+        decision = conn.execute(
+            "SELECT decision FROM decisions WHERE details LIKE '%Inactive Resident%first-year exams'"
+        ).fetchone()
+        assert decision is not None
+        assert decision["decision"] == "Passed"
+        assert conn.execute(
+            "SELECT COUNT(*) FROM audit WHERE action='resident.year_advanced' AND details LIKE ?",
+            (f"%resident_id={rid};%",),
+        ).fetchone()[0] == 0
+
 def test_dems_archive_keeps_resident_and_history(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
@@ -491,6 +530,67 @@ def test_academic_year_change_creates_four_new_periods_and_preserves_old_periods
         assert conn.execute("SELECT COUNT(*) FROM periods WHERE year_label='2027-2028'").fetchone()[0] == 4
         assert conn.execute("SELECT COUNT(*) FROM periods WHERE year_label=?", (old_year,)).fetchone()[0] == 4
 
+
+
+def test_documented_history_import_requires_preview_and_preserves_explicit_records(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)",
+            ("Doe", "Jane", 2),
+        )
+        resident_id = conn.execute(
+            "SELECT id FROM residents WHERE surname='Doe' AND firstname='Jane'"
+        ).fetchone()[0]
+        terrain_id = conn.execute(
+            "SELECT id FROM terrains WHERE name='Réanimation chirurgicale'"
+        ).fetchone()[0]
+    csv_bytes = (
+        "resident,terrain,year_label,period,date_done\\n"
+        "Doe Jane,Réanimation chirurgicale,2025-2026,01 Fév - 30 Avr,2025-02-15\\n"
+    ).encode("utf-8")
+    response = client.post("/import", data={
+        "import_type": "history",
+        "file": (io.BytesIO(csv_bytes), "documented-history.csv"),
+    }, content_type="multipart/form-data")
+    assert response.status_code == 200
+    assert b"Only explicit documented stages will be added" in response.data
+    assert b"Doe Jane" in response.data
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM history WHERE resident_id=?", (resident_id,)
+        ).fetchone()[0] == 0
+    match = re.search(rb'name="preview_id" value="(\\d+)"', response.data)
+    assert match is not None
+    response = client.post("/import", data={
+        "action": "confirm", "preview_id": match.group(1).decode(),
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        row = conn.execute(
+            "SELECT terrain_id,year_label,period,date_done FROM history WHERE resident_id=?",
+            (resident_id,),
+        ).fetchone()
+        assert tuple(row) == (terrain_id, "2025-2026", "01 Fév - 30 Avr", "2025-02-15")
+
+
+def test_documented_history_import_rejects_unknown_resident_without_writing_history(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    csv_bytes = (
+        "resident,terrain,year_label\\n"
+        "Unknown Person,Réanimation chirurgicale,2025-2026\\n"
+    ).encode("utf-8")
+    response = client.post("/import", data={
+        "import_type": "history",
+        "file": (io.BytesIO(csv_bytes), "invalid-history.csv"),
+    }, content_type="multipart/form-data")
+    assert response.status_code == 200
+    assert b"Resident must match exactly one existing resident" in response.data
+    assert b'disabled' in response.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM history").fetchone()[0] == 0
 
 def test_xlsx_import_preview(tmp_path, monkeypatch):
     from openpyxl import Workbook

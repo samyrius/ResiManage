@@ -70,6 +70,7 @@ def init():
   ensure_column(c,"residents",col,spec)
  ensure_column(c,"terrains","active","INTEGER NOT NULL DEFAULT 1")
  ensure_column(c,"audit","actor","TEXT DEFAULT ''")
+ ensure_column(c,"import_previews","import_type","TEXT NOT NULL DEFAULT 'residents'")
  c.executescript("""
  CREATE TABLE IF NOT EXISTS exam_records(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL,study_year INTEGER NOT NULL,module TEXT NOT NULL,theory REAL NOT NULL,practical REAL NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE IF NOT EXISTS objectives(id INTEGER PRIMARY KEY,terrain_id INTEGER NOT NULL,study_year INTEGER NOT NULL,objective TEXT NOT NULL);
@@ -616,10 +617,15 @@ def normalize_header(value):
   "year":"year","study year":"year","année":"year","annee":"year","niveau":"year","السنة":"year",
   "phone":"phone","telephone":"phone","téléphone":"phone","mobile":"phone","الهاتف":"phone",
   "birth place":"birth_place","lieu de naissance":"birth_place","مكان الميلاد":"birth_place",
-  "birth date":"birth_date","date de naissance":"birth_date","تاريخ الميلاد":"birth_date"
+  "birth date":"birth_date","date de naissance":"birth_date","تاريخ الميلاد":"birth_date",
+  "resident":"resident","resident name":"resident","full name":"resident","nom complet":"resident","nom du résident":"resident","المقيم":"resident",
+  "terrain":"terrain","stage":"terrain","rotation":"terrain","terrain de stage":"terrain","مكان التربص":"terrain",
+  "academic year":"year_label","academic year label":"year_label","year label":"year_label","year_label":"year_label","année universitaire":"year_label","annee universitaire":"year_label","السنة الجامعية":"year_label",
+  "period":"period","période":"period","periode":"period","الفترة":"period",
+  "date":"date_done","date done":"date_done","date_done":"date_done","completion date":"date_done","date de stage":"date_done","تاريخ التربص":"date_done"
  }
  return aliases.get(value,value.replace(" ","_"))
-def parse_import_file(path, extension):
+def parse_import_file(path, extension, import_type="residents"):
  rows=[]
  if extension==".csv":
   with open(path,"r",encoding="utf-8-sig",newline="") as handle:
@@ -669,9 +675,15 @@ def parse_import_file(path, extension):
   rows=[re.split(r"\s*[,;\t]\s*",line) for line in lines]
  if not rows: raise ValueError("No table rows could be read from this file.")
  header=[normalize_header(x) for x in rows[0]]
- required={"surname","firstname","year"}
- if not required.issubset(set(header)):
-  raise ValueError("Missing required columns. Include surname/nom/اللقب, firstname/prénom/الاسم, and year/année/السنة in the first row.")
+ if import_type=="history":
+  header=[("year_label" if key=="year" else key) for key in header]
+  required={"resident","terrain","year_label"}
+  if not required.issubset(set(header)):
+   raise ValueError("History import requires resident, terrain and academic year/year_label columns. Period and date_done are optional.")
+ else:
+  required={"surname","firstname","year"}
+  if not required.issubset(set(header)):
+   raise ValueError("Resident import requires surname/nom/اللقب, firstname/prénom/الاسم, and year/année/السنة columns.")
  parsed=[]
  for line_number,values in enumerate(rows[1:],start=2):
   if not any(str(x or "").strip() for x in values): continue
@@ -680,7 +692,7 @@ def parse_import_file(path, extension):
    if key and i<len(values): item[key]=str(values[i] if values[i] is not None else "").strip()
   item["row_number"]=line_number
   parsed.append(item)
- if not parsed: raise ValueError("The file contains headers but no resident rows.")
+ if not parsed: raise ValueError("The file contains headers but no data rows.")
  return parsed
 @app.route("/import",methods=["GET","POST"])
 def import_residents():
@@ -697,17 +709,32 @@ def import_residents():
    if action=="cancel":
     c.execute("DELETE FROM import_previews WHERE id=?",(preview_id,)); c.commit(); c.close(); flash("Import cancelled."); return redirect("/import")
    rows=json.loads(preview["rows_json"]); errors=json.loads(preview["errors_json"])
+   import_type=preview["import_type"] if "import_type" in preview.keys() else "residents"
    if errors:
     c.close(); flash("Fix the invalid rows in the source file before importing."); return redirect("/import")
    inserted=0
-   for row in rows:
-    c.execute("INSERT INTO residents(surname,firstname,year,phone,birth_place,birth_date,status) VALUES(?,?,?,?,?,?, 'active')",
-      (row["surname"],row["firstname"],int(row["year"]),row.get("phone",""),row.get("birth_place",""),row.get("birth_date","")))
-    inserted+=1
-   audit_event(c,"residents.imported",f"filename={preview['filename']}; imported={inserted}; history_not_imported=true")
+   if import_type=="history":
+    for row in rows:
+     c.execute("INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+       (int(row["resident_id"]),int(row["terrain_id"]),row["year_label"],row.get("period",""),row.get("date_done","")))
+     inserted+=1
+    audit_event(c,"history.imported",f"filename={preview['filename']}; imported={inserted}; documented_rows_only=true")
+    success_message=f"Imported {inserted} documented past-stage records. No additional history was invented."
+    destination="/history"
+   else:
+    for row in rows:
+     c.execute("INSERT INTO residents(surname,firstname,year,phone,birth_place,birth_date,status) VALUES(?,?,?,?,?,?, 'active')",
+       (row["surname"],row["firstname"],int(row["year"]),row.get("phone",""),row.get("birth_place",""),row.get("birth_date","")))
+     inserted+=1
+    audit_event(c,"residents.imported",f"filename={preview['filename']}; imported={inserted}; history_not_imported=true")
+    success_message=f"Imported {inserted} residents. Past stages were not fabricated or imported."
+    destination="/residents"
    c.execute("DELETE FROM import_previews WHERE id=?",(preview_id,)); c.commit(); c.close()
-   flash(f"Imported {inserted} residents. No past rotations were invented or imported.")
-   return redirect("/residents")
+   flash(success_message)
+   return redirect(destination)
+  import_type=request.form.get("import_type","residents")
+  if import_type not in ("residents","history"):
+   c.close(); flash("Choose residents or documented stage history."); return redirect("/import")
   upload=request.files.get("file")
   if not upload or not upload.filename:
    c.close(); flash("Choose a file first."); return redirect("/import")
@@ -719,36 +746,77 @@ def import_residents():
   try:
    with tempfile.NamedTemporaryFile(prefix="rotation_import_",suffix=extension,dir=os.path.dirname(os.path.abspath(DB)),delete=False) as temp:
     staged=temp.name; upload.save(staged)
-   rows=parse_import_file(staged,extension)
+   rows=parse_import_file(staged,extension,import_type)
    errors=[]; seen=set()
-   for row in rows:
-    row_errors=[]
-    surname=row.get("surname","").strip(); firstname=row.get("firstname","").strip()
-    if not surname or not firstname: row_errors.append("Surname and first name are required.")
-    try:
-     year=int(float(row.get("year","")))
-     if year not in (1,2,3,4): raise ValueError()
-     row["year"]=year
-    except (ValueError,TypeError): row_errors.append("Year must be 1, 2, 3 or 4.")
-    row["surname"]=surname; row["firstname"]=firstname
-    key=(surname.casefold(),firstname.casefold(),row.get("year"))
-    if key in seen: row_errors.append("Duplicate resident row in this file.")
-    seen.add(key)
-    exists=c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=?",(surname,firstname,row.get("year",0))).fetchone()
-    if exists: row_errors.append("Resident with same name and year already exists.")
-    if row_errors: errors.append({"row":row.get("row_number"),"message":" ".join(row_errors)})
-   rows.sort(key=lambda row:(row.get("year",99),row.get("surname","").casefold(),row.get("firstname","").casefold()))
-   c.execute("DELETE FROM import_previews WHERE created_at < datetime('now','-1 day')")
-   c.execute("INSERT INTO import_previews(owner,rows_json,errors_json,filename) VALUES(?,?,?,?)",(session["user"],json.dumps(rows,ensure_ascii=False),json.dumps(errors,ensure_ascii=False),filename))
-   preview_id=c.execute("SELECT last_insert_rowid()").fetchone()[0]; c.commit()
-   preview=c.execute("SELECT * FROM import_previews WHERE id=?",(preview_id,)).fetchone(); c.close()
-   return page("""<section><h3>{{t('import')}} — {{t('preview')}}</h3><p>File: {{filename}} — {{rows|length}} rows. Past stages/history will not be fabricated.</p>{% if errors %}<p class="bad">Validation errors: {{errors|length}}. Correct the source file and upload again; no rows can be imported while errors remain.</p>{% endif %}<div class="wrap"><table><tr><th>Row</th><th>Surname</th><th>First name</th><th>Year</th><th>Phone</th><th>Validation</th></tr>{% for row in rows %}<tr><td>{{row.row_number}}</td><td>{{row.surname}}</td><td>{{row.firstname}}</td><td>{{row.year}}</td><td>{{row.phone or ''}}</td><td>{% for e in errors if e.row==row.row_number %}<span class="bad">{{e.message}}</span>{% else %}<span class="good">OK</span>{% endfor %}</td></tr>{% endfor %}</table></div><form method="post"><input type="hidden" name="preview_id" value="{{preview_id}}"><button name="action" value="confirm" {% if errors %}disabled{% endif %}>{{t('confirm_import')}}</button> <button name="action" value="cancel">{{t('cancel')}}</button></form></section>""",filename=filename,rows=rows,errors=errors,preview_id=preview_id)
+   if import_type=="history":
+    for row in rows:
+     row_errors=[]
+     resident_name=row.get("resident","").strip()
+     terrain_name=row.get("terrain","").strip()
+     year_label=row.get("year_label","").strip()
+     row["resident"]=resident_name; row["terrain"]=terrain_name; row["year_label"]=year_label
+     if not resident_name: row_errors.append("Resident name is required.")
+     if not terrain_name: row_errors.append("Terrain name is required.")
+     if not re.fullmatch(r"\d{4}-\d{4}",year_label) or (year_label and int(year_label.split("-")[1])!=int(year_label.split("-")[0])+1):
+      row_errors.append("Academic year must use YYYY-YYYY with consecutive years.")
+     resident_pool=c.execute("SELECT id,surname,firstname FROM residents").fetchall()
+     resident_key=resident_name.casefold().strip()
+     resident_matches=[r for r in resident_pool if resident_key in {
+      (r["surname"]+" "+r["firstname"]).casefold().strip(),
+      (r["firstname"]+" "+r["surname"]).casefold().strip(),
+      (r["surname"]+", "+r["firstname"]).casefold().strip()
+     }]
+     if len(resident_matches)!=1:
+      row_errors.append("Resident must match exactly one existing resident (use 'Surname Firstname').")
+     else:
+      row["resident_id"]=resident_matches[0]["id"]
+      row["resident_display"]=resident_matches[0]["surname"]+" "+resident_matches[0]["firstname"]
+     terrain_pool=c.execute("SELECT id,name FROM terrains").fetchall()
+     terrain_matches=[t for t in terrain_pool if t["name"].casefold().strip()==terrain_name.casefold().strip()]
+     if len(terrain_matches)!=1:
+      row_errors.append("Terrain must match exactly one existing terrain.")
+     else:
+      row["terrain_id"]=terrain_matches[0]["id"]; row["terrain_display"]=terrain_matches[0]["name"]
+     period=row.get("period","").strip(); date_done=row.get("date_done","").strip()
+     if date_done:
+      try: datetime.strptime(date_done,"%Y-%m-%d")
+      except ValueError: row_errors.append("Date must be a real calendar date in YYYY-MM-DD format.")
+     row["period"]=period; row["date_done"]=date_done
+     key=(row.get("resident_id"),row.get("terrain_id"),year_label,period,date_done)
+     if key in seen: row_errors.append("Duplicate stage-history row in this file.")
+     seen.add(key)
+     if row.get("resident_id") and row.get("terrain_id"):
+      exists=c.execute("SELECT 1 FROM history WHERE resident_id=? AND terrain_id=? AND year_label=? AND COALESCE(period,'')=? AND COALESCE(date_done,'')=?",(row["resident_id"],row["terrain_id"],year_label,period,date_done)).fetchone()
+      if exists: row_errors.append("This exact history record already exists.")
+     if row_errors: errors.append({"row":row.get("row_number"),"message":" ".join(row_errors)})
+    rows.sort(key=lambda row:(row.get("year_label",""),row.get("resident","").casefold(),row.get("terrain","").casefold()))
+   else:
+    for row in rows:
+     row_errors=[]
+     surname=row.get("surname","").strip(); firstname=row.get("firstname","").strip()
+     if not surname or not firstname: row_errors.append("Surname and first name are required.")
+     try:
+      year=int(float(row.get("year","")))
+      if year not in (1,2,3,4): raise ValueError()
+      row["year"]=year
+     except (ValueError,TypeError): row_errors.append("Year must be 1, 2, 3 or 4.")
+     row["surname"]=surname; row["firstname"]=firstname
+     key=(surname.casefold(),firstname.casefold(),row.get("year"))
+     if key in seen: row_errors.append("Duplicate resident row in this file.")
+     seen.add(key)
+     exists=c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=?",(surname,firstname,row.get("year",0))).fetchone()
+     if exists: row_errors.append("Resident with same name and year already exists.")
+     if row_errors: errors.append({"row":row.get("row_number"),"message":" ".join(row_errors)})
+    rows.sort(key=lambda row:(row.get("year",99),row.get("surname","").casefold(),row.get("firstname","").casefold()))
+   c.execute("INSERT INTO import_previews(owner,rows_json,errors_json,filename,import_type) VALUES(?,?,?,?,?)",(session["user"],json.dumps(rows,ensure_ascii=False),json.dumps(errors,ensure_ascii=False),filename,import_type))
+   preview_id=c.execute("SELECT last_insert_rowid()").fetchone()[0]; c.commit(); c.close()
+   return page("""<section><h3>{{t('import')}} — {{t('preview')}}</h3><p>File: {{filename}} — {{rows|length}} rows. {% if import_type=='history' %}Only explicit documented stages will be added; no history is inferred.{% else %}Resident records only; past stages are not inferred.{% endif %}</p>{% if errors %}<p class="bad">Validation errors: {{errors|length}}. Correct the source file and upload again; no rows can be imported while errors remain.</p>{% endif %}<div class="wrap"><table>{% if import_type=='history' %}<tr><th>Row</th><th>Resident</th><th>Terrain</th><th>Academic year</th><th>Period</th><th>Date</th><th>Validation</th></tr>{% for row in rows %}<tr><td>{{row.row_number}}</td><td>{{row.resident_display or row.resident}}</td><td>{{row.terrain_display or row.terrain}}</td><td>{{row.year_label}}</td><td>{{row.period or ''}}</td><td>{{row.date_done or ''}}</td><td>{% for e in errors if e.row==row.row_number %}<span class="bad">{{e.message}}</span>{% else %}<span class="good">OK</span>{% endfor %}</td></tr>{% endfor %}{% else %}<tr><th>Row</th><th>Surname</th><th>First name</th><th>Year</th><th>Phone</th><th>Validation</th></tr>{% for row in rows %}<tr><td>{{row.row_number}}</td><td>{{row.surname}}</td><td>{{row.firstname}}</td><td>{{row.year}}</td><td>{{row.phone or ''}}</td><td>{% for e in errors if e.row==row.row_number %}<span class="bad">{{e.message}}</span>{% else %}<span class="good">OK</span>{% endfor %}</td></tr>{% endfor %}{% endif %}</table></div><form method="post"><input type="hidden" name="preview_id" value="{{preview_id}}"><button name="action" value="confirm" {% if errors %}disabled{% endif %}>{{t('confirm_import')}}</button> <button name="action" value="cancel">{{t('cancel')}}</button></form></section>""",filename=filename,rows=rows,errors=errors,preview_id=preview_id,import_type=import_type)
   except Exception as exc:
    c.close(); flash("Could not read/validate the file: "+str(exc)[:250]); return redirect("/import")
   finally:
    if staged and os.path.exists(staged): os.remove(staged)
  c.close()
- return page("""<section><h3>{{t('import')}}</h3><p>{{t('import_help')}} Supported: CSV, XLS/XLSX, DOC/DOCX and text-based PDF.</p><form method="post" enctype="multipart/form-data"><label>{{t('file')}}</label><input type="file" name="file" accept=".csv,.xls,.xlsx,.doc,.docx,.pdf" required><button>{{t('upload_preview')}}</button></form></section>""")
+ return page("""<section><h3>{{t('import')}}</h3><p>{{t('import_help')}} Supported: CSV, XLS/XLSX, DOC/DOCX and text-based PDF.</p><form method="post" enctype="multipart/form-data"><label>Import type / Type d’import / نوع الاستيراد</label><select name="import_type"><option value="residents">Residents / Résidents / المقيمون</option><option value="history">Documented stage history / Historique documenté / تاريخ التربصات الموثق</option></select><p class="muted">For history, provide columns resident, terrain, year_label (or academic year); period and date_done are optional. The resident and terrain must already exist.</p><label>{{t('file')}}</label><input type="file" name="file" accept=".csv,.xls,.xlsx,.doc,.docx,.pdf" required><button>{{t('upload_preview')}}</button></form></section>""")
 @app.get("/photos/<filename>")
 def resident_photo(filename):
  if guard(): return redirect("/login")
@@ -836,10 +904,18 @@ def exams():
     passed=average>=10 and all(x["theory"]>=10 and x["practical"]>=10 for x in records)
     c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — first-year exams","Passed" if passed else "Failed",f"Average={average:.2f}/20; all theory/practical marks >=10: {all(x['theory']>=10 and x['practical']>=10 for x in records)}",session["user"]))
     audit_event(c,"exam.first_year_evaluated",f"resident_id={rid}; average={average:.2f}; passed={passed}")
-    if passed and resident["year"]==1:
+    if passed and resident["year"]==1 and resident["status"]=="active":
      c.execute("UPDATE residents SET year=2 WHERE id=?",(rid,))
      audit_event(c,"resident.year_advanced",f"resident_id={rid}; from=1; to=2")
-    c.commit(); flash(("Passed; resident advanced to year 2." if passed else "Failed: average must be at least 10/20 and every theory/practical mark must be at least 10/20"))
+    c.commit()
+    if passed and resident["year"]==1 and resident["status"]=="active":
+     flash("Passed; resident advanced to year 2.")
+    elif passed and resident["status"]!="active":
+     flash("Exam criteria passed, but the resident is not active; no progression was applied.")
+    elif passed:
+     flash("Exam criteria passed, but this action only advances active first-year residents; no progression was applied.")
+    else:
+     flash("Failed: average must be at least 10/20 and every theory/practical mark must be at least 10/20")
   elif action=="approve_advance":
    actor=session.get("user","").lower()
    outcome=request.form.get("outcome","approve")

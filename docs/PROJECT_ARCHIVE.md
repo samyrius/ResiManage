@@ -217,3 +217,16 @@ This repository log captures durable project decisions and progress; it is not a
 6. Create/configure private accounts for Pr Benhocine and Dr Dris in the running app only when the user/admin can set their private passwords. Never store passwords or tokens in Git.
 7. Keep `rotation.db`, resident histories, DEMS records, resident photos, backups, and secrets out of Git. Never overwrite user data without explicit permission.
 8. Do not start the Android APK workflow unless the user explicitly asks for a build.
+
+## ResiManage 2 requirements audit — 2026-10-17
+
+- Working branch: `resimanage-2-requirements-completion`, based on `resimanage-2-work`. `resimanage-1-backup` and `main` were not changed.
+- Confirmed the existing app already contains 19 seeded terrains, four annual periods, mandatory/optional classification, priority sorting, capacity and duplicate guards, resident profiles/photos/exam records, per-terrain/year objectives, import preview for CSV/XLS/XLSX/DOC/DOCX/text-PDF, official dual-vote promotion/DEMS, annual leave, external rotations, audit logging, ZIP backups with resident photos, and expanded CSV export. Existing tests cover these areas; the latest baseline CI run passed before the current edits.
+- Fixed a progression edge case: passing first-year exam criteria no longer advances a resident whose status is inactive. Added a regression test verifying the year remains 1, the passed exam decision is retained for audit, and no year-advance audit event is created.
+- Updated `README_AR.txt` to remove the outdated shared initial password and instruct the administrator to set a private password at first launch.
+- Current changes are committed on the dedicated completion branch. CI for this branch must finish successfully before this change set is described as verified.
+- No Android APK build, app launch, phone experiment, database migration, or real resident-data change was started in this task, per the user's instruction.
+- Branding status: the repository contains the existing navy/cyan clinician/ICU monitor/ECG artwork without a cross. It is not proven to be the exact 3D doctor image the user previously sent; do not claim exact-image integration until the original asset can be recovered and compared.
+- Implemented after the initial audit: a separate documented-stage-history import mode for CSV/XLS/XLSX/DOC/DOCX/text-PDF with preview-first validation, exact matching to existing residents and terrains, academic-year checks, duplicate checks, and no write while any row is invalid. Only explicitly supplied rows are inserted. Added valid/invalid import regression tests and updated English/Arabic instructions. CI for the new branch is pending.
+
+- Remaining release gates: recover/confirm the requested original 3D icon image; review mobile layout/RTL and Android launcher resources without building an APK; wait for CI to pass; then, only when the user explicitly requests it, run the Android build workflow and verify the actual artifact.
