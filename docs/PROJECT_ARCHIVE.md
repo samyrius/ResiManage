@@ -369,3 +369,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression tests added:** reject malformed academic year and unknown period; accept one valid entry; reject a duplicate without adding a second row or audit event.
 - **Branch:** `resimanage-2-history-validation-guard`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / PROMOTION-INACTIVE-RESIDENT-001 — 2026-10-17
+
+- **Audit finding:** the dual-official year-2/year-3 promotion endpoint accepted a vote for an inactive resident if a crafted POST supplied the resident ID. The UI listed active residents only, but server-side validation did not enforce that condition.
+- **Fix proposed on isolated branch:** reject progression votes for inactive residents before inserting a vote or audit event.
+- **Regression test added:** a Super Admin POST for an inactive year-2 resident produces no promotion vote and no vote audit record.
+- **Branch:** `resimanage-2-promotion-active-resident-guard-v2`; based on the latest `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
