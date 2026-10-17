@@ -979,7 +979,7 @@ def test_assignment_page_has_priority_filters_and_clear_conflict_feedback(tmp_pa
     assert b'id="assignment-search"' in response.data
     assert b'id="assignment-year-filter"' in response.data
     assert b'value="4"' in response.data and ("السنة".encode() in response.data or b'Year 4' in response.data)
-    assert b'Rotation planning &amp; resident assignment' in response.data or b'Rotation planning & resident assignment' in response.data
+    assert "تخطيط التربصات وتعيين المقيمين".encode() in response.data or b'Rotation planning &amp; resident assignment' in response.data or b'Rotation planning & resident assignment' in response.data
     assert b'rt-assignment-stats' in response.data
     assert b'rt-assignment-notice' in response.data
     assert b'External rotation conflict' in response.data
