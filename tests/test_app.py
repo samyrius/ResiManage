@@ -1509,6 +1509,13 @@ def test_history_rejects_invalid_year_period_and_duplicate_records(tmp_path, mon
     assert invalid_period.status_code == 200
     assert b"Choose one of the four official rotation periods" in invalid_period.data
 
+    future_date = client.post("/history", data={
+        "resident":str(rid),"terrain":str(tid),"year_label":"2098-2099",
+        "period":"01 Fév - 30 Avr","date_done":"2098-03-01"
+    }, follow_redirects=True)
+    assert future_date.status_code == 200
+    assert b"A historical rotation date cannot be in the future" in future_date.data
+
     payload = {
         "resident":str(rid),"terrain":str(tid),"year_label":"2025-2026",
         "period":"01 Fév - 30 Avr","date_done":"2026-03-01"
