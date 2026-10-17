@@ -757,7 +757,7 @@ def import_residents():
      row["resident"]=resident_name; row["terrain"]=terrain_name; row["year_label"]=year_label
      if not resident_name: row_errors.append("Resident name is required.")
      if not terrain_name: row_errors.append("Terrain name is required.")
-     if not re.fullmatch(r"\\d{4}-\\d{4}",year_label) or (year_label and int(year_label.split("-")[1])!=int(year_label.split("-")[0])+1):
+     if not re.fullmatch(r"\d{4}-\\d{4}",year_label) or (year_label and int(year_label.split("-")[1])!=int(year_label.split("-")[0])+1):
       row_errors.append("Academic year must use YYYY-YYYY with consecutive years.")
      resident_matches=c.execute("SELECT id,surname,firstname FROM residents WHERE lower(trim(surname||' '||firstname))=lower(?) OR lower(trim(firstname||' '||surname))=lower(?) OR lower(trim(surname||', '||firstname))=lower(?)",(resident_name,resident_name,resident_name)).fetchall()
      if len(resident_matches)!=1:
@@ -771,7 +771,7 @@ def import_residents():
      else:
       row["terrain_id"]=terrain_matches[0]["id"]; row["terrain_display"]=terrain_matches[0]["name"]
      period=row.get("period","").strip(); date_done=row.get("date_done","").strip()
-     if date_done and not re.fullmatch(r"\\d{4}-\\d{2}-\\d{2}",date_done):
+     if date_done and not re.fullmatch(r"\d{4}-\\d{2}-\\d{2}",date_done):
       row_errors.append("Date must use YYYY-MM-DD when supplied.")
      row["period"]=period; row["date_done"]=date_done
      key=(row.get("resident_id"),row.get("terrain_id"),year_label,period,date_done)
