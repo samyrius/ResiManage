@@ -1471,6 +1471,7 @@ def test_standard_user_cannot_create_rotation_assignments(tmp_path, monkeypatch)
     with client.session_transaction() as session:
         session["user"]="assignment-operator"
         session["role"]="user"
+        session["lang"]="en"
 
     read_only = client.get("/assign")
     assert read_only.status_code == 200
