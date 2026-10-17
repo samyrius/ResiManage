@@ -1114,6 +1114,26 @@ def rotation_period_bounds(year_label, period_name):
     if "nov" in n: return date(y,11,1), date(y+1,1,30)
     return date(y,2,1), date(y+1,1,30)
 
+def reject_external_overlap_with_local_assignment(c, resident_id, start, end):
+    local_rows = c.execute(
+        """SELECT a.id,t.name terrain,p.year_label,p.name period
+           FROM assignments a
+           JOIN terrains t ON t.id=a.terrain_id
+           JOIN periods p ON p.id=a.period_id
+           WHERE a.resident_id=? AND a.status IN ('confirmed','pending')""",
+        (resident_id,),
+    ).fetchall()
+    for assignment in local_rows:
+        local_start, local_end = rotation_period_bounds(
+            assignment["year_label"], assignment["period"]
+        )
+        if start <= local_end and end >= local_start:
+            raise ValueError(
+                "External rotation overlaps an existing local assignment: "
+                + assignment["terrain"] + " / " + assignment["period"] + "."
+            )
+
+
 @app.route("/leave", methods=["GET","POST"])
 def leave_management():
     if guard(): return redirect("/login")
@@ -1168,6 +1188,7 @@ def external_rotations():
             if end<start: raise ValueError("Return date must not precede start date.")
             overlap=c.execute("SELECT id FROM external_rotations WHERE resident_id=? AND status<>'cancelled' AND start_date<=? AND end_date>=?",(rid,end.isoformat(),start.isoformat())).fetchone()
             if overlap: raise ValueError("External rotations for this resident cannot overlap.")
+            reject_external_overlap_with_local_assignment(c,rid,start,end)
             status="returned" if end<date.today() else "active"
             c.execute("INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,notes,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?)",(rid,supervisor,destination,hospital,country,kind,start.isoformat(),end.isoformat(),request.form.get("notes","").strip(),status,session.get("user","")))
             audit_event(c,"external_rotation.created",f"resident_id={rid}; hospital={hospital}; country={country}; start={start}; end={end}")
@@ -1203,6 +1224,7 @@ def edit_external_rotation(xid):
             if end<start: raise ValueError("Return date must not precede start date.")
             overlap=c.execute("SELECT id FROM external_rotations WHERE resident_id=? AND id<>? AND status<>'cancelled' AND start_date<=? AND end_date>=?",(rid,xid,end.isoformat(),start.isoformat())).fetchone()
             if overlap: raise ValueError("External rotations for this resident cannot overlap.")
+            reject_external_overlap_with_local_assignment(c,rid,start,end)
             old=f"resident_id={row['resident_id']}; hospital={row['hospital']}; country={row['country']}; start={row['start_date']}; end={row['end_date']}"
             status="returned" if end<date.today() else "active"
             c.execute("UPDATE external_rotations SET resident_id=?,supervisor=?,destination=?,hospital=?,country=?,rotation_type=?,start_date=?,end_date=?,notes=?,status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",(rid,supervisor,destination,hospital,country,kind,start.isoformat(),end.isoformat(),request.form.get("notes","").strip(),status,xid))

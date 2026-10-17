@@ -2,6 +2,7 @@ import hashlib
 from flask.testing import FlaskClient
 import io
 import sqlite3
+from datetime import timedelta
 import re
 import zipfile
 import sys
@@ -1258,4 +1259,56 @@ def test_settings_rejects_password_shorter_than_twelve_characters(tmp_path, monk
             "SELECT password_hash FROM users WHERE username='admin'"
         ).fetchone()[0]
         assert after == before
+
+def test_external_rotation_creation_rejects_overlap_with_existing_local_assignment(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,2)", ("LocalFirst", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='LocalFirst'").fetchone()[0]
+        tid = conn.execute("SELECT id FROM terrains WHERE name='Réanimation chirurgicale'").fetchone()[0]
+        period = conn.execute("SELECT id,year_label,name FROM periods ORDER BY id LIMIT 1").fetchone()
+        conn.execute("INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')", (rid,tid,period["id"]))
+        conn.commit()
+    start_day, end_day = rotation_app.rotation_period_bounds(period["year_label"], period["name"])
+    response = client.post("/external-rotations", data={
+        "resident_id":str(rid),"supervisor":"Dr Test","destination":"Paris",
+        "hospital":"CHU Test","country":"France","rotation_type":"Observation",
+        "start_date":start_day.isoformat(),"end_date":end_day.isoformat(),"notes":"overlap"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"overlaps an existing local assignment" in response.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM external_rotations WHERE resident_id=?", (rid,)).fetchone()[0] == 0
+
+
+def test_external_rotation_edit_rejects_overlap_with_existing_local_assignment(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,2)", ("LocalEdit", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='LocalEdit'").fetchone()[0]
+        tid = conn.execute("SELECT id FROM terrains WHERE name='Réanimation chirurgicale'").fetchone()[0]
+        period = conn.execute("SELECT id,year_label,name FROM periods ORDER BY id LIMIT 1").fetchone()
+        conn.execute("INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')", (rid,tid,period["id"]))
+        conn.commit()
+    start_day, end_day = rotation_app.rotation_period_bounds(period["year_label"], period["name"])
+    nonoverlap_start = end_day + timedelta(days=1)
+    nonoverlap_end = nonoverlap_start + timedelta(days=7)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,status) VALUES(?,?,?,?,?,?,?,?,?)",
+            (rid,"Dr Test","Paris","CHU Test","France","Observation",nonoverlap_start.isoformat(),nonoverlap_end.isoformat(),"returned"),
+        )
+        xid = conn.execute("SELECT id FROM external_rotations WHERE resident_id=?", (rid,)).fetchone()[0]
+    response = client.post(f"/external-rotations/{xid}/edit", data={
+        "resident_id":str(rid),"supervisor":"Dr Test","destination":"Paris",
+        "hospital":"CHU Test","country":"France","rotation_type":"Observation",
+        "start_date":start_day.isoformat(),"end_date":end_day.isoformat(),"notes":"overlap"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"overlaps an existing local assignment" in response.data
+    with rotation_app.db() as conn:
+        row = conn.execute("SELECT start_date,end_date FROM external_rotations WHERE id=?", (xid,)).fetchone()
+        assert tuple(row) == (nonoverlap_start.isoformat(), nonoverlap_end.isoformat())
 
