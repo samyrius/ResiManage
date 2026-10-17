@@ -1509,6 +1509,13 @@ def test_history_rejects_invalid_year_period_and_duplicate_records(tmp_path, mon
     assert invalid_period.status_code == 200
     assert b"Choose one of the four official rotation periods" in invalid_period.data
 
+    future_date = client.post("/history", data={
+        "resident":str(rid),"terrain":str(tid),"year_label":"2098-2099",
+        "period":"01 Fév - 30 Avr","date_done":"2098-03-01"
+    }, follow_redirects=True)
+    assert future_date.status_code == 200
+    assert b"A historical rotation date cannot be in the future" in future_date.data
+
     payload = {
         "resident":str(rid),"terrain":str(tid),"year_label":"2025-2026",
         "period":"01 Fév - 30 Avr","date_done":"2026-03-01"
@@ -1699,6 +1706,38 @@ def test_repeat_of_core_terrain_is_blocked_across_academic_years(tmp_path, monke
         with rotation_app.db() as conn:
             allowed, message, status = rotation_app.check(
                 conn,rid,target,current_period["id"],current_year
+            )
+    assert allowed is False
+    assert status is None
+
+def test_future_dated_history_does_not_unlock_core_terrain_repeats(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        rid = conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,4) RETURNING id",
+            ("FutureHistory", "Resident"),
+        ).fetchone()[0]
+        current_period = conn.execute("SELECT * FROM periods ORDER BY id LIMIT 1").fetchone()
+        terrains = conn.execute(
+            "SELECT id FROM terrains WHERE active=1 AND kind IN ('mandatory','basic')"
+        ).fetchall()
+        target = terrains[0]["id"]
+        conn.execute(
+            "INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,1)",
+            (current_period["year_label"],target,current_period["id"]),
+        )
+        for terrain in terrains:
+            conn.execute(
+                "INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+                (rid,terrain["id"],"2098-2099","01 Fév - 30 Avr","2098-03-01"),
+            )
+        conn.commit()
+
+    with rotation_app.app.test_request_context("/"):
+        with rotation_app.db() as conn:
+            allowed, message, status = rotation_app.check(
+                conn,rid,target,current_period["id"],current_period["year_label"]
             )
     assert allowed is False
     assert status is None
