@@ -433,3 +433,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** future-year marks and post-graduation marks create neither exam rows nor exam audit events.
 - **Branch:** `resimanage-2-exam-record-stage-guard`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / OBJECTIVE-INPUT-VALIDATION-001 — 2026-10-17
+
+- **Audit finding:** objective creation trusted form values for terrain ID and study year, allowing objectives for inactive/nonexistent terrains, invalid years, and duplicate objective text.
+- **Fix proposed on isolated branch:** require an active terrain, study year 1–4, non-empty objective text up to 1000 characters, and reject case-insensitive duplicates for the same terrain/year.
+- **Regression tests added:** invalid year, inactive terrain, and duplicate objective are rejected; only one valid row is saved.
+- **Branch:** `resimanage-2-objective-input-validation`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
