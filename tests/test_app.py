@@ -50,7 +50,7 @@ def test_internal_navigation_is_grouped_responsive_and_marks_current_page(tmp_pa
     assert b'aria-label="Main navigation"' in response.data or b'aria-label="\xd8\xa7\xd9\x84\xd8\xaa\xd9\x86\xd9\x82\xd9\x84 \xd8\xa7\xd9\x84\xd8\xb1\xd8\xa6\xd9\x8a\xd8\xb3\xd9\x8a"' in response.data
     assert b'href="/leave"' in response.data
     assert b'href="/external-rotations"' in response.data
-    assert b'Rotations &amp; planning' in response.data or b'Rotations & planning' in response.data
+    assert "التربصات والتخطيط".encode() in response.data or b'Rotations &amp; planning' in response.data or b'Rotations & planning' in response.data
     assert b'class="nav-home is-active"' in response.data
     assert b'grid-template-columns:260px minmax(0,1fr)' in response.data
     assert b'@media(max-width:680px)' in response.data
@@ -978,7 +978,7 @@ def test_assignment_page_has_priority_filters_and_clear_conflict_feedback(tmp_pa
     assert response.status_code == 200
     assert b'id="assignment-search"' in response.data
     assert b'id="assignment-year-filter"' in response.data
-    assert b'Year 4' in response.data
+    assert b'value="4"' in response.data and (b'السنة' in response.data or b'Year 4' in response.data)
     assert b'Rotation planning &amp; resident assignment' in response.data or b'Rotation planning & resident assignment' in response.data
     assert b'rt-assignment-stats' in response.data
     assert b'rt-assignment-notice' in response.data
