@@ -899,7 +899,22 @@ def resident_profile(rid):
  if not r: c.close(); return ("Resident not found",404)
  if request.method=="POST":
   if session.get("role")!="super_admin": c.close(); return ("Forbidden — Super Admin only",403)
-  photo_path=request.form.get("photo_path","").strip()
+  surname=request.form.get("surname",r["surname"]).strip()
+  firstname=request.form.get("firstname",r["firstname"]).strip()
+  birth_place=request.form.get("birth_place",r["birth_place"] or "").strip()
+  birth_date=request.form.get("birth_date",r["birth_date"] or "").strip()
+  phone=request.form.get("phone",r["phone"] or "").strip()
+  if not surname or not firstname or len(surname)>100 or len(firstname)>100:
+   c.close(); flash("Surname and first name are required and must be at most 100 characters."); return redirect("/profile/"+str(rid))
+  if len(birth_place)>120 or len(phone)>40:
+   c.close(); flash("Birth place must be at most 120 characters and phone at most 40 characters."); return redirect("/profile/"+str(rid))
+  if birth_date:
+   try: parsed_birth_date=date.fromisoformat(birth_date)
+   except ValueError:
+    c.close(); flash("Enter a valid birth date."); return redirect("/profile/"+str(rid))
+   if parsed_birth_date>date.today():
+    c.close(); flash("Birth date cannot be in the future."); return redirect("/profile/"+str(rid))
+  photo_path=request.form.get("photo_path",r["photo_path"] or "").strip()
   photo_file=request.files.get("photo")
   if photo_file and photo_file.filename:
    ext=os.path.splitext(secure_filename(photo_file.filename))[1].lower()
@@ -915,8 +930,8 @@ def resident_profile(rid):
    photo_name="resident_"+str(rid)+"_"+str(int(datetime.now().timestamp()))+ext
    photo_file.save(os.path.join(photo_dir,photo_name)); photo_path="/photos/"+photo_name
   c.execute("UPDATE residents SET surname=?,firstname=?,birth_place=?,birth_date=?,photo_path=?,phone=? WHERE id=?",
-   (request.form.get("surname",r["surname"]).strip(),request.form.get("firstname",r["firstname"]).strip(),request.form.get("birth_place","").strip(),request.form.get("birth_date",""),photo_path,request.form.get("phone","").strip(),rid))
-  audit_event(c,"resident.profile_updated",f"resident_id={rid}; name={request.form.get('surname',r['surname']).strip()} {request.form.get('firstname',r['firstname']).strip()}; photo_uploaded={bool(photo_file and photo_file.filename)}")
+   (surname,firstname,birth_place,birth_date,photo_path,phone,rid))
+  audit_event(c,"resident.profile_updated",f"resident_id={rid}; name={surname} {firstname}; photo_uploaded={bool(photo_file and photo_file.filename)}")
   c.commit(); r=c.execute("SELECT * FROM residents WHERE id=?",(rid,)).fetchone(); flash(tr("done"))
  history_rows=c.execute("SELECT h.*,t.name terrain FROM history h JOIN terrains t ON t.id=h.terrain_id WHERE h.resident_id=? ORDER BY h.id DESC",(rid,)).fetchall()
  assignment_rows=c.execute("SELECT a.status,p.name period,p.year_label,t.name terrain FROM assignments a JOIN periods p ON p.id=a.period_id JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=? ORDER BY p.year_label DESC,p.id",(rid,)).fetchall()
