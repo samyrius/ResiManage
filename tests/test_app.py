@@ -1486,3 +1486,24 @@ def test_standard_user_cannot_create_rotation_assignments(tmp_path, monkeypatch)
         assert conn.execute("SELECT COUNT(*) FROM assignments WHERE resident_id=?", (rid,)).fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='assignment.created'").fetchone()[0] == 0
 
+def test_inactive_resident_cannot_receive_promotion_votes(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,2,'inactive')", ("Inactive", "Promotion"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Inactive'").fetchone()[0]
+        conn.commit()
+
+    with client.session_transaction() as session:
+        session["user"]="benhocine"
+        session["role"]="super_admin"
+    first = client.post("/exams", data={
+        "action":"approve_advance","resident":str(rid),"study_year":"2",
+        "outcome":"approve","reason":"Should not count"
+    }, follow_redirects=True)
+    assert first.status_code == 200
+    assert b"Inactive residents cannot be advanced" in first.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM promotion_votes WHERE resident_id=?", (rid,)).fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='promotion.vote_recorded'").fetchone()[0] == 0
+
