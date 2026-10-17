@@ -1522,3 +1522,42 @@ def test_history_rejects_invalid_year_period_and_duplicate_records(tmp_path, mon
         assert conn.execute("SELECT COUNT(*) FROM history WHERE resident_id=? AND terrain_id=?", (rid,tid)).fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='history.created'").fetchone()[0] == 1
 
+def test_future_confirmed_rotations_do_not_count_as_completed_for_repeat_eligibility(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        rid = conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,4) RETURNING id",
+            ("Future", "Rotations"),
+        ).fetchone()[0]
+        current_period = conn.execute("SELECT * FROM periods ORDER BY id LIMIT 1").fetchone()
+        target = conn.execute(
+            "SELECT id FROM terrains WHERE name='Réanimation chirurgicale'"
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,2)",
+            (current_period["year_label"],target,current_period["id"]),
+        )
+        conn.execute(
+            "INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+            (rid,target,"2025-2026","01 Fév - 30 Avr","2026-04-30"),
+        )
+        future_period_id = conn.execute(
+            "INSERT INTO periods(year_label,name) VALUES(?,?) RETURNING id",
+            ("2099-2100","01 Fév - 30 Avr"),
+        ).fetchone()[0]
+        conn.execute(
+            """INSERT INTO assignments(resident_id,terrain_id,period_id,status)
+               SELECT ?,id,?,'confirmed' FROM terrains WHERE active=1 AND kind IN ('mandatory','basic')""",
+            (rid,future_period_id),
+        )
+        conn.commit()
+
+    with rotation_app.app.test_request_context("/"):
+        with rotation_app.db() as conn:
+            allowed, message, status = rotation_app.check(
+                conn,rid,target,current_period["id"],current_period["year_label"]
+            )
+    assert allowed is False
+    assert "التربص منجز سابقاً" in message
+
