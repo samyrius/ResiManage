@@ -204,12 +204,12 @@ This repository log captures durable project decisions and progress; it is not a
 - Created `resimanage-1-backup` from that exact `main` commit. It is the frozen baseline; do not commit application changes to it.
 - Created `resimanage-2-work` from `resimanage-1-backup`. Initial comparison confirmed both branches were identical to `main`; the backup branch remains identical to `main`.
 - Recent merged work already present in that baseline includes PRs #15–#24: ResiManage display branding, navy/cyan UI, no-cross medical icon and removal of cross-like UI glyphs, annual leave and external rotations, hardening of leave/external rules, CSRF protection and protected official admins, dual-official progression/DEMS votes, and ZIP backups including resident photos plus expanded CSV export. Do not re-merge stale/divergent branches wholesale.
-- Added a one-line CI trigger change on `resimanage-2-work` so the Python test workflow can run on this work branch; opened draft PR #25 (`https://github.com/samyrius/ResiManage/pull/25`) for review. It is intentionally not merged. The available status/run lookup returned no checks yet, so the current test result is **pending / not verified**.
+- Added a one-line CI trigger change on `resimanage-2-work` so the Python test workflow can run on this work branch; opened draft PR #25 (`https://github.com/samyrius/ResiManage/pull/25`) for review. It is intentionally not merged. GitHub Actions run #326 (run ID `39023073942`) passed **40 tests in 13.71 seconds** on the PR merge commit including this branch head. The new DEMS-rejection regression test is included.
 - Android build workflow remains `workflow_dispatch` only. No APK was built or requested.
 
 ### Remaining release gates — do not mark complete without evidence
 
-1. Check the Python CI result for PR #25 and fix any failures on `resimanage-2-work` only.
+1. The current code/test change set passed Python CI: run #326, 40 tests in 13.71 seconds. Re-run checks after further code changes.
 2. Review the complete requirements against the current code and add regression tests for any uncovered behavior, particularly the first-year rule, dual approvals, leave carry-forward/overlap, returned external rotations, and safe backup/restore.
 3. Verify the exact launcher image request: current `static/resitrack-icon.svg` is a custom SVG clinician/ICU monitor/ECG illustration without a cross; it is **not confirmed to be the exact 3D doctor image previously sent by the user**. Do not claim it is that exact image without recovering and comparing the original asset.
 4. Physical phone checks remain pending for responsive layout, usable navigation/buttons, Arabic RTL, and launcher icon rendering. Remote repository operations cannot prove these on-device checks.
