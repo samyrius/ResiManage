@@ -1627,3 +1627,41 @@ def test_capacity_rejects_negative_and_cross_academic_year_periods(tmp_path, mon
             (terrain_id,current["id"]),
         ).fetchone()[0] == 0
 
+def test_repeat_of_core_terrain_is_blocked_across_academic_years(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        rid = conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,4) RETURNING id",
+            ("CrossYear", "Repeat"),
+        ).fetchone()[0]
+        target = conn.execute(
+            "SELECT id FROM terrains WHERE active=1 AND kind IN ('mandatory','basic') ORDER BY id LIMIT 1"
+        ).fetchone()[0]
+        current_year = conn.execute("SELECT value FROM settings WHERE key='year'").fetchone()[0]
+        current_period = conn.execute(
+            "SELECT id,year_label FROM periods WHERE year_label=? ORDER BY id LIMIT 1",
+            (current_year,),
+        ).fetchone()
+        conn.execute(
+            "INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,1)",
+            (current_year,target,current_period["id"]),
+        )
+        previous_period = conn.execute(
+            "INSERT INTO periods(year_label,name) VALUES(?,?) RETURNING id",
+            ("2024-2025","01 Fév - 30 Avr"),
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",
+            (rid,target,previous_period),
+        )
+        conn.commit()
+
+    with rotation_app.app.test_request_context("/"):
+        with rotation_app.db() as conn:
+            allowed, message, status = rotation_app.check(
+                conn,rid,target,current_period["id"],current_year
+            )
+    assert allowed is False
+    assert "التربص منجز سابقاً" in message or "same_terrain_year" in message
+
