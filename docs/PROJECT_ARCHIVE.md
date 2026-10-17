@@ -351,3 +351,5 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** a standard user can view assignments but cannot see or submit the assignment form; a forged POST returns 403 and creates no assignment/audit event.
 - **Branch:** `resimanage-2-assignment-permission-guard`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+- **Related UI issue found during verification:** role-based controls inside the page body were rendered without the `role` template variable. This hid assignment controls and other admin-only UI even for Super Admins. The shared page renderer now passes the active role into the body template context; regression tests for assignment controls cover this.
