@@ -1591,3 +1591,32 @@ def test_future_confirmed_rotations_do_not_count_as_completed_for_repeat_eligibi
     assert allowed is False
     assert "التربص منجز سابقاً" in message
 
+def test_import_confirmation_rechecks_duplicates_and_imports_nothing_on_stale_preview(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    source = b"surname,firstname,year,phone\nRace,Resident,2,0550000001\nSecond,Resident,2,0550000002\n"
+    preview = client.post("/import", data={
+        "file":(io.BytesIO(source),"race-import.csv")
+    }, content_type="multipart/form-data", follow_redirects=True)
+    assert preview.status_code == 200
+    match = re.search(rb'name="preview_id" value="(\d+)"', preview.data)
+    assert match
+
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,2)",
+            ("Race","Resident"),
+        )
+        conn.commit()
+
+    confirmed = client.post("/import", data={
+        "action":"confirm","preview_id":match.group(1).decode()
+    }, follow_redirects=True)
+    assert confirmed.status_code == 200
+    assert b"Import cancelled" in confirmed.data
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM residents WHERE surname='Second' AND firstname='Resident'"
+        ).fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='residents.imported'").fetchone()[0] == 0
+
