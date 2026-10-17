@@ -499,6 +499,8 @@ def assign():
  if guard():return redirect("/login")
  c=db(); y=setting(c,"year")
  if request.method=="POST":
+  if session.get("role")!="super_admin":
+   c.close(); return ("Forbidden — Super Admin only",403)
   try:
    rid,tid,pid=map(int,(request.form["resident"],request.form["terrain"],request.form["period"])); ok,msg,status=check(c,rid,tid,pid,y)
    if not ok: flash(msg)
