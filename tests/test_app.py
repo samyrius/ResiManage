@@ -40,6 +40,25 @@ def login(client):
     return client.post("/login", data={"password": "test-strong-password-2026"}, follow_redirects=True)
 
 
+
+def test_internal_navigation_is_grouped_responsive_and_marks_current_page(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.get("/")
+    assert response.status_code == 200
+    assert b'class="rt-app-shell"' in response.data
+    assert b'aria-label="Main navigation"' in response.data or b'aria-label="\xd8\xa7\xd9\x84\xd8\xaa\xd9\x86\xd9\x82\xd9\x84 \xd8\xa7\xd9\x84\xd8\xb1\xd8\xa6\xd9\x8a\xd8\xb3\xd9\x8a"' in response.data
+    assert b'href="/leave"' in response.data
+    assert b'href="/external-rotations"' in response.data
+    assert b'Rotations &amp; planning' in response.data or b'Rotations & planning' in response.data
+    assert b'class="nav-home is-active"' in response.data
+    assert b'grid-template-columns:260px minmax(0,1fr)' in response.data
+    assert b'@media(max-width:680px)' in response.data
+    residents = client.get("/residents")
+    assert residents.status_code == 200
+    assert b'href="/residents" class="is-active"' in residents.data
+
+
 def test_login_page_and_language_selector(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     response = client.get("/login")
