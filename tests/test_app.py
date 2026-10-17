@@ -2048,3 +2048,29 @@ def test_dems_rejects_future_exam_date_without_vote_or_audit(tmp_path, monkeypat
         assert conn.execute(
             "SELECT COUNT(*) FROM audit WHERE action='dems.vote_recorded'"
         ).fetchone()[0] == 0
+
+
+def test_admin_routes_handle_malformed_record_ids_without_server_error(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+
+    decision_response = client.post("/decisions", data={
+        "aid": "not-an-id",
+        "outcome": "reject",
+        "reason": "Malformed request",
+    }, follow_redirects=True)
+    assert decision_response.status_code == 200
+
+    user_response = client.post("/users", data={
+        "action": "deactivate",
+        "user_id": "not-a-user-id",
+    }, follow_redirects=True)
+    assert user_response.status_code == 200
+
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM decisions WHERE reason='Malformed request'"
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM audit WHERE action IN ('assignment.override_approved','assignment.override_rejected','user.deactivated','user.activated')"
+        ).fetchone()[0] == 0
