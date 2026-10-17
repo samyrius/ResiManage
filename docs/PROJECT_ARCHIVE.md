@@ -278,3 +278,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** start from a legacy database with incorrect categories, confirm migration, then change a category and verify a later initialization preserves the authorized change.
 - **Branch:** `resimanage-2-terrain-classification-migration`; based on `resimanage-2-work`. CI pending; verify before merge.
 - **Safety:** no real database or resident records accessed/modified; no APK build, phone test, secrets, or visual assets changed.
+
+### RESI-2 / PASSWORD-STRENGTH-SETTINGS-001 — 2026-10-17
+
+- **Audit finding:** account creation and first-run setup required passwords of at least 12 characters, but the settings page accepted a shorter administrator password.
+- **Fix proposed on isolated branch:** enforce the same 12-character minimum server-side in settings and add the HTML `minlength` hint. A short value is rejected without changing the stored account hash.
+- **Regression test added:** submit a short password and assert the warning is shown and the stored password hash remains unchanged.
+- **Branch:** `resimanage-2-password-strength-guard`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no credentials stored in source; no database/real resident data/assets changed; no APK build or phone test started.
