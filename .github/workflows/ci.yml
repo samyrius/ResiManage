@@ -2,7 +2,7 @@ name: Python application checks
 
 on:
   push:
-    branches: ["main", "prototype/**"]
+    branches: ["main", "prototype/**", "resimanage-2-work"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
