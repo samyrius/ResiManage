@@ -187,3 +187,8 @@ This repository log captures durable project decisions and progress; it is not a
 - **Observed:** current main had no CSRF validation on state-changing POST requests, and the user-management route allowed the official accounts named `benhocine` and `drdris` to be created with a normal-user role or deactivated.
 - **Fix applied on branch:** add session-bound CSRF tokens to POST forms at render time, validate tokens before POST handlers, and reject missing/invalid tokens. Require official accounts to be created as Super Admins and prevent deactivation. Test client now obtains a real rendered token for ordinary form submissions; a separate test explicitly submits without a token.
 - **Status:** awaiting CI; no merge until the full suite passes. No APK build started.
+
+### GOV-001: Dual-official decisions for progression and DEMS
+- **Observed:** the current exams route advanced year-2/year-3 residents immediately after a single Super Admin click, and the DEMS route archived a year-4 resident after one administrator action. This did not meet the requirement that Pr Benhocine and Dr Dris jointly decide progression/final graduation.
+- **Fix applied on branch:** added additive vote tables; restrict progression and DEMS votes to active Super Admin sessions for the exact official usernames `benhocine` and `drdris`; require a reason; keep the first vote pending; apply year advancement or DEMS-success archive only after both officials approve; if either rejects, do not advance/archive; log every vote and final decision to audit/decision records. Pending votes are visible on the corresponding pages.
+- **Status:** awaiting CI. DEMS archive remains a copy of profile/history/exams; the active resident is marked graduated only after dual approval.
