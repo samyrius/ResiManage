@@ -937,6 +937,9 @@ def leave_management():
         used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND end_date<=?",(r["id"],date(now.year,12,31).isoformat())).fetchone()[0]
         balances.append({"name":r["surname"]+" "+r["firstname"],"earned":earned,"used":used,"remaining":earned-used})
     entries=c.execute("SELECT l.*,r.surname,r.firstname FROM leave_entries l JOIN residents r ON r.id=l.resident_id ORDER BY l.start_date DESC").fetchall()
+    c.commit(); c.close()
+    return page("""<section><h3>الإجازات / Congés / Annual leave</h3><p>30 calendar days per year. Unused days carry forward.</p><form method="post"><label>Resident <select name="resident_id" required>{% for r in residents %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}}</option>{% endfor %}</select></label><div class="grid"><label>Start <input type="date" name="start_date" required></label><label>End <input type="date" name="end_date" required></label></div><label>Notes <input name="notes" maxlength="500"></label><button>Record leave</button></form></section><section><h3>Balances</h3><div class="wrap"><table><tr><th>Resident</th><th>Accrued</th><th>Used</th><th>Remaining</th></tr>{% for b in balances %}<tr><td>{{b.name}}</td><td>{{b.earned}}</td><td>{{b.used}}</td><td>{{b.remaining}}</td></tr>{% endfor %}</table></div></section><section><h3>History</h3><div class="wrap"><table><tr><th>Resident</th><th>Start</th><th>End</th><th>Days</th><th>Notes</th></tr>{% for e in entries %}<tr><td>{{e.surname}} {{e.firstname}}</td><td>{{e.start_date}}</td><td>{{e.end_date}}</td><td>{{e.days}}</td><td>{{e.notes}}</td></tr>{% endfor %}</table></div></section>""",residents=residents,balances=balances,entries=entries)
+
 @app.route("/external-rotations", methods=["GET","POST"])
 def external_rotations():
     if guard(): return redirect("/login")
