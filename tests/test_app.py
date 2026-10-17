@@ -1160,3 +1160,48 @@ def test_inactive_core_terrain_does_not_block_repeat_eligibility(tmp_path, monke
     assert status == "confirmed"
     assert "يمكن التكرار" in message
 
+def test_pending_assignment_cannot_be_approved_after_terrain_deactivation(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,2)", ("StaleTerrain", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='StaleTerrain'").fetchone()[0]
+        conn.execute("INSERT INTO terrains(name,kind,mandatory_year) VALUES(?,?,3)", ("Pending Deactivated Terrain", "mandatory"))
+        tid = conn.execute("SELECT id FROM terrains WHERE name='Pending Deactivated Terrain'").fetchone()[0]
+        period = conn.execute("SELECT id,year_label FROM periods ORDER BY id LIMIT 1").fetchone()
+        conn.execute("INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,1)", (period["year_label"], tid, period["id"]))
+    client.post("/assign", data={"resident":str(rid),"terrain":str(tid),"period":str(period["id"])})
+    with rotation_app.db() as conn:
+        aid = conn.execute("SELECT id FROM assignments WHERE resident_id=? AND status='pending'", (rid,)).fetchone()[0]
+        conn.execute("UPDATE terrains SET active=0 WHERE id=?", (tid,))
+    response = client.post("/decisions", data={"aid":str(aid),"outcome":"approve","reason":"Review stale request"}, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT status FROM assignments WHERE id=?", (aid,)).fetchone()[0] == "pending"
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='assignment.override_approved'").fetchone()[0] == 0
+
+
+def test_pending_assignment_cannot_be_approved_during_new_external_overlap(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,2)", ("StaleExternal", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='StaleExternal'").fetchone()[0]
+        conn.execute("INSERT INTO terrains(name,kind,mandatory_year) VALUES(?,?,3)", ("Pending External Terrain", "mandatory"))
+        tid = conn.execute("SELECT id FROM terrains WHERE name='Pending External Terrain'").fetchone()[0]
+        period = conn.execute("SELECT id,year_label,name FROM periods ORDER BY id LIMIT 1").fetchone()
+        conn.execute("INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,1)", (period["year_label"], tid, period["id"]))
+    client.post("/assign", data={"resident":str(rid),"terrain":str(tid),"period":str(period["id"])})
+    start_day, end_day = rotation_app.rotation_period_bounds(period["year_label"], period["name"])
+    with rotation_app.db() as conn:
+        aid = conn.execute("SELECT id FROM assignments WHERE resident_id=? AND status='pending'", (rid,)).fetchone()[0]
+        conn.execute(
+            "INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,status) VALUES(?,?,?,?,?,?,?,?,?)",
+            (rid,"Dr Test","Paris","CHU Test","France","Observation",start_day.isoformat(),end_day.isoformat(),"active"),
+        )
+    response = client.post("/decisions", data={"aid":str(aid),"outcome":"approve","reason":"Review external conflict"}, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT status FROM assignments WHERE id=?", (aid,)).fetchone()[0] == "pending"
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='assignment.override_approved'").fetchone()[0] == 0
+
