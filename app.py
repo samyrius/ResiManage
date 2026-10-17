@@ -365,9 +365,18 @@ def residents():
    c.execute("UPDATE residents SET year=?,repeat_year=?,status=? WHERE id=?",(int(request.form["year"]),int(request.form.get("repeat_year","0")),request.form["status"],rid))
    audit_event(c,"resident.updated",f"resident_id={rid}; year={request.form['year']}; status={request.form['status']}")
   else:
-   c.execute("INSERT INTO residents(surname,firstname,year,phone,repeat_year,status) VALUES(?,?,?,?,?,?)",(request.form["surname"].strip(),request.form["firstname"].strip(),int(request.form["year"]),request.form.get("phone",""),int(request.form.get("repeat_year","0")),"active"))
-   audit_event(c,"resident.created",request.form["surname"].strip()+" "+request.form["firstname"].strip())
-  c.commit(); flash(tr("done"))
+   if session.get("role")!="super_admin":
+    c.close(); return ("Forbidden — Super Admin only",403)
+   surname=request.form.get("surname","").strip()
+   firstname=request.form.get("firstname","").strip()
+   try: year=int(request.form.get("year","0"))
+   except (TypeError,ValueError): year=0
+   if not surname or not firstname or year not in (1,2,3,4):
+    flash("Surname, first name and a valid study year are required.")
+   else:
+    c.execute("INSERT INTO residents(surname,firstname,year,phone,repeat_year,status) VALUES(?,?,?,?,?,?)",(surname,firstname,year,request.form.get("phone","").strip(),int(request.form.get("repeat_year","0")),"active"))
+    audit_event(c,"resident.created",surname+" "+firstname)
+    c.commit(); flash(tr("done"))
  rows=c.execute("SELECT * FROM residents ORDER BY status DESC,year DESC,surname").fetchall(); c.close()
  return page("""<section><h3>{{t('add')}} — {{t('resident')}}</h3><form method="post"><div class="grid"><div><label>{{t('surname')}}</label><input name="surname" required></div><div><label>{{t('firstname')}}</label><input name="firstname" required></div><div><label>{{t('study_year')}}</label><select name="year">{% for y in range(1,5) %}<option>{{y}}</option>{% endfor %}</select></div><div><label>{{t('phone')}}</label><input name="phone"></div></div><label><input type="checkbox" name="repeat_year" value="1"> {{t('repeat')}}</label><button>{{t('add')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('save')}}</th></tr>{% for r in rows %}<tr><td><a href="/profile/{{r.id}}">{{r.surname}} {{r.firstname}}</a></td><td>{{r.year}}</td><td><form method="post"><input type="hidden" name="action" value="edit"><input type="hidden" name="rid" value="{{r.id}}"><select name="year">{% for y in range(1,5) %}<option value="{{y}}" {% if r.year==y %}selected{% endif %}>{{y}}</option>{% endfor %}</select><label><input type="checkbox" name="repeat_year" value="1" {% if r.repeat_year %}checked{% endif %}> {{t('repeat')}}</label><select name="status"><option value="active" {% if r.status=='active' %}selected{% endif %}>{{t('active')}}</option><option value="inactive" {% if r.status=='inactive' %}selected{% endif %}>{{t('inactive')}}</option><option value="graduated" {% if r.status=='graduated' %}selected{% endif %}>Graduated / Diplômé / متخرج</option></select><button>{{t('save')}}</button></form></td></tr>{% endfor %}</table></div></section>""",rows=rows)
 @app.route("/terrains",methods=["GET","POST"])
@@ -812,6 +821,8 @@ def exams():
   if not resident:
    flash("Resident not found")
   elif action=="record":
+   if session.get("role")!="super_admin":
+    c.close(); return ("Forbidden — Super Admin only",403)
    module=request.form["module"].strip(); theory=float(request.form["theory"]); practical=float(request.form["practical"])
    if sy not in (1,2,3,4) or not module or not (0<=theory<=20 and 0<=practical<=20):
     flash("Module and marks from 0 to 20 are required")
@@ -836,10 +847,23 @@ def exams():
     passed=average>=10 and all(x["theory"]>=10 and x["practical"]>=10 for x in records)
     c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — first-year exams","Passed" if passed else "Failed",f"Average={average:.2f}/20; all theory/practical marks >=10: {all(x['theory']>=10 and x['practical']>=10 for x in records)}",session["user"]))
     audit_event(c,"exam.first_year_evaluated",f"resident_id={rid}; average={average:.2f}; passed={passed}")
-    if passed and resident["year"]==1:
-     c.execute("UPDATE residents SET year=2 WHERE id=?",(rid,))
-     audit_event(c,"resident.year_advanced",f"resident_id={rid}; from=1; to=2")
-    c.commit(); flash(("Passed; resident advanced to year 2." if passed else "Failed: average must be at least 10/20 and every theory/practical mark must be at least 10/20"))
+    advanced=False
+    if passed and resident["year"]==1 and resident["status"]=="active":
+     c.execute("UPDATE residents SET year=2 WHERE id=? AND year=1 AND status='active'",(rid,))
+     advanced=c.execute("SELECT changes()").fetchone()[0]==1
+     if advanced:
+      audit_event(c,"resident.year_advanced",f"resident_id={rid}; from=1; to=2")
+    c.commit()
+    if not passed:
+     flash("Failed: average must be at least 10/20 and every theory/practical mark must be at least 10/20")
+    elif resident["year"]!=1:
+     flash("Exam criteria passed; no year change because the resident is not currently in year 1.")
+    elif resident["status"]!="active":
+     flash("Exam criteria passed, but the resident is inactive; no progression was applied.")
+    elif advanced:
+     flash("Passed; resident advanced to year 2.")
+    else:
+     flash("Exam criteria passed, but progression was not applied; review the resident record.")
   elif action=="approve_advance":
    actor=session.get("user","").lower()
    outcome=request.form.get("outcome","approve")

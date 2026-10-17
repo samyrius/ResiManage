@@ -321,6 +321,46 @@ def test_first_year_progression_requires_every_component_at_least_ten(tmp_path, 
         assert conn.execute("SELECT year FROM residents WHERE id=?", (fail_id,)).fetchone()[0] == 1
 
 
+def test_first_year_progression_does_not_advance_inactive_resident(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,1,'inactive')",
+            ("InactivePass", "Resident"),
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='InactivePass'"
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO exam_records(resident_id,study_year,module,theory,practical) VALUES(?,1,?,?,?)",
+            (rid, "Module A", 12, 12),
+        )
+        conn.commit()
+
+    response = client.post(
+        "/exams",
+        data={
+            "action": "evaluate_first_year",
+            "resident": str(rid),
+            "study_year": "1",
+            "all_modules_confirmed": "yes",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "resident is inactive".encode() in response.data
+    with rotation_app.db() as conn:
+        resident = conn.execute(
+            "SELECT year,status FROM residents WHERE id=?", (rid,)
+        ).fetchone()
+        assert (resident["year"], resident["status"]) == (1, "inactive")
+        assert conn.execute(
+            "SELECT COUNT(*) FROM audit WHERE action='resident.year_advanced' AND details LIKE ?",
+            (f"%resident_id={rid};%",),
+        ).fetchone()[0] == 0
+
+
 def test_dems_archive_keeps_resident_and_history(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
@@ -372,6 +412,89 @@ def test_standard_user_cannot_access_super_admin_pages(tmp_path, monkeypatch):
     assert client.get("/settings").status_code == 403
     assert client.get("/dems").status_code == 403
     assert client.get("/audit").status_code == 403
+
+def test_standard_user_cannot_create_residents(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    client.post(
+        "/users",
+        data={
+            "username": "standard-operator",
+            "password": "standard-operator-password-2026",
+            "role": "user",
+        },
+        follow_redirects=True,
+    )
+    with client.session_transaction() as sess:
+        sess["user"] = "standard-operator"
+        sess["role"] = "user"
+
+    response = client.post(
+        "/residents",
+        data={
+            "surname": "Unauthorized",
+            "firstname": "Resident",
+            "year": "2",
+            "phone": "",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 403
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM residents WHERE surname='Unauthorized'"
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM audit WHERE action='resident.created' AND details='Unauthorized Resident'"
+        ).fetchone()[0] == 0
+
+
+def test_standard_user_cannot_record_or_change_exam_marks(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    client.post(
+        "/users",
+        data={
+            "username": "exam-operator",
+            "password": "exam-operator-password-2026",
+            "role": "user",
+        },
+        follow_redirects=True,
+    )
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,1)",
+            ("ProtectedExam", "Resident"),
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='ProtectedExam'"
+        ).fetchone()[0]
+        conn.commit()
+    with client.session_transaction() as sess:
+        sess["user"] = "exam-operator"
+        sess["role"] = "user"
+
+    response = client.post(
+        "/exams",
+        data={
+            "action": "record",
+            "resident": str(rid),
+            "study_year": "1",
+            "module": "Unauthorized module",
+            "theory": "20",
+            "practical": "20",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 403
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM exam_records WHERE resident_id=?", (rid,)
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM audit WHERE action='exam.recorded'"
+        ).fetchone()[0] == 0
+
 
 def test_backup_and_restore_preserve_database_and_resident_photos(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)

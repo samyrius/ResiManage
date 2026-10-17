@@ -1,9 +1,9 @@
-# Rotation App — Project Continuity Archive
+# ResiManage — Project Continuity Archive
 
-Last updated: 2026-10-13
+Last updated: 2026-10-17
 
 ## Purpose and working rule
-This file is the durable project handover log for `samyrius/rotation-app`. Read it before continuing work. Update it when requirements, implementation, tests, or decisions change. Do not restart completed setup steps or ask the user to repeat information already recorded.
+This file is the durable project handover log for `samyrius/ResiManage`. Read it before continuing work. Update it when requirements, implementation, tests, or decisions change. Do not restart completed setup steps or ask the user to repeat information already recorded.
 
 ## Confirmed by the user
 - GitHub repository read/write access was resolved earlier. Do not revisit it unless a new, specific failure occurs.
@@ -217,3 +217,33 @@ This repository log captures durable project decisions and progress; it is not a
 6. Create/configure private accounts for Pr Benhocine and Dr Dris in the running app only when the user/admin can set their private passwords. Never store passwords or tokens in Git.
 7. Keep `rotation.db`, resident histories, DEMS records, resident photos, backups, and secrets out of Git. Never overwrite user data without explicit permission.
 8. Do not start the Android APK workflow unless the user explicitly asks for a build.
+
+
+### RESI-2 / PROGRESSION-001: Prevent inactive residents from advancing — 2026-10-17
+
+- **Baseline preserved:** all changes below are isolated on branch `resimanage-2-eligibility-guard`, created from `resimanage-2-work`. The frozen `resimanage-1-backup` branch and `main` were not modified.
+- **Issue found in code review:** the first-year exam evaluation route advanced any resident whose marks passed, even if the resident's status was inactive. It also displayed an advancement success message whenever the exam criteria passed, which could misreport the outcome for a resident not currently in year 1.
+- **Fix committed:** progression now updates only a resident who is both active and currently in year 1; the SQL update repeats those conditions to guard against a status/year change. The response distinguishes failed marks, a non-year-1 resident, an inactive resident, a successful advancement, and an unexpected no-op. Audit is written only when the guarded update actually changes the year.
+- **Regression coverage added:** an inactive first-year resident with passing marks is evaluated; the test asserts the resident remains inactive in year 1 and no advancement audit event is recorded.
+- **Commits:** implementation `d81d20b400d5ea44dcfb588c796dbe9f869d3934`; regression test `686b481b8af33c6166e72a265d1dcd1906508356`.
+- **Verification status:** code and regression test are committed to the isolated branch. Automated CI status must be checked after the review PR is opened; this is not a claim that the test has already run. No APK build, user-phone experiment, database change, icon change, or theme/image change was made.
+- **Next:** compare the remaining requirements against this exact branch, fix further confirmed gaps in isolated commits, and keep `resimanage-2-work` as the integration target. Do not merge into `main` or trigger the manual Android build without the user's later instruction.
+
+
+### RESI-2 / AUTH-RESIDENT-CREATE-001: Restrict resident creation — 2026-10-17
+
+- **Issue found in code review:** editing a resident was already restricted to Super Admin, but the creation branch of `/residents` accepted POSTs from any signed-in standard user. This contradicted the requirement that normal users have limited privileges.
+- **Fix committed:** resident creation now explicitly requires `role=super_admin`; surname, first name, and study year are validated before insert; invalid input does not create a resident or write a creation audit event.
+- **Regression coverage added:** a standard-user session posts a new resident and must receive HTTP 403, with no resident row or creation audit event.
+- **Commits:** implementation `06401822f78bc56f82884143b5320e3faa9eea55`; test `4f127db73c08496697ee3e9d8bc8d083fe657696`.
+- **CI evidence:** the earlier PR run #347 succeeded after the inactive-progression fix; that run predates the resident-creation permission fix. The updated head's CI run #349 is in progress at the time of this archive update. Do not treat run #347 as verification of the latest head.
+- **Current review:** draft PR #29 remains open against `resimanage-2-work`; latest head at this point is `4f127db73c08496697ee3e9d8bc8d083fe657696`. No merge to `main`, no APK build, and no changes to user databases or visual assets.
+
+
+### RESI-2 / AUTH-EXAMS-001: Restrict exam mark changes — 2026-10-17
+
+- **Issue found in code review:** exam evaluation and dual-official votes were role-guarded, but the `action=record` branch accepted exam mark creation/updates from any signed-in user. This could let a standard user alter academic records.
+- **Fix committed:** recording or updating exam marks now returns HTTP 403 unless the signed-in account is a Super Admin. Existing dual-official progression voting remains restricted to the two named official administrators.
+- **Regression coverage added:** a standard-user session attempts to post 20/20 marks; the request must be rejected and neither an exam row nor an exam-recorded audit event may be created.
+- **Commits:** implementation `2351b99ca233d4cd4a44aec29b94de5be2a06ae4`; test `7d4dd99f07a1073fa8fe2e877765a1a9db0fc9e4`.
+- **CI status:** earlier run #347 passed before the resident-create and exam-write permission fixes. Run #350 was launched for the preceding branch head; the newest commit after this update still requires its own CI result. Do not merge until the latest head's CI is green.
