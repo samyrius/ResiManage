@@ -878,7 +878,7 @@ def exams():
    if resident["year"]!=1:
     flash("Only current first-year residents can be evaluated for first-year progression.")
    elif resident["status"]!="active":
-    flash("Inactive residents cannot be evaluated for progression.")
+    flash("The resident is inactive; progression is not available.")
    else:
     records=c.execute("SELECT theory,practical FROM exam_records WHERE resident_id=? AND study_year=1",(rid,)).fetchall()
     if not records:
