@@ -1112,14 +1112,24 @@ def exams():
  if guard(): return redirect("/login")
  c=db()
  if request.method=="POST":
-  action=request.form.get("action","record"); rid=int(request.form["resident"]); sy=int(request.form["study_year"])
+  action=request.form.get("action","record")
+  try:
+   rid=int(request.form.get("resident",""))
+   sy=int(request.form.get("study_year",""))
+  except (TypeError,ValueError):
+   c.close(); flash("Choose a valid resident and study year."); return redirect("/exams")
   resident=c.execute("SELECT * FROM residents WHERE id=?",(rid,)).fetchone()
   if not resident:
    flash("Resident not found")
   elif action=="record":
    if session.get("role")!="super_admin":
     c.close(); return ("Forbidden — Super Admin only",403)
-   module=request.form["module"].strip(); theory=float(request.form["theory"]); practical=float(request.form["practical"])
+   try:
+    module=request.form.get("module","").strip()
+    theory=float(request.form.get("theory",""))
+    practical=float(request.form.get("practical",""))
+   except (TypeError,ValueError):
+    c.close(); flash("Module and numeric marks from 0 to 20 are required."); return redirect("/exams")
    if resident["status"]=="graduated" or sy>resident["year"]:
     flash("Cannot record marks for a future study year or modify a DEMS-graduated resident's archived record.")
    elif sy not in (1,2,3,4) or not module or not (0<=theory<=20 and 0<=practical<=20):
