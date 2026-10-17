@@ -2078,3 +2078,21 @@ def test_admin_routes_handle_malformed_record_ids_without_server_error(tmp_path,
         assert conn.execute(
             "SELECT COUNT(*) FROM audit WHERE action IN ('assignment.override_approved','assignment.override_rejected','user.deactivated','user.activated')"
         ).fetchone()[0] == 0
+
+
+def test_profile_photo_picker_accepts_supported_extensions_without_rejecting_generic_android_mime(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        rid = conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,1) RETURNING id",
+            ("Photo", "Picker"),
+        ).fetchone()[0]
+        conn.commit()
+    response = client.get(f"/profile/{rid}")
+    assert response.status_code == 200
+    assert b'accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"' in response.data
+    html = response.get_data(as_text=True)
+    assert "!['png','jpg','jpeg','webp'].includes(ext)" in html
+    assert "file.type&&!allowed.includes(file.type)" not in html
+    assert "reader.onerror=function()" in html
