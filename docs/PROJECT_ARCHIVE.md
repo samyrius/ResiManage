@@ -474,3 +474,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** valid history is written only after preview confirmation; future-dated history is rejected without extra history rows.
 - **Branch:** `resimanage-2-documented-history-import`; based on the latest `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / UNDATED-FUTURE-HISTORY-GUARD-001 — 2026-10-17
+
+- **Audit finding:** historical rotations with an empty completion date were counted as completed regardless of their academic year/period. Future-dated rows such as 2098–2099 could therefore unlock repeats of mandatory/core terrains.
+- **Fix proposed on isolated branch:** count a history row only when its explicit ISO completion date is not in the future, or when its official period end is already in the past if no exact date was recorded. Malformed dates are not completion evidence.
+- **Regression test added:** all core terrains recorded in a future academic year with blank completion dates must not authorize a repeat.
+- **Branch:** `resimanage-2-history-undated-future-guard`; based on the current `resimanage-2-work`. CI pending.
+- **Safety:** no resident database or real records changed; no APK build or phone test started.

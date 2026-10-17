@@ -495,12 +495,30 @@ def check(c,rid,tid,pid,y):
  total=c.execute(
   "SELECT COUNT(*) FROM terrains WHERE kind IN ('mandatory','basic') AND active=1"
  ).fetchone()[0]
- completed_terrains={row["terrain_id"] for row in c.execute("""
-  SELECT h.terrain_id FROM history h
-  JOIN terrains t ON t.id=h.terrain_id
+ # Historical rows without an explicit completion date still need a completed period.
+ # A future academic year with a blank date is not proof that the rotation happened.
+ today=date.today()
+ completed_terrains=set()
+ history_rows=c.execute("""
+  SELECT h.terrain_id,h.year_label,h.period,h.date_done
+  FROM history h JOIN terrains t ON t.id=h.terrain_id
   WHERE h.resident_id=? AND t.kind IN ('mandatory','basic') AND t.active=1
-    AND (COALESCE(h.date_done,'')='' OR h.date_done<=?)
- """,(rid,date.today().isoformat())).fetchall()}
+ """,(rid,)).fetchall()
+ for history_row in history_rows:
+  done_date=str(history_row["date_done"] or "").strip()
+  if done_date:
+   try:
+    if date.fromisoformat(done_date)<=today:
+     completed_terrains.add(history_row["terrain_id"])
+   except ValueError:
+    continue
+  else:
+   try:
+    _,history_period_end=rotation_period_bounds(history_row["year_label"],history_row["period"])
+    if history_period_end<today:
+     completed_terrains.add(history_row["terrain_id"])
+   except (ValueError,TypeError):
+    continue
  # A confirmed assignment is completion evidence only after its rotation period has ended.
  # Future/current assignments must not unlock repetition of mandatory terrains.
  completed_assignments=c.execute("""
@@ -509,7 +527,6 @@ def check(c,rid,tid,pid,y):
   WHERE a.resident_id=? AND a.status='confirmed'
     AND t.kind IN ('mandatory','basic') AND t.active=1
  """,(rid,)).fetchall()
- today=date.today()
  for completed in completed_assignments:
   _,period_end=rotation_period_bounds(completed["year_label"],completed["name"])
   if period_end<today:
