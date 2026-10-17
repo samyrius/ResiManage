@@ -836,10 +836,23 @@ def exams():
     passed=average>=10 and all(x["theory"]>=10 and x["practical"]>=10 for x in records)
     c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — first-year exams","Passed" if passed else "Failed",f"Average={average:.2f}/20; all theory/practical marks >=10: {all(x['theory']>=10 and x['practical']>=10 for x in records)}",session["user"]))
     audit_event(c,"exam.first_year_evaluated",f"resident_id={rid}; average={average:.2f}; passed={passed}")
-    if passed and resident["year"]==1:
-     c.execute("UPDATE residents SET year=2 WHERE id=?",(rid,))
-     audit_event(c,"resident.year_advanced",f"resident_id={rid}; from=1; to=2")
-    c.commit(); flash(("Passed; resident advanced to year 2." if passed else "Failed: average must be at least 10/20 and every theory/practical mark must be at least 10/20"))
+    advanced=False
+    if passed and resident["year"]==1 and resident["status"]=="active":
+     c.execute("UPDATE residents SET year=2 WHERE id=? AND year=1 AND status='active'",(rid,))
+     advanced=c.execute("SELECT changes()").fetchone()[0]==1
+     if advanced:
+      audit_event(c,"resident.year_advanced",f"resident_id={rid}; from=1; to=2")
+    c.commit()
+    if not passed:
+     flash("Failed: average must be at least 10/20 and every theory/practical mark must be at least 10/20")
+    elif resident["year"]!=1:
+     flash("Exam criteria passed; no year change because the resident is not currently in year 1.")
+    elif resident["status"]!="active":
+     flash("Exam criteria passed, but the resident is inactive; no progression was applied.")
+    elif advanced:
+     flash("Passed; resident advanced to year 2.")
+    else:
+     flash("Exam criteria passed, but progression was not applied; review the resident record.")
   elif action=="approve_advance":
    actor=session.get("user","").lower()
    outcome=request.form.get("outcome","approve")
