@@ -1,10 +1,8 @@
 name: Android APK build
 
+# APK builds must be started manually by the user.
+# Do not build on push or pull requests.
 on:
-  push:
-    branches: [main, release/rotation-app-verified, release/resitrack-beautification-test]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
