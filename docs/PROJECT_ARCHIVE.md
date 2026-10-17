@@ -385,3 +385,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** a resident with history for one core terrain and confirmed assignments for all core terrains in academic years starting in 2099 or later must still be blocked from repeating the historical terrain.
 - **Branch:** `resimanage-2-completion-evidence-guard-v2`; based on the latest `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / CAPACITY-INPUT-VALIDATION-001 — 2026-10-17
+
+- **Audit finding:** capacity editing silently converted negative places to zero and accepted a period ID from a different academic year while writing the currently selected year label. Malformed numeric values could also raise an unhandled error.
+- **Fix proposed on isolated branch:** require a non-negative whole number, an active terrain, and a period belonging to the selected academic year; reject malformed input without writing capacity changes.
+- **Regression test added:** negative capacity and a period from academic year 2099–2100 are rejected and create no invalid capacity rows.
+- **Branch:** `resimanage-2-capacity-input-validation`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
