@@ -319,3 +319,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression coverage updated:** ordinary status edit persists without changing year; a direct year change is rejected and leaves year/status unchanged.
 - **Branch:** `resimanage-2-promotion-state-guard`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / PERIOD-COMPLETENESS-MIGRATION-001 — 2026-10-17
+
+- **Audit finding:** startup and academic-year settings created four periods only when none existed for that year. A legacy database containing one to three periods would remain incomplete indefinitely.
+- **Fix proposed on isolated branch:** both initialization and academic-year settings now use idempotent `INSERT OR IGNORE` for all four canonical periods, filling only missing entries without deleting or rewriting existing periods.
+- **Regression test added:** start from a legacy database with one period, verify all four exist after initialization, and verify a second initialization does not duplicate them.
+- **Branch:** `resimanage-2-period-completion-migration`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.

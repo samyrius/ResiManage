@@ -102,9 +102,9 @@ def init():
   c.execute("UPDATE terrains SET kind='basic' WHERE name='Gynécologie'")
   c.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",("terrain_classification_migration_20261017","1"))
  y=setting(c,"year",y)
- if not c.execute("SELECT 1 FROM periods WHERE year_label=?",(y,)).fetchone():
-  for n in ["01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"]:
-   c.execute("INSERT OR IGNORE INTO periods(year_label,name) VALUES(?,?)",(y,n))
+ # Fill any missing canonical periods in legacy/partially initialized databases.
+ for n in ["01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"]:
+  c.execute("INSERT OR IGNORE INTO periods(year_label,name) VALUES(?,?)",(y,n))
  c.commit(); c.close()
 @app.before_request
 def boot():
@@ -597,8 +597,8 @@ def settings():
    y=setting(c,"year")
   if y:
    c.execute("INSERT INTO settings(key,value) VALUES('year',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(y,))
-   if not c.execute("SELECT 1 FROM periods WHERE year_label=?",(y,)).fetchone():
-    for n in ["01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"]:c.execute("INSERT OR IGNORE INTO periods(year_label,name) VALUES(?,?)",(y,n))
+   for n in ["01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"]:
+    c.execute("INSERT OR IGNORE INTO periods(year_label,name) VALUES(?,?)",(y,n))
   d=request.form.get("director","").strip()
   if d:c.execute("INSERT INTO settings(key,value) VALUES('director',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(d,))
   pw=request.form.get("new_password","")
