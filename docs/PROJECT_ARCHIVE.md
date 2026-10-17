@@ -508,3 +508,13 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** malformed decision and user IDs return normal responses and create no decision or audit records.
 - **Branch:** `resimanage-2-admin-id-validation`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real resident data/database files/secrets/assets changed; no APK build or phone test started.
+
+
+## Verified merge and regression status — 2026-10-17
+
+- **PR #67 — malformed exam input validation:** merged into `resimanage-2-work` as `fb75c934c2cb9d80389b3d099d3f633ea9fee83c`. GitHub Actions run `39034505220` passed on PR head `8c60c2f0c568c277bba560ce57197b4c9baefd4e`.
+- **PR #68 — reject future DEMS exam dates:** merged into `resimanage-2-work` as `3190b0a0bfc6eb2a110e8a66d75a7fe6f1968f61`. GitHub Actions run `39034917406` passed on PR head `4475809b2ba4e3f658559a769c82a178ea39bb77`.
+- **PR #69 — malformed admin decision/user IDs:** merged into `resimanage-2-work` as `79d1e400b20cfa9f59a8e243b43a70d591d5ef3d`. GitHub Actions run `39035224898` passed on PR head `1bf45f85d191cea31bfd3ae98e8e8cb6c2a13c61`.
+- The current work branch includes regression tests for 19 seeded terrains/four periods, year-priority ordering, capacity validation, future rotations/history not counting as completion, stale import-preview duplicates, year progression approvals/rejections, DEMS rejection, backup/restore, CSV export credential exclusion, profile/objective validation, and permissions.
+- **Still requires authoritative input:** the official first-year module list and any module weighting. The app can validate saved module scores and requires explicit confirmation that all modules were entered, but must not invent the institution's curriculum.
+- **Release safety remains unchanged:** no changes were merged to `main` or `resimanage-1-backup`; no APK was built and no phone experiment was run. CI results are for the exact PR heads listed above, not a claim that every remaining product requirement is finished.
