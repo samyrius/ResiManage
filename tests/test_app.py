@@ -2,6 +2,7 @@ import hashlib
 from flask.testing import FlaskClient
 import io
 import re
+import zipfile
 import sys
 from pathlib import Path
 
