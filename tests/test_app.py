@@ -468,14 +468,12 @@ def test_invalid_photo_is_rejected_and_existing_photo_is_preserved(tmp_path, mon
     login(client)
     photo_dir = tmp_path / "resident_photos"
     photo_dir.mkdir(exist_ok=True)
-    existing = photo_dir / "resident_1_existing.png"
-    Image.new("RGB", (16, 16), (200, 50, 50)).save(existing, format="PNG")
     with rotation_app.db() as conn:
-        conn.execute(
-            "INSERT INTO residents(surname,firstname,year,photo_path) VALUES(?,?,1,?)",
-            ("PhotoKeep", "Resident", "/photos/resident_1_existing.png"),
-        )
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,1)", ("PhotoKeep", "Resident"))
         rid = conn.execute("SELECT id FROM residents WHERE surname='PhotoKeep'").fetchone()[0]
+        conn.execute("UPDATE residents SET photo_path=? WHERE id=?", (f"/photos/resident_{rid}_existing.png", rid))
+    existing = photo_dir / f"resident_{rid}_existing.png"
+    Image.new("RGB", (16, 16), (200, 50, 50)).save(existing, format="PNG")
 
     response = client.post("/profile/" + str(rid), data={
         "surname": "PhotoKeep", "firstname": "Resident",
@@ -485,7 +483,7 @@ def test_invalid_photo_is_rejected_and_existing_photo_is_preserved(tmp_path, mon
     assert b"not a readable PNG/JPG/WEBP" in response.data
     with rotation_app.db() as conn:
         row = conn.execute("SELECT photo_path FROM residents WHERE id=?", (rid,)).fetchone()
-    assert row["photo_path"] == "/photos/resident_1_existing.png"
+    assert row["photo_path"] == f"/photos/resident_{rid}_existing.png"
     assert client.get(row["photo_path"]).status_code == 200
 
 
