@@ -1804,3 +1804,34 @@ def test_terrain_classification_cannot_change_after_rotation_records_exist(tmp_p
         assert unchanged["mandatory_year"] == terrain["mandatory_year"]
         assert conn.execute("SELECT COUNT(*) FROM history WHERE resident_id=? AND terrain_id=?", (resident_id,terrain["id"])).fetchone()[0] == 1
 
+def test_objectives_reject_invalid_year_inactive_terrain_and_duplicates(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        terrain = conn.execute("SELECT id FROM terrains WHERE active=1 ORDER BY id LIMIT 1").fetchone()[0]
+        conn.execute("INSERT INTO terrains(name,kind,active) VALUES('Inactive objective terrain','basic',0)")
+        inactive = conn.execute("SELECT id FROM terrains WHERE name='Inactive objective terrain'").fetchone()[0]
+        conn.commit()
+
+    invalid_year = client.post("/objectives", data={
+        "terrain":str(terrain),"study_year":"5","objective":"Objective"
+    }, follow_redirects=True)
+    assert invalid_year.status_code == 200
+    assert b"Objective study year must be 1, 2, 3 or 4" in invalid_year.data
+
+    inactive_terrain = client.post("/objectives", data={
+        "terrain":str(inactive),"study_year":"1","objective":"Objective"
+    }, follow_redirects=True)
+    assert inactive_terrain.status_code == 200
+    assert b"Choose an active terrain" in inactive_terrain.data
+
+    payload = {"terrain":str(terrain),"study_year":"1","objective":"Clinical skills"}
+    first = client.post("/objectives", data=payload, follow_redirects=True)
+    assert first.status_code == 200
+    second = client.post("/objectives", data=payload, follow_redirects=True)
+    assert second.status_code == 200
+    assert b"This objective already exists" in second.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM objectives WHERE terrain_id=? AND study_year=1 AND objective='Clinical skills'",(terrain,)).fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM objectives WHERE terrain_id=? AND study_year=5",(terrain,)).fetchone()[0] == 0
+
