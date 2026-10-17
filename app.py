@@ -784,6 +784,12 @@ def import_residents():
    rows=json.loads(preview["rows_json"]); errors=json.loads(preview["errors_json"])
    if errors:
     c.close(); flash("Fix the invalid rows in the source file before importing."); return redirect("/import")
+   # Re-check against the live database at confirmation time: another admin may
+   # have added one of these residents after this preview was generated.
+   for row in rows:
+    exists=c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=?",(row["surname"],row["firstname"],int(row["year"]))).fetchone()
+    if exists:
+     c.close(); flash("Import cancelled: "+row["surname"]+" "+row["firstname"]+" already exists for year "+str(row["year"])+". Upload the file again to review the current data."); return redirect("/import")
    inserted=0
    for row in rows:
     c.execute("INSERT INTO residents(surname,firstname,year,phone,birth_place,birth_date,status) VALUES(?,?,?,?,?,?, 'active')",
