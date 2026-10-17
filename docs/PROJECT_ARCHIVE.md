@@ -425,3 +425,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression tests:** reject future-dated manual history; prove future-dated rows for all core terrains do not unlock a repeat.
 - **Branch:** `resimanage-2-history-future-date-guard-v2`; based on the latest `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / EXAM-RECORD-STAGE-GUARD-001 — 2026-10-17
+
+- **Audit finding:** the exam-record endpoint accepted marks for study years beyond the resident's current year and allowed edits after a resident was archived as a DEMS graduate. This could make the live exam record disagree with the immutable graduation snapshot.
+- **Fix proposed on isolated branch:** reject future-year marks and make exam records read-only after DEMS graduation; retain admin ability to record valid current/past-year marks for non-graduated residents.
+- **Regression test added:** future-year marks and post-graduation marks create neither exam rows nor exam audit events.
+- **Branch:** `resimanage-2-exam-record-stage-guard`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
