@@ -29,6 +29,22 @@ def test_login_page_and_language_selector(tmp_path, monkeypatch):
     assert "English".encode() in response.data
 
 
+
+def test_login_branding_uses_resimanage_and_navy_cyan_identity(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    response = client.get("/login")
+    assert response.status_code == 200
+    assert b"ResiManage" in response.data
+    assert b"ResiTrack" not in response.data
+    assert b"#00dff755" in response.data
+    assert b"#19dfbd" in response.data
+    assert b"prefers-reduced-motion:reduce" in response.data
+    assert b"Tous droits r\xc3\xa9serv\xc3\xa9s" in response.data
+    assert b"All rights reserved" in response.data
+    assert "جميع الحقوق محفوظة".encode() in response.data
+    assert "✚".encode() not in response.data
+
+
 def test_login_and_protected_dashboard(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     response = login(client)

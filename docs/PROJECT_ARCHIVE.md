@@ -152,3 +152,23 @@ This repository log captures durable project decisions and progress; it is not a
 - Annual leave and external rotation functionality was ported from the stale PR #12 branch onto a fresh branch based on current main, without copying its obsolete icon assets or old UI styles. It adds tables only (no existing rows are deleted), 30-day annual leave tracking with carry-forward and overlap checks, external-rotation records, server-side blocking of overlapping local assignments, dashboard shortcuts, and regression tests.
 - PR #18: `https://github.com/samyrius/ResiManage/pull/18`. Python GitHub Actions test suite passed on the current PR head before this archive update; recheck the latest run before merge.
 - Outstanding validation: test the new leave/external-rotation screens on a phone; visually verify the launcher icon on-device. Do not claim the APK was manually built or installed. Continue preserving `rotation.db`, resident and stage histories, DEMS archive, photos and backups; never commit personal data or secrets.
+
+## Continuity / defect log update — 2026-10-17
+
+### BRAND-002: Login and registration still showed the retired ResiTrack name
+- **Observed:** the shared header, Android label, and SVG used ResiManage, but the login/register/verification hero markup still rendered `Resi<span>Track</span>`; login hero used a warm pink/orange palette that no longer matched the approved navy/electric-blue/cyan/teal identity.
+- **Fix applied on branch:** replace the remaining hero wordmark with ResiManage; align hero lighting, orbit glow, wordmark gradient, motto accent and footer separators with navy/cyan/teal; include ResiManage in the trilingual copyright line. Existing reduced-motion handling is retained.
+- **Test:** add `test_login_branding_uses_resimanage_and_navy_cyan_identity` covering rendered login branding, no retired name, navy/cyan/teal color markers, reduced-motion CSS, trilingual rights line and absence of the cross-like `✚` glyph in login output.
+- **Status:** awaiting CI on the new branch; not yet merged at time of this entry.
+
+### VERIFIED-001: Current main regression suite
+- **Evidence:** GitHub Actions Python application checks passed on commit `0287366dead0586867345dfb260f21b9f932be37`; the run covered the 29 current tests, including resident import/profile, promotion, DEMS archive, backup/restore, admin access, leave and external-rotation checks.
+- **Limit:** passing automated tests do not verify physical Android installation, icon rendering on the launcher, real SMTP delivery, or visual layout on the user's phone.
+
+### Remaining release gates (not falsely marked complete)
+- [ ] Add deeper leave tests for multiple-year carry-forward, overlap rejection, and exact balance boundaries; review the meaning of the balance year (calendar vs academic year) with the written requirement.
+- [ ] Verify external-rotation boundary dates and that assignment choices exclude a resident during an overlapping period (not just server-side rejection).
+- [ ] Inspect/close obsolete PRs #12, #13 and #14 after confirming their useful changes have been recovered; review PR #7 selectively, never merge its divergent branch wholesale.
+- [ ] Confirm real SMTP delivery only after authorized SMTP settings/test mailbox are available.
+- [ ] Validate icon/UI on a physical phone and confirm Android package installability only after the user explicitly authorizes a build. Do not build an APK without that authorization.
+- [ ] Keep all real databases, resident photos, backups, credentials and tokens out of Git.
