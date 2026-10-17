@@ -361,6 +361,14 @@ def test_first_year_progression_does_not_advance_inactive_resident(tmp_path, mon
             "SELECT COUNT(*) FROM audit WHERE action='resident.year_advanced' AND details LIKE ?",
             (f"%resident_id={rid};%",),
         ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM decisions WHERE details LIKE ?",
+            ("%InactivePass Resident — first-year exams%",),
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM audit WHERE action='exam.first_year_evaluated' AND details LIKE ?",
+            (f"%resident_id={rid};%",),
+        ).fetchone()[0] == 0
 
 
 def test_dems_archive_keeps_resident_and_history(tmp_path, monkeypatch):
@@ -1346,4 +1354,27 @@ def test_resident_edit_persists_and_cannot_bypass_or_reverse_dems_graduation(tmp
     with rotation_app.db() as conn:
         assert conn.execute("SELECT status FROM residents WHERE id=?", (graduated,)).fetchone()[0] == "graduated"
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='resident.updated'").fetchone()[0] == 1
+
+def test_first_year_evaluation_does_not_record_decision_for_resident_in_later_year(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,2,'active')", ("LaterYear", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='LaterYear'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO exam_records(resident_id,study_year,module,theory,practical) VALUES(?,1,?,?,?)",
+            (rid,"Module A",12,12),
+        )
+        conn.commit()
+
+    response = client.post("/exams", data={
+        "action":"evaluate_first_year","resident":str(rid),"study_year":"1",
+        "all_modules_confirmed":"yes"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"Only current first-year residents" in response.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT year FROM residents WHERE id=?", (rid,)).fetchone()[0] == 2
+        assert conn.execute("SELECT COUNT(*) FROM decisions WHERE details LIKE ?", (f"%LaterYear Resident — first-year exams%",)).fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='exam.first_year_evaluated'").fetchone()[0] == 0
 

@@ -302,3 +302,12 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** verify a normal edit persists, direct graduation is rejected, and an archived graduate cannot be reactivated.
 - **Branch:** `resimanage-2-dems-status-guard`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / FIRST-YEAR-EVALUATION-STATE-001 — 2026-10-17
+
+- **Audit finding:** the first-year evaluation endpoint could record a Passed/Failed decision and evaluation audit for a resident whose current year was not 1, or who was inactive. The previous advancement guard prevented changing their year, but the decision log could still misleadingly say their first-year exam was evaluated.
+- **Fix proposed on isolated branch:** only active residents currently in year 1 may enter first-year evaluation. Other states return a clear message and create neither a decision nor an evaluation audit event.
+- **Regression tests added:** inactive first-year and active later-year residents cannot create first-year evaluation decisions/audit records.
+- **Branch:** `resimanage-2-first-year-evaluation-guard`; based on `resimanage-2-work`. CI pending.
+- **Remaining dependency:** the app still needs the official first-year module list/weights before it can independently verify that every required module was entered; do not invent that curriculum.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
