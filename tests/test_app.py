@@ -965,3 +965,23 @@ def test_dems_archive_is_blocked_if_either_official_rejects(tmp_path, monkeypatc
         ).fetchone()
         assert decision is not None
         assert decision["decision"] == "Not approved by official vote"
+
+
+def test_assignment_page_has_priority_filters_and_clear_conflict_feedback(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)", ("Priority", "Four", 4, "active"))
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)", ("Search", "One", 1, "active"))
+        conn.commit()
+    response = client.get("/assign")
+    assert response.status_code == 200
+    assert b'id="assignment-search"' in response.data
+    assert b'id="assignment-year-filter"' in response.data
+    assert b'Year 4' in response.data
+    assert b'Rotation planning &amp; resident assignment' in response.data or b'Rotation planning & resident assignment' in response.data
+    assert b'rt-assignment-stats' in response.data
+    assert b'rt-assignment-notice' in response.data
+    assert b'External rotation conflict' in response.data
+    assert b'rt-assignment-table' in response.data
+
