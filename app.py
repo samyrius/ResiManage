@@ -808,7 +808,7 @@ def exams():
     if passed and resident["year"]==1 and resident["status"]=="active":
      c.execute("UPDATE residents SET year=2 WHERE id=?",(rid,))
      audit_event(c,"resident.year_advanced",f"resident_id={rid}; from=1; to=2")
-    c.commit(); flash(("Passed; resident advanced to year 2." if passed else "Failed: average must be at least 10/20 and every theory/practical mark must be at least 10/20"))
+    c.commit(); flash(("Passed; resident advanced to year 2." if passed and resident["year"]==1 and resident["status"]=="active" else ("Exam criteria passed, but the resident is not active; no progression was applied." if passed else "Failed: average must be at least 10/20 and every theory/practical mark must be at least 10/20")))
   elif action=="approve_advance":
    actor=session.get("user","").lower()
    outcome=request.form.get("outcome","approve")
