@@ -1233,6 +1233,8 @@ def dems():
   try: success_date=date.fromisoformat(request.form.get("success_date","").strip()).isoformat()
   except ValueError:
    c.close(); flash("Enter a valid DEMS exam date."); return redirect("/dems")
+  if date.fromisoformat(success_date)>date.today():
+   c.close(); flash("The DEMS exam date cannot be in the future."); return redirect("/dems")
   r=c.execute("SELECT * FROM residents WHERE id=? AND year=4 AND status='active'",(rid,)).fetchone()
   if not r or outcome not in ("approve","reject") or not reason:
    flash("Choose an active year-4 resident, a valid vote, a date and a reason.")
