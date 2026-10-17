@@ -581,3 +581,63 @@ def test_email_registration_requires_verification_code(tmp_path, monkeypatch):
         account = conn.execute("SELECT username,email,email_verified,role FROM users WHERE username='emailuser'").fetchone()
         assert tuple(account) == ("emailuser", "emailuser@example.com", 1, "user")
         assert conn.execute("SELECT 1 FROM pending_registrations WHERE email=?", (sent["email"],)).fetchone() is None
+
+
+def test_annual_leave_records_days_and_carries_unused_balance(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)", ("Leave", "Test", 2, "active"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Leave'").fetchone()[0]
+        conn.commit()
+    from datetime import date, timedelta
+    start = date.today().replace(month=1, day=1)
+    end = start + timedelta(days=4)
+    response = client.post("/leave", data={
+        "resident_id": str(rid), "start_date": start.isoformat(),
+        "end_date": end.isoformat(), "notes": "test leave"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        entry = conn.execute("SELECT days FROM leave_entries WHERE resident_id=?", (rid,)).fetchone()
+        assert entry[0] == 5
+        earned = conn.execute("SELECT SUM(earned_days) FROM leave_years WHERE resident_id=?", (rid,)).fetchone()[0]
+        used = conn.execute("SELECT SUM(days) FROM leave_entries WHERE resident_id=?", (rid,)).fetchone()[0]
+        assert earned >= 30
+        assert earned - used >= 25
+
+
+def test_external_rotation_blocks_overlapping_local_period(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)", ("Away", "Resident", 2, "active"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Away'").fetchone()[0]
+        tid = conn.execute("SELECT id FROM terrains WHERE name='Réanimation chirurgicale'").fetchone()[0]
+        period = conn.execute("SELECT id,year_label,name FROM periods WHERE name LIKE '%Août%' OR name LIKE '%Aout%'").fetchone()
+        if period is None:
+            period = conn.execute("SELECT id,year_label,name FROM periods ORDER BY id LIMIT 1").fetchone()
+        conn.execute("INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,status) VALUES(?,?,?,?,?,?,?,?,?)",
+                     (rid, "Dr Test", "Paris", "CHU Test", "France", "Observation", "2026-08-01", "2026-10-30", "active"))
+        conn.commit()
+        allowed, message, status = rotation_app.check(conn, rid, tid, period["id"], period["year_label"])
+        assert allowed is False
+        assert "External rotation" in message
+
+
+def test_external_rotation_form_requires_all_destination_details(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)", ("Trip", "Resident", 3, "active"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Trip'").fetchone()[0]
+        conn.commit()
+    response = client.post("/external-rotations", data={
+        "resident_id": str(rid), "supervisor": "Dr Test", "destination": "Paris",
+        "hospital": "CHU Test", "country": "France", "rotation_type": "Observation",
+        "start_date": "2026-11-01", "end_date": "2026-12-01", "notes": "test"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        row = conn.execute("SELECT supervisor,hospital,country,rotation_type FROM external_rotations WHERE resident_id=?", (rid,)).fetchone()
+        assert tuple(row) == ("Dr Test", "CHU Test", "France", "Observation")
