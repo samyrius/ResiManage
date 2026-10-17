@@ -45,6 +45,7 @@ def test_login_page_and_language_selector(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert "Français".encode() in response.data
     assert "English".encode() in response.data
+    assert b'name="_csrf_token"' in response.data
 
 
 
