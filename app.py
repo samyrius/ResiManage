@@ -773,7 +773,9 @@ def import_residents():
     surname=row.get("surname","").strip(); firstname=row.get("firstname","").strip()
     if not surname or not firstname: row_errors.append("Surname and first name are required.")
     try:
-     year=int(float(row.get("year","")))
+     numeric_year=float(row.get("year",""))
+     if not numeric_year.is_integer(): raise ValueError()
+     year=int(numeric_year)
      if year not in (1,2,3,4): raise ValueError()
      row["year"]=year
     except (ValueError,TypeError): row_errors.append("Year must be 1, 2, 3 or 4.")
