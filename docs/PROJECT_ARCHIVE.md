@@ -535,7 +535,7 @@ This repository log captures durable project decisions and progress; it is not a
 - **Porting gate:** the identical icon/header/launcher integration passed Python CI on the ResiManage 1 candidate exact commit `f2721c9b553c7e11e5eef094ad8a7847774294a5` (Actions run `39039772026`, success). This is now ported to isolated branch `resimanage-2-photo-ui-port`, targeting `resimanage-2-work`; the protected `resimanage-1-backup` and ResiManage 2 base branch are not modified by this commit.
 - **Files:** app header/favicon references, Android manifest launcher resource, optimized user-provided 3D icon binary in static and drawable-nodpi, regression test, and archive entry.
 - **Asset/brand caveat:** the artwork itself includes the old wordmark "ResiTrack"; launcher label remains ResiManage. Original image is retained in Library.
-- **Status:** port is committed to the PR candidate; CI must pass on the new exact ResiManage 2 head before calling the port verified. No APK build or phone test.
+- **Status:** port code commit `d69015236ac712a43c5d350342bedbcc72708f0f` is included in candidate head `88d59c36b02a8becd051ccf5f303977c0e84b605`; Python CI passed on that exact head (Actions run `39040002013`, success). The follow-up archive/CI-trigger commit did not alter app runtime code or tests. No APK build or phone test.
 
 
 ### CI-CANDIDATE-PUSH-001 — 2026-10-17
@@ -543,4 +543,4 @@ This repository log captures durable project decisions and progress; it is not a
 - **Reason:** GitHub Actions had not launched a run for the latest isolated ResiManage 2 photo/icon candidate commit, although the same tests passed on an earlier PR head. The workflow's push filter only named `resimanage-2-work`, excluding candidate branches.
 - **Change:** broaden the CI push filter to `resimanage-2-**` so isolated ResiManage 2 candidate branches are tested on their exact pushed SHA as well as PR base checks.
 - **Scope:** workflow configuration and archive only; no production/runtime behavior or resident data changed. This commit is on `resimanage-2-photo-ui-port`, not on `resimanage-2-work` or `main`.
-- **Status:** awaiting CI on this exact resulting commit; icon integration remains unverified on ResiManage 2 until that run passes.
+- **Status:** CI passed on the exact candidate head `88d59c36b02a8becd051ccf5f303977c0e84b605` (Actions run `39040002013`, success).
