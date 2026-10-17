@@ -376,7 +376,7 @@ def residents():
    except (TypeError,ValueError):
     flash("Invalid resident update.")
    else:
-    target=c.execute("SELECT status FROM residents WHERE id=?",(rid,)).fetchone()
+    target=c.execute("SELECT status,year FROM residents WHERE id=?",(rid,)).fetchone()
     if not target:
      flash("Resident not found.")
     elif target["status"]=="graduated":
