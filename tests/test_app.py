@@ -302,6 +302,45 @@ def test_first_year_progression_requires_every_component_at_least_ten(tmp_path, 
         assert conn.execute("SELECT year FROM residents WHERE id=?", (fail_id,)).fetchone()[0] == 1
 
 
+
+def test_inactive_first_year_resident_is_not_advanced_after_passing_exams(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,1,'inactive')",
+            ("Inactive", "Resident"),
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='Inactive'"
+        ).fetchone()[0]
+    for module, theory, practical in [("Module A", 12, 12), ("Module B", 10, 10)]:
+        client.post("/exams", data={
+            "action": "record", "resident": str(rid), "study_year": "1",
+            "module": module, "theory": str(theory), "practical": str(practical),
+        })
+    response = client.post("/exams", data={
+        "action": "evaluate_first_year", "resident": str(rid),
+        "study_year": "1", "all_modules_confirmed": "yes",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"resident is not active" in response.data
+    with rotation_app.db() as conn:
+        resident = conn.execute(
+            "SELECT year,status FROM residents WHERE id=?", (rid,)
+        ).fetchone()
+        assert tuple(resident) == (1, "inactive")
+        decision = conn.execute(
+            "SELECT decision FROM decisions WHERE details LIKE '%Inactive Resident%first-year exams'"
+        ).fetchone()
+        assert decision is not None
+        assert decision["decision"] == "Passed"
+        assert conn.execute(
+            "SELECT COUNT(*) FROM audit WHERE action='resident.year_advanced' AND details LIKE ?",
+            (f"%resident_id={rid};%",),
+        ).fetchone()[0] == 0
+
+
 def test_dems_archive_keeps_resident_and_history(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
