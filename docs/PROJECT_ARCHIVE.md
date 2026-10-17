@@ -286,3 +286,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** submit a short password and assert the warning is shown and the stored password hash remains unchanged.
 - **Branch:** `resimanage-2-password-strength-guard`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no credentials stored in source; no database/real resident data/assets changed; no APK build or phone test started.
+
+### RESI-2 / EXTERNAL-LOCAL-OVERLAP-001 — 2026-10-17
+
+- **Audit finding:** local assignment checks correctly blocked new local rotations during external placements, but the reverse workflow could still create or edit an external placement over an already confirmed/pending local assignment.
+- **Fix proposed on isolated branch:** external-rotation create and edit now compare the requested date range with the resident's confirmed/pending local assignments and reject overlaps. Cancelled/rejected local assignments do not block.
+- **Regression tests added:** creating and editing external rotations over a local period must fail and must not persist the conflicting dates/record.
+- **Branch:** `resimanage-2-external-local-conflict-guard`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no database/real resident data/secrets/assets changed; no APK build or phone test started.
