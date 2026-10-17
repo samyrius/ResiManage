@@ -409,3 +409,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** a two-row preview becomes stale after one resident is added; confirmation imports neither row and records no import audit event.
 - **Branch:** `resimanage-2-import-confirmation-recheck-v4`; based on the latest `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / HISTORY-FUTURE-DATE-GUARD-001 — 2026-10-17
+
+- **Audit finding:** manual history entry accepted future completion dates, and the repeat-eligibility calculation treated every history row as completed regardless of its date. Incorrect future-dated records could unlock repeat eligibility prematurely.
+- **Fix proposed on isolated branch:** reject future completion dates in manual history entry and exclude future-dated legacy/history rows from the set of completed mandatory/basic terrains.
+- **Regression tests:** reject future-dated manual history; prove future-dated rows for all core terrains do not unlock a repeat.
+- **Branch:** `resimanage-2-history-future-date-guard`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
