@@ -1,9 +1,9 @@
-# Rotation App — Project Continuity Archive
+# ResiManage — Project Continuity Archive
 
-Last updated: 2026-10-13
+Last updated: 2026-10-17
 
 ## Purpose and working rule
-This file is the durable project handover log for `samyrius/rotation-app`. Read it before continuing work. Update it when requirements, implementation, tests, or decisions change. Do not restart completed setup steps or ask the user to repeat information already recorded.
+This file is the durable project handover log for `samyrius/ResiManage`. Read it before continuing work. Update it when requirements, implementation, tests, or decisions change. Do not restart completed setup steps or ask the user to repeat information already recorded.
 
 ## Confirmed by the user
 - GitHub repository read/write access was resolved earlier. Do not revisit it unless a new, specific failure occurs.
@@ -217,3 +217,14 @@ This repository log captures durable project decisions and progress; it is not a
 6. Create/configure private accounts for Pr Benhocine and Dr Dris in the running app only when the user/admin can set their private passwords. Never store passwords or tokens in Git.
 7. Keep `rotation.db`, resident histories, DEMS records, resident photos, backups, and secrets out of Git. Never overwrite user data without explicit permission.
 8. Do not start the Android APK workflow unless the user explicitly asks for a build.
+
+
+### RESI-2 / PROGRESSION-001: Prevent inactive residents from advancing — 2026-10-17
+
+- **Baseline preserved:** all changes below are isolated on branch `resimanage-2-eligibility-guard`, created from `resimanage-2-work`. The frozen `resimanage-1-backup` branch and `main` were not modified.
+- **Issue found in code review:** the first-year exam evaluation route advanced any resident whose marks passed, even if the resident's status was inactive. It also displayed an advancement success message whenever the exam criteria passed, which could misreport the outcome for a resident not currently in year 1.
+- **Fix committed:** progression now updates only a resident who is both active and currently in year 1; the SQL update repeats those conditions to guard against a status/year change. The response distinguishes failed marks, a non-year-1 resident, an inactive resident, a successful advancement, and an unexpected no-op. Audit is written only when the guarded update actually changes the year.
+- **Regression coverage added:** an inactive first-year resident with passing marks is evaluated; the test asserts the resident remains inactive in year 1 and no advancement audit event is recorded.
+- **Commits:** implementation `d81d20b400d5ea44dcfb588c796dbe9f869d3934`; regression test `686b481b8af33c6166e72a265d1dcd1906508356`.
+- **Verification status:** code and regression test are committed to the isolated branch. Automated CI status must be checked after the review PR is opened; this is not a claim that the test has already run. No APK build, user-phone experiment, database change, icon change, or theme/image change was made.
+- **Next:** compare the remaining requirements against this exact branch, fix further confirmed gaps in isolated commits, and keep `resimanage-2-work` as the integration target. Do not merge into `main` or trigger the manual Android build without the user's later instruction.
