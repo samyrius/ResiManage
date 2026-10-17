@@ -172,3 +172,8 @@ This repository log captures durable project decisions and progress; it is not a
 - [ ] Confirm real SMTP delivery only after authorized SMTP settings/test mailbox are available.
 - [ ] Validate icon/UI on a physical phone and confirm Android package installability only after the user explicitly authorizes a build. Do not build an APK without that authorization.
 - [ ] Keep all real databases, resident photos, backups, credentials and tokens out of Git.
+
+### LEAVE-001 / EXT-001: Deeper leave accounting and external-rotation controls
+- **Observed:** prior tests checked only one leave entry and a single active external rotation. The external assignment guard considered only status 'active', so a rotation marked 'returned' could fail to block an assignment entered later for the historical period it covered. The assignment dropdown also showed all residents even where a selected period overlapped an external rotation. External rotation records had no edit/cancel controls.
+- **Fix applied on branch:** overlap checks now include active and returned external rotations and ignore only cancelled records; the assignment form marks conflicting resident options disabled based on the selected period; external rotation edit and cancel actions validate dates/required fields, preserve records, and write audit events. Added regression tests for multi-year leave carry-forward/overdraw, overlapping leave entries, returned-rotation period conflicts, assignment dropdown filtering, and audited edit/cancel.
+- **Status:** awaiting CI on the feature branch; not merged until checks pass.
