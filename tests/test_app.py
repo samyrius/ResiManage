@@ -1,4 +1,5 @@
 import hashlib
+from flask.testing import FlaskClient
 import io
 import re
 import sys
@@ -9,7 +10,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import app as rotation_app
 
 
+class CsrfAwareTestClient(FlaskClient):
+    def post(self, *args, **kwargs):
+        data = dict(kwargs.get("data") or {})
+        if "_csrf_token" not in data:
+            with self.session_transaction() as sess:
+                token = sess.get("_csrf_token")
+            if not token:
+                self.get("/login")
+                with self.session_transaction() as sess:
+                    token = sess.get("_csrf_token")
+            if token:
+                data["_csrf_token"] = token
+        kwargs["data"] = data
+        return super().post(*args, **kwargs)
+
+
 def setup_client(tmp_path, monkeypatch):
+    rotation_app.app.test_client_class = CsrfAwareTestClient
     monkeypatch.setenv("ROTATION_INITIAL_PASSWORD", "test-strong-password-2026")
     monkeypatch.setattr(rotation_app, "DB", str(tmp_path / "test_rotation.db"))
     monkeypatch.setattr(rotation_app.app, "_ready", False, raising=False)
@@ -756,4 +774,38 @@ def test_external_rotation_can_be_edited_and_cancelled_with_audit(tmp_path, monk
     with rotation_app.db() as conn:
         assert conn.execute("SELECT status FROM external_rotations WHERE id=?", (xid,)).fetchone()[0] == "cancelled"
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='external_rotation.cancelled'").fetchone()[0] == 1
+
+def test_post_without_csrf_token_is_rejected(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    client.get("/login")
+    response = client.open("/login", method="POST", data={"username": "admin", "password": "not-a-real-password"})
+    assert response.status_code == 400
+    assert b"Invalid or missing CSRF token" in response.data
+
+
+def test_official_admin_accounts_must_be_super_admin_and_cannot_be_disabled(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    for username in ("benhocine", "drdris"):
+        invalid = client.post("/users", data={
+            "username": username, "password": "strong-test-password-2026", "role": "user"
+        }, follow_redirects=True)
+        assert invalid.status_code == 200
+        assert b"Official accounts must be Super Admins" in invalid.data
+        with rotation_app.db() as conn:
+            assert conn.execute("SELECT 1 FROM users WHERE lower(username)=?", (username,)).fetchone() is None
+
+        created = client.post("/users", data={
+            "username": username, "password": "strong-test-password-2026", "role": "super_admin"
+        }, follow_redirects=True)
+        assert created.status_code == 200
+        with rotation_app.db() as conn:
+            row = conn.execute("SELECT id,role,active FROM users WHERE lower(username)=?", (username,)).fetchone()
+            assert tuple(row[1:]) == ("super_admin", 1)
+            uid = row["id"]
+        deactivated = client.post("/users", data={"action": "deactivate", "user_id": str(uid)}, follow_redirects=True)
+        assert deactivated.status_code == 200
+        assert b"Official accounts cannot be deactivated" in deactivated.data
+        with rotation_app.db() as conn:
+            assert conn.execute("SELECT active FROM users WHERE id=?", (uid,)).fetchone()[0] == 1
 
