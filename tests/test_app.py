@@ -1542,15 +1542,19 @@ def test_future_confirmed_rotations_do_not_count_as_completed_for_repeat_eligibi
             "INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
             (rid,target,"2025-2026","01 Fév - 30 Avr","2026-04-30"),
         )
-        future_period_id = conn.execute(
-            "INSERT INTO periods(year_label,name) VALUES(?,?) RETURNING id",
-            ("2099-2100","01 Fév - 30 Avr"),
-        ).fetchone()[0]
-        conn.execute(
-            """INSERT INTO assignments(resident_id,terrain_id,period_id,status)
-               SELECT ?,id,?,'confirmed' FROM terrains WHERE active=1 AND kind IN ('mandatory','basic')""",
-            (rid,future_period_id),
-        )
+        future_terrains = conn.execute(
+            "SELECT id FROM terrains WHERE active=1 AND kind IN ('mandatory','basic')"
+        ).fetchall()
+        for index, terrain_row in enumerate(future_terrains):
+            start_year = 2099 + index
+            future_period_id = conn.execute(
+                "INSERT INTO periods(year_label,name) VALUES(?,?) RETURNING id",
+                (f"{start_year}-{start_year+1}","01 Fév - 30 Avr"),
+            ).fetchone()[0]
+            conn.execute(
+                "INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",
+                (rid,terrain_row["id"],future_period_id),
+            )
         conn.commit()
 
     with rotation_app.app.test_request_context("/"):
