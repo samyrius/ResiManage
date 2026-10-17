@@ -228,3 +228,13 @@ This repository log captures durable project decisions and progress; it is not a
 - **Commits:** implementation `d81d20b400d5ea44dcfb588c796dbe9f869d3934`; regression test `686b481b8af33c6166e72a265d1dcd1906508356`.
 - **Verification status:** code and regression test are committed to the isolated branch. Automated CI status must be checked after the review PR is opened; this is not a claim that the test has already run. No APK build, user-phone experiment, database change, icon change, or theme/image change was made.
 - **Next:** compare the remaining requirements against this exact branch, fix further confirmed gaps in isolated commits, and keep `resimanage-2-work` as the integration target. Do not merge into `main` or trigger the manual Android build without the user's later instruction.
+
+
+### RESI-2 / AUTH-RESIDENT-CREATE-001: Restrict resident creation — 2026-10-17
+
+- **Issue found in code review:** editing a resident was already restricted to Super Admin, but the creation branch of `/residents` accepted POSTs from any signed-in standard user. This contradicted the requirement that normal users have limited privileges.
+- **Fix committed:** resident creation now explicitly requires `role=super_admin`; surname, first name, and study year are validated before insert; invalid input does not create a resident or write a creation audit event.
+- **Regression coverage added:** a standard-user session posts a new resident and must receive HTTP 403, with no resident row or creation audit event.
+- **Commits:** implementation `06401822f78bc56f82884143b5320e3faa9eea55`; test `4f127db73c08496697ee3e9d8bc8d083fe657696`.
+- **CI evidence:** the earlier PR run #347 succeeded after the inactive-progression fix; that run predates the resident-creation permission fix. The updated head's CI run #349 is in progress at the time of this archive update. Do not treat run #347 as verification of the latest head.
+- **Current review:** draft PR #29 remains open against `resimanage-2-work`; latest head at this point is `4f127db73c08496697ee3e9d8bc8d083fe657696`. No merge to `main`, no APK build, and no changes to user databases or visual assets.
