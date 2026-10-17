@@ -159,7 +159,7 @@ This repository log captures durable project decisions and progress; it is not a
 - **Observed:** the shared header, Android label, and SVG used ResiManage, but the login/register/verification hero markup still rendered `Resi<span>Track</span>`; login hero used a warm pink/orange palette that no longer matched the approved navy/electric-blue/cyan/teal identity.
 - **Fix applied on branch:** replace the remaining hero wordmark with ResiManage; align hero lighting, orbit glow, wordmark gradient, motto accent and footer separators with navy/cyan/teal; include ResiManage in the trilingual copyright line. Existing reduced-motion handling is retained.
 - **Test:** add `test_login_branding_uses_resimanage_and_navy_cyan_identity` covering rendered login branding, no retired name, navy/cyan/teal color markers, reduced-motion CSS, trilingual rights line and absence of the cross-like `✚` glyph in login output.
-- **Status:** awaiting CI on the new branch; not yet merged at time of this entry.
+- **Status:** merged in PR #20; current `main` contains the ResiManage login branding and navy/cyan regression test.
 
 ### VERIFIED-001: Current main regression suite
 - **Evidence:** GitHub Actions Python application checks passed on commit `0287366dead0586867345dfb260f21b9f932be37`; the run covered the 29 current tests, including resident import/profile, promotion, DEMS archive, backup/restore, admin access, leave and external-rotation checks.
@@ -176,26 +176,26 @@ This repository log captures durable project decisions and progress; it is not a
 ### LEAVE-001 / EXT-001: Deeper leave accounting and external-rotation controls
 - **Observed:** prior tests checked only one leave entry and a single active external rotation. The external assignment guard considered only status 'active', so a rotation marked 'returned' could fail to block an assignment entered later for the historical period it covered. The assignment dropdown also showed all residents even where a selected period overlapped an external rotation. External rotation records had no edit/cancel controls.
 - **Fix applied on branch:** overlap checks now include active and returned external rotations and ignore only cancelled records; the assignment form marks conflicting resident options disabled based on the selected period; external rotation edit and cancel actions validate dates/required fields, preserve records, and write audit events. Added regression tests for multi-year leave carry-forward/overdraw, overlapping leave entries, returned-rotation period conflicts, assignment dropdown filtering, and audited edit/cancel.
-- **Status:** awaiting CI on the feature branch; not merged until checks pass.
+- **Status:** merged in PR #21; current `main` contains the leave/external-rotation fixes. The PR's Python CI run succeeded (run 39020608604).
 ### CI-LEAVE-001: Refactor recovery and regression follow-up — 2026-10-17
 - The first CI run for PR #21 exposed a source-refactor boundary error: the annual-leave route's final response template had been truncated while replacing the following external-rotation route. This was caught before merge; no changes reached main.
 - Restored the complete annual-leave route verbatim from the current main baseline, then rechecked the boundary between the leave and external-rotation routes. The latest branch head is `097ed46032323368b82d5ab650ee785af02c0164`.
-- **Status:** a fresh CI run on this corrected head is still required. Do not merge based on the earlier failed runs.
+- **Status:** resolved before merge. The corrected changes were included in PR #21, whose Python CI run succeeded (run 39020608604).
 
 ### SEC-001: CSRF protection and official administrator safeguards
 - **Observed:** current main had no CSRF validation on state-changing POST requests, and the user-management route allowed the official accounts named `benhocine` and `drdris` to be created with a normal-user role or deactivated.
 - **Fix applied on branch:** add session-bound CSRF tokens to POST forms at render time, validate tokens before POST handlers, and reject missing/invalid tokens. Require official accounts to be created as Super Admins and prevent deactivation. Test client now obtains a real rendered token for ordinary form submissions; a separate test explicitly submits without a token.
-- **Status:** awaiting CI; no merge until the full suite passes. No APK build started.
+- **Status:** merged in PR #22; the Python CI run succeeded (run 39020964223). No APK build was started.
 
 ### GOV-001: Dual-official decisions for progression and DEMS
 - **Observed:** the current exams route advanced year-2/year-3 residents immediately after a single Super Admin click, and the DEMS route archived a year-4 resident after one administrator action. This did not meet the requirement that Pr Benhocine and Dr Dris jointly decide progression/final graduation.
 - **Fix applied on branch:** added additive vote tables; restrict progression and DEMS votes to active Super Admin sessions for the exact official usernames `benhocine` and `drdris`; require a reason; keep the first vote pending; apply year advancement or DEMS-success archive only after both officials approve; if either rejects, do not advance/archive; log every vote and final decision to audit/decision records. Pending votes are visible on the corresponding pages.
-- **Status:** awaiting CI. DEMS archive remains a copy of profile/history/exams; the active resident is marked graduated only after dual approval.
+- **Status:** merged in PR #23; the Python CI run succeeded (run 39020964223). DEMS archives preserve profile/history/exams and finalize only after dual approval.
 
 ### BACKUP-001 / EXPORT-001: Include all new records and resident photos
 - **Observed:** CSV export did not include the new leave/external-rotation/official-vote tables. The database backup did not package resident photos, so restoring it on another device could leave profile photo paths broken.
 - **Fix applied on branch:** CSV export includes leave balances, leave entries, external rotations, and pending/final official vote tables while continuing to exclude user password records. The backup is now a ZIP containing a consistent SQLite snapshot and all files in `resident_photos/`; restore accepts both this ZIP and legacy .db/.sqlite backups, validates archive paths and database integrity, creates a pre-restore full ZIP and DB copy, and restores photos only when the ZIP includes the photo folder. Added tests for database and photo restoration, and expanded export coverage.
-- **Status:** awaiting CI. This does not build an APK or touch real resident data in the repository.
+- **Status:** merged in PR #24; the Python CI run succeeded (run 39021172710). No APK build or real resident-data change was part of the PR.
 
 
 ## ResiManage 1 / ResiManage 2 handover — 2026-10-17
