@@ -74,6 +74,8 @@ def init():
  CREATE TABLE IF NOT EXISTS exam_records(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL,study_year INTEGER NOT NULL,module TEXT NOT NULL,theory REAL NOT NULL,practical REAL NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE IF NOT EXISTS objectives(id INTEGER PRIMARY KEY,terrain_id INTEGER NOT NULL,study_year INTEGER NOT NULL,objective TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS dems_archive(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL UNIQUE,success_date TEXT NOT NULL,profile_json TEXT NOT NULL,history_json TEXT NOT NULL,archived_at TEXT DEFAULT CURRENT_TIMESTAMP);
+ CREATE TABLE IF NOT EXISTS promotion_votes(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL,from_year INTEGER NOT NULL,decision TEXT NOT NULL CHECK(decision IN ('approve','reject')),reason TEXT NOT NULL,actor TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP,UNIQUE(resident_id,from_year,actor));
+ CREATE TABLE IF NOT EXISTS dems_votes(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL,success_date TEXT NOT NULL,decision TEXT NOT NULL CHECK(decision IN ('approve','reject')),reason TEXT NOT NULL,actor TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP,UNIQUE(resident_id,success_date,actor));
  CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,username TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('super_admin','user')),active INTEGER NOT NULL DEFAULT 1,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE IF NOT EXISTS pending_registrations(id INTEGER PRIMARY KEY,username TEXT NOT NULL,email TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,code_hash TEXT NOT NULL,expires_at INTEGER NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE IF NOT EXISTS import_previews(id INTEGER PRIMARY KEY,owner TEXT NOT NULL,rows_json TEXT NOT NULL,errors_json TEXT NOT NULL,filename TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
@@ -808,41 +810,93 @@ def exams():
      audit_event(c,"resident.year_advanced",f"resident_id={rid}; from=1; to=2")
     c.commit(); flash(("Passed; resident advanced to year 2." if passed else "Failed: average must be at least 10/20 and every theory/practical mark must be at least 10/20"))
   elif action=="approve_advance":
-   if session.get("role")!="super_admin": c.close(); return ("Forbidden — Super Admin only",403)
-   if sy not in (2,3) or resident["year"]!=sy:
-    flash("Only an authorized year 2 or 3 progression decision is valid here")
+   actor=session.get("user","").lower()
+   outcome=request.form.get("outcome","approve")
+   reason=request.form.get("reason","").strip()
+   if session.get("role")!="super_admin" or actor not in ("benhocine","drdris"):
+    c.close(); return ("Only the official Super Admins Dr Dris and Pr Benhocine may vote on progression.",403)
+   if outcome not in ("approve","reject") or not reason:
+    flash("Choose approve/reject and enter the decision reason.")
+   elif sy not in (2,3) or resident["year"]!=sy:
+    flash("Only year 2 or 3 residents can use the dual-official progression vote.")
    else:
-    c.execute("UPDATE residents SET year=? WHERE id=?",(sy+1,rid))
-    c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — year {sy}","Approved","Progression approved by logged-in administrator",session["user"]))
-    audit_event(c,"resident.year_advanced",f"resident_id={rid}; from={sy}; to={sy+1}")
-    c.commit(); flash(tr("done"))
+    c.execute("INSERT INTO promotion_votes(resident_id,from_year,decision,reason,actor) VALUES(?,?,?,?,?) ON CONFLICT(resident_id,from_year,actor) DO UPDATE SET decision=excluded.decision,reason=excluded.reason,created_at=CURRENT_TIMESTAMP",(rid,sy,outcome,reason,actor))
+    audit_event(c,"promotion.vote_recorded",f"resident_id={rid}; from_year={sy}; decision={outcome}; reason={reason}")
+    votes=c.execute("SELECT actor,decision,reason FROM promotion_votes WHERE resident_id=? AND from_year=? AND actor IN ('benhocine','drdris')",(rid,sy)).fetchall()
+    if len(votes)<2:
+     c.commit(); flash("Vote recorded. Waiting for the other official administrator.")
+    else:
+     combined_reason=" | ".join(v["actor"]+": "+v["decision"]+" — "+v["reason"] for v in votes)
+     actor_names="+".join(sorted(v["actor"] for v in votes))
+     approved=all(v["decision"]=="approve" for v in votes)
+     if approved:
+      c.execute("UPDATE residents SET year=? WHERE id=? AND year=? AND status='active'",(sy+1,rid,sy))
+      if c.execute("SELECT changes()").fetchone()[0]:
+       c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — year {sy}","Approved by both official administrators",combined_reason,actor_names))
+       audit_event(c,"resident.year_advanced",f"resident_id={rid}; from={sy}; to={sy+1}; officials={actor_names}")
+       flash("Approved by both official administrators; resident advanced.")
+      else:
+       flash("Resident status changed before the vote was finalized; no progression was applied.")
+     else:
+      c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — year {sy}","Rejected by official vote",combined_reason,actor_names))
+      audit_event(c,"promotion.vote_rejected",f"resident_id={rid}; from_year={sy}; officials={actor_names}")
+      flash("Progression not approved; both official votes are recorded.")
+     c.execute("DELETE FROM promotion_votes WHERE resident_id=? AND from_year=?",(rid,sy))
+     c.commit()
  rows=c.execute("SELECT e.*,r.surname,r.firstname FROM exam_records e JOIN residents r ON r.id=e.resident_id ORDER BY e.created_at DESC,e.id DESC").fetchall()
  rs=c.execute("SELECT * FROM residents WHERE status='active' ORDER BY year DESC,surname").fetchall()
  selected=request.args.get("resident",type=int)
+ pending_votes=c.execute("SELECT v.*,r.surname,r.firstname FROM promotion_votes v JOIN residents r ON r.id=v.resident_id ORDER BY v.created_at DESC").fetchall()
  c.close()
- return page("""<section><h3>{{t('exams')}}</h3><form method="post"><input type="hidden" name="action" value="record"><label>Resident</label><select name="resident">{% for r in rs %}<option value="{{r.id}}" {% if selected==r.id %}selected{% endif %}>{{r.year}} — {{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>Study year</label><select name="study_year">{% for y in range(1,5) %}<option>{{y}}</option>{% endfor %}</select><label>{{t('module')}}</label><input name="module" required><div class="grid"><div><label>{{t('theory')}}</label><input type="number" name="theory" min="0" max="20" step="0.01" required></div><div><label>{{t('practical')}}</label><input type="number" name="practical" min="0" max="20" step="0.01" required></div></div><button>Record exam / Enregistrer / تسجيل</button></form></section><section><h4>Evaluate first year / Évaluer la 1re année / تقييم السنة الأولى</h4><form method="post"><input type="hidden" name="action" value="evaluate_first_year"><label>Resident</label><select name="resident">{% for r in rs if r.year==1 %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}}</option>{% endfor %}</select><input type="hidden" name="study_year" value="1"><label><input type="checkbox" name="all_modules_confirmed" value="yes" required> Confirm all module results are entered / Confirmer toutes les notes / تأكيد إدخال جميع العلامات</label><button>Evaluate and advance if eligible</button></form><h4>Approve progression (years 2–3)</h4><form method="post"><input type="hidden" name="action" value="approve_advance"><label>Resident</label><select name="resident">{% for r in rs if r.year in [2,3] %}<option value="{{r.id}}">{{r.year}} — {{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>Study year</label><select name="study_year"><option>2</option><option>3</option></select><button>Approve progression</button></form></section><section><div class="wrap"><table><tr><th>Resident</th><th>Year</th><th>Module</th><th>Theory</th><th>Practical</th></tr>{% for e in rows %}<tr><td>{{e.surname}} {{e.firstname}}</td><td>{{e.study_year}}</td><td>{{e.module}}</td><td>{{e.theory}}</td><td>{{e.practical}}</td></tr>{% else %}<tr><td colspan="5">{{t('none')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows,rs=rs,selected=selected)
+ return page("""<section><h3>{{t('exams')}}</h3><form method="post"><input type="hidden" name="action" value="record"><label>Resident</label><select name="resident">{% for r in rs %}<option value="{{r.id}}" {% if selected==r.id %}selected{% endif %}>{{r.year}} — {{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>Study year</label><select name="study_year">{% for y in range(1,5) %}<option>{{y}}</option>{% endfor %}</select><label>{{t('module')}}</label><input name="module" required><div class="grid"><div><label>{{t('theory')}}</label><input type="number" name="theory" min="0" max="20" step="0.01" required></div><div><label>{{t('practical')}}</label><input type="number" name="practical" min="0" max="20" step="0.01" required></div></div><button>Record exam / Enregistrer / تسجيل</button></form></section><section><h4>Evaluate first year / Évaluer la 1re année / تقييم السنة الأولى</h4><form method="post"><input type="hidden" name="action" value="evaluate_first_year"><label>Resident</label><select name="resident">{% for r in rs if r.year==1 %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}}</option>{% endfor %}</select><input type="hidden" name="study_year" value="1"><label><input type="checkbox" name="all_modules_confirmed" value="yes" required> Confirm all module results are entered / Confirmer toutes les notes / تأكيد إدخال جميع العلامات</label><button>Evaluate and advance if eligible</button></form><h4>Progression vote — years 2–3 (Dr Dris + Pr Benhocine)</h4><form method="post"><input type="hidden" name="action" value="approve_advance"><label>Resident</label><select name="resident" required>{% for r in rs if r.year in [2,3] %}<option value="{{r.id}}">{{r.year}} — {{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>Study year</label><select name="study_year"><option>2</option><option>3</option></select><label>Vote</label><select name="outcome"><option value="approve">Approve</option><option value="reject">Reject</option></select><label>Reason</label><input name="reason" required maxlength="500"><button>Record official vote</button></form><h4>Pending official votes</h4><div class="wrap"><table><tr><th>Resident</th><th>From year</th><th>Official</th><th>Vote</th><th>Reason</th></tr>{% for v in pending_votes %}<tr><td>{{v.surname}} {{v.firstname}}</td><td>{{v.from_year}}</td><td>{{v.actor}}</td><td>{{v.decision}}</td><td>{{v.reason}}</td></tr>{% else %}<tr><td colspan="5">No pending official votes</td></tr>{% endfor %}</table></div></section><section><div class="wrap"><table><tr><th>Resident</th><th>Year</th><th>Module</th><th>Theory</th><th>Practical</th></tr>{% for e in rows %}<tr><td>{{e.surname}} {{e.firstname}}</td><td>{{e.study_year}}</td><td>{{e.module}}</td><td>{{e.theory}}</td><td>{{e.practical}}</td></tr>{% else %}<tr><td colspan="5">{{t('none')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows,rs=rs,selected=selected,pending_votes=pending_votes)
 @app.route("/dems",methods=["GET","POST"])
 def dems():
  if super_guard(): return super_guard()
  c=db()
  if request.method=="POST":
-  rid=int(request.form["resident"]); success_date=request.form.get("success_date","").strip()
+  actor=session.get("user","").lower()
+  if actor not in ("benhocine","drdris"):
+   c.close(); return ("Only Dr Dris and Pr Benhocine may vote on DEMS success.",403)
+  rid=request.form.get("resident",type=int)
+  outcome=request.form.get("outcome","approve")
+  reason=request.form.get("reason","").strip()
+  try: success_date=date.fromisoformat(request.form.get("success_date","").strip()).isoformat()
+  except ValueError:
+   c.close(); flash("Enter a valid DEMS exam date."); return redirect("/dems")
   r=c.execute("SELECT * FROM residents WHERE id=? AND year=4 AND status='active'",(rid,)).fetchone()
-  if not r or not success_date:
-   flash("Only an active year-4 resident with a DEMS success date can be archived.")
+  if not r or outcome not in ("approve","reject") or not reason:
+   flash("Choose an active year-4 resident, a valid vote, a date and a reason.")
   else:
-   hist=c.execute("SELECT h.*,t.name terrain FROM history h JOIN terrains t ON t.id=h.terrain_id WHERE h.resident_id=?",(rid,)).fetchall()
-   asgs=c.execute("SELECT a.*,p.name period,p.year_label,t.name terrain FROM assignments a JOIN periods p ON p.id=a.period_id JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=?",(rid,)).fetchall()
-   exams_snapshot=c.execute("SELECT * FROM exam_records WHERE resident_id=? ORDER BY study_year,module",(rid,)).fetchall()
-   profile={k:r[k] for k in r.keys()}
-   c.execute("INSERT INTO dems_archive(resident_id,success_date,profile_json,history_json) VALUES(?,?,?,?)",(rid,success_date,json.dumps(profile,ensure_ascii=False),json.dumps({"history":[dict(x) for x in hist],"assignments":[dict(x) for x in asgs],"exams":[dict(x) for x in exams_snapshot]},ensure_ascii=False)))
-   c.execute("UPDATE residents SET status='graduated',dems_status='success' WHERE id=?",(rid,))
-   audit_event(c,"dems.archived",f"resident_id={rid}; success_date={success_date}")
-   c.commit(); flash("Resident archived; original records retained.")
+   c.execute("INSERT INTO dems_votes(resident_id,success_date,decision,reason,actor) VALUES(?,?,?,?,?) ON CONFLICT(resident_id,success_date,actor) DO UPDATE SET decision=excluded.decision,reason=excluded.reason,created_at=CURRENT_TIMESTAMP",(rid,success_date,outcome,reason,actor))
+   audit_event(c,"dems.vote_recorded",f"resident_id={rid}; success_date={success_date}; decision={outcome}; reason={reason}")
+   votes=c.execute("SELECT actor,decision,reason FROM dems_votes WHERE resident_id=? AND success_date=? AND actor IN ('benhocine','drdris')",(rid,success_date)).fetchall()
+   if len(votes)<2:
+    c.commit(); flash("DEMS vote recorded. Waiting for the other official administrator.")
+   else:
+    combined_reason=" | ".join(v["actor"]+": "+v["decision"]+" — "+v["reason"] for v in votes)
+    actor_names="+".join(sorted(v["actor"] for v in votes))
+    approved=all(v["decision"]=="approve" for v in votes)
+    if approved:
+     hist=c.execute("SELECT h.*,t.name terrain FROM history h JOIN terrains t ON t.id=h.terrain_id WHERE h.resident_id=?",(rid,)).fetchall()
+     asgs=c.execute("SELECT a.*,p.name period,p.year_label,t.name terrain FROM assignments a JOIN periods p ON p.id=a.period_id JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=?",(rid,)).fetchall()
+     exams_snapshot=c.execute("SELECT * FROM exam_records WHERE resident_id=? ORDER BY study_year,module",(rid,)).fetchall()
+     profile={k:r[k] for k in r.keys()}
+     c.execute("INSERT INTO dems_archive(resident_id,success_date,profile_json,history_json) VALUES(?,?,?,?)",(rid,success_date,json.dumps(profile,ensure_ascii=False),json.dumps({"history":[dict(x) for x in hist],"assignments":[dict(x) for x in asgs],"exams":[dict(x) for x in exams_snapshot]},ensure_ascii=False)))
+     c.execute("UPDATE residents SET status='graduated',dems_status='success' WHERE id=?",(rid,))
+     c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{r['surname']} {r['firstname']} — DEMS","Success approved by both official administrators",combined_reason,actor_names))
+     audit_event(c,"dems.archived",f"resident_id={rid}; success_date={success_date}; officials={actor_names}")
+     flash("DEMS success approved by both officials; profile and history archived.")
+    else:
+     c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{r['surname']} {r['firstname']} — DEMS","Not approved by official vote",combined_reason,actor_names))
+     audit_event(c,"dems.vote_rejected",f"resident_id={rid}; success_date={success_date}; officials={actor_names}")
+     flash("DEMS success was not approved; both official votes are recorded.")
+    c.execute("DELETE FROM dems_votes WHERE resident_id=? AND success_date=?",(rid,success_date))
+    c.commit()
  residentsrow_numbers=c.execute("SELECT * FROM residents WHERE year=4 AND status='active' ORDER BY surname").fetchall()
  archiverow_numbers=c.execute("SELECT d.*,r.surname,r.firstname FROM dems_archive d JOIN residents r ON r.id=d.resident_id ORDER BY d.id DESC").fetchall()
+ pending_votes=c.execute("SELECT v.*,r.surname,r.firstname FROM dems_votes v JOIN residents r ON r.id=v.resident_id ORDER BY v.created_at DESC").fetchall()
  c.close()
- return page("""<section><h3>{{t('dems')}}</h3><form method="post"><label>Year-4 resident</label><select name="resident">{% for r in residentsrow_numbers %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>{{t('success_date')}}</label><input type="date" name="success_date" required><button>{{t('archive')}}</button></form><p>{{t('archive_note')}}</p></section><section><h4>Archived graduates</h4>{% for a in archiverow_numbers %}<p>{{a.surname}} {{a.firstname}} — DEMS success: {{a.success_date}} — archived {{a.archived_at}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",residentsrow_numbers=residentsrow_numbers,archiverow_numbers=archiverow_numbers)
+ return page("""<section><h3>{{t('dems')}}</h3><p>DEMS success is finalized only after both Dr Dris and Pr Benhocine approve.</p><form method="post"><label>Year-4 resident</label><select name="resident" required>{% for r in residentsrow_numbers %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>{{t('success_date')}}</label><input type="date" name="success_date" required><label>Vote</label><select name="outcome"><option value="approve">Approve success</option><option value="reject">Reject success</option></select><label>Reason</label><input name="reason" required maxlength="500"><button>Record official vote</button></form></section><section><h4>Pending official votes</h4><div class="wrap"><table><tr><th>Resident</th><th>Exam date</th><th>Official</th><th>Vote</th><th>Reason</th></tr>{% for v in pending_votes %}<tr><td>{{v.surname}} {{v.firstname}}</td><td>{{v.success_date}}</td><td>{{v.actor}}</td><td>{{v.decision}}</td><td>{{v.reason}}</td></tr>{% else %}<tr><td colspan="5">No pending official votes</td></tr>{% endfor %}</table></div></section><section><h4>Archived graduates</h4>{% for a in archiverow_numbers %}<p>{{a.surname}} {{a.firstname}} — DEMS success: {{a.success_date}} — archived {{a.archived_at}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",residentsrow_numbers=residentsrow_numbers,archiverow_numbers=archiverow_numbers,pending_votes=pending_votes)
 @app.get("/export")
 def export():
  if super_guard():return super_guard()
