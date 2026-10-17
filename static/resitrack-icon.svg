@@ -1,22 +1,46 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
-<title id="title">ResiManage</title><desc id="desc">Three-dimensional medical shield with a cross, heartbeat, and rotation arrows</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+<title id="title">ResiManage — Anesthésie-Réanimation</title>
+<desc id="desc">Badge néon bleu montrant un médecin en tenue de réanimation, des moniteurs de soins intensifs et une ligne ECG, sans croix.</desc>
 <defs>
- <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#12385d"/><stop offset=".55" stop-color="#167aa0"/><stop offset="1" stop-color="#32c3b1"/></linearGradient>
- <linearGradient id="shield" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#d7f6f5"/><stop offset="1" stop-color="#86d9d6"/></linearGradient>
- <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a9fff0"/><stop offset="1" stop-color="#4e9bb7"/></linearGradient>
- <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="9" stdDeviation="7" flood-color="#052844" flood-opacity=".45"/></filter>
+ <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#020b22"/><stop offset=".52" stop-color="#073d85"/><stop offset="1" stop-color="#02091b"/></linearGradient>
+ <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e9ffff"/><stop offset=".25" stop-color="#00eaff"/><stop offset=".6" stop-color="#087dff"/><stop offset="1" stop-color="#5bfff1"/></linearGradient>
+ <linearGradient id="scrubs" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#35d9ff"/><stop offset=".5" stop-color="#0754b8"/><stop offset="1" stop-color="#061c52"/></linearGradient>
+ <linearGradient id="teal" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#00f5ff"/><stop offset="1" stop-color="#00e6b5"/></linearGradient>
+ <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+ <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#000" flood-opacity=".8"/></filter>
 </defs>
-<rect x="8" y="8" width="240" height="240" rx="56" fill="#082c4d"/>
-<rect x="12" y="9" width="232" height="232" rx="52" fill="url(#bg)" stroke="#8fe9e1" stroke-opacity=".55" stroke-width="2"/>
-<path d="M28 56Q128 -4 228 56" fill="none" stroke="#ffffff" stroke-opacity=".12" stroke-width="14" stroke-linecap="round"/>
+<rect x="10" y="10" width="492" height="492" rx="70" fill="#01091a" stroke="url(#rim)" stroke-width="9" filter="url(#glow)"/>
+<rect x="25" y="25" width="462" height="462" rx="58" fill="url(#bg)" stroke="#17dfff" stroke-opacity=".7" stroke-width="2"/>
+<path d="M50 150Q256 8 462 150" fill="none" stroke="#00dfff" stroke-width="10" opacity=".65"/>
+<!-- ICU monitors -->
 <g filter="url(#shadow)">
- <path d="M128 43 190 66V116c0 43-25 70-62 91-37-21-62-48-62-91V66Z" fill="#0a3154" opacity=".65" transform="translate(5 7)"/>
- <path d="M128 38 190 61V111c0 43-25 70-62 91-37-21-62-48-62-91V61Z" fill="url(#shield)" stroke="url(#edge)" stroke-width="4" stroke-linejoin="round"/>
- <path d="M128 52 177 70v41c0 33-18 56-49 75-31-19-49-42-49-75V70Z" fill="#f7ffff" opacity=".65"/>
- <path d="M116 69h24v28h28v24h-28v28h-24v-28H88V97h28Z" fill="#14799a" stroke="#0d5d82" stroke-width="2" stroke-linejoin="round"/>
- <path d="M83 163h24l10-17 13 29 13-24 8 12h23" fill="none" stroke="#19a99e" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+ <rect x="326" y="112" width="126" height="104" rx="12" fill="#061a35" stroke="#24dfff" stroke-width="5"/>
+ <rect x="338" y="124" width="102" height="80" rx="5" fill="#021027"/>
+ <path d="M344 151h14l8-12 10 27 10-20 8 5h39" fill="none" stroke="#22ff8d" stroke-width="4" stroke-linejoin="round"/>
+ <path d="M344 177h16l8-8 9 13 9-9h37" fill="none" stroke="#168dff" stroke-width="3"/>
+ <text x="420" y="198" font-family="Arial,sans-serif" font-size="17" font-weight="bold" fill="#22f5ff" text-anchor="end">98</text>
+ <rect x="355" y="228" width="84" height="55" rx="8" fill="#09284d" stroke="#17cfff" stroke-width="3"/>
+ <path d="M365 254h13l6-8 7 16 7-11h30" fill="none" stroke="#00f5cf" stroke-width="3"/>
 </g>
-<path d="M54 184a88 88 0 0 0 138-4" fill="none" stroke="#b9fff4" stroke-width="5" stroke-linecap="round" opacity=".95"/>
-<path d="m185 165 9 15-18 2" fill="none" stroke="#b9fff4" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-<circle cx="52" cy="62" r="4" fill="#b9fff4" opacity=".8"/><circle cx="207" cy="194" r="3" fill="#fff" opacity=".7"/>
+<!-- clinician head and cap -->
+<path d="M158 128Q168 68 232 70Q291 74 300 133L286 166H174Z" fill="#064bba" stroke="#28e9ff" stroke-width="4"/>
+<path d="M165 123Q205 87 289 119L282 139Q222 124 174 145Z" fill="#147bff"/>
+<path d="M180 140Q174 183 199 205L251 207Q282 183 279 143L265 123Q223 110 184 130Z" fill="#b97855" stroke="#f4b48b" stroke-width="3"/>
+<path d="M181 155Q204 171 228 161Q252 169 278 151L277 183Q255 210 225 207Q194 202 184 182Z" fill="#eaf8ff" stroke="#76dcff" stroke-width="3"/>
+<path d="M188 178Q222 190 271 174" fill="none" stroke="#19bfff" stroke-width="5"/>
+<!-- shoulders and scrubs -->
+<path d="M114 332Q125 241 188 211L220 230L247 211Q313 237 330 332L347 369H101Z" fill="url(#scrubs)" stroke="#18dfff" stroke-width="5"/>
+<path d="M188 215L218 252L247 213" fill="none" stroke="#7df6ff" stroke-width="5"/>
+<!-- stethoscope -->
+<path d="M178 236Q160 291 201 309Q242 324 263 283L270 258" fill="none" stroke="#071225" stroke-width="10" stroke-linecap="round"/>
+<path d="M178 236Q160 291 201 309Q242 324 263 283L270 258" fill="none" stroke="#a8f7ff" stroke-width="3" stroke-linecap="round"/>
+<circle cx="270" cy="258" r="12" fill="#c8fbff" stroke="#123d69" stroke-width="5"/>
+<!-- glowing ECG sweep -->
+<path d="M43 310H105L123 286L143 335L169 236L194 356L218 292L237 317H311Q365 350 456 304" fill="none" stroke="#003d72" stroke-width="17" stroke-linejoin="round"/>
+<path d="M43 310H105L123 286L143 335L169 236L194 356L218 292L237 317H311Q365 350 456 304" fill="none" stroke="url(#teal)" stroke-width="8" stroke-linejoin="round" filter="url(#glow)"/>
+<!-- title plate -->
+<path d="M43 378Q256 395 469 378V458Q256 484 43 458Z" fill="#020b20" stroke="#0c78d9" stroke-width="2"/>
+<text x="256" y="421" font-family="Arial,sans-serif" font-size="42" font-weight="900" font-style="italic" text-anchor="middle" fill="#f4ffff" stroke="#0a8edb" stroke-width="1.5" paint-order="stroke">Resi<tspan fill="#00eaff">Manage</tspan></text>
+<path d="M91 436H156M356 436H421" stroke="#00eaff" stroke-width="3" stroke-linecap="round"/>
+<text x="256" y="449" font-family="Arial,sans-serif" font-size="13" font-weight="bold" letter-spacing="1" text-anchor="middle" fill="#d8f8ff">ANESTHÉSIE-RÉANIMATION</text>
 </svg>
