@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, request, redirect, session, render_template_string, flash, send_file, send_from_directory
-import sqlite3, os, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess, secrets, smtplib, time
+import sqlite3, os, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess, secrets, smtplib, time, zipfile
 from datetime import datetime, date
 from werkzeug.utils import secure_filename
 
@@ -901,40 +901,92 @@ def dems():
 def export():
  if super_guard():return super_guard()
  c=db(); out=io.StringIO(); w=csv.writer(out)
- for table in ["residents","terrains","periods","capacities","assignments","history","decisions","exam_records","objectives","dems_archive","audit"]:
+ for table in ["residents","terrains","periods","capacities","assignments","history","decisions","exam_records","objectives","dems_archive","leave_years","leave_entries","external_rotations","promotion_votes","dems_votes","audit"]:
   w.writerow([table])
   w.writerow([x[1] for x in c.execute('PRAGMA table_info("'+table+'")')])
   for row in c.execute('SELECT * FROM "'+table+'"'):w.writerow(list(row))
  c.close(); f=io.BytesIO(("\ufeff"+out.getvalue()).encode("utf-8")); return send_file(f,mimetype="text/csv",as_attachment=True,download_name="rotation_export.csv")
+def create_full_backup_bytes(directory):
+ with tempfile.TemporaryDirectory(prefix="resimanage_backup_",dir=directory) as workdir:
+  snapshot=os.path.join(workdir,"rotation.db")
+  source=sqlite3.connect(DB,timeout=20)
+  destination=sqlite3.connect(snapshot)
+  try:
+   source.backup(destination); destination.commit()
+  finally:
+   destination.close(); source.close()
+  output=io.BytesIO()
+  with zipfile.ZipFile(output,"w",compression=zipfile.ZIP_DEFLATED) as bundle:
+   bundle.write(snapshot,"rotation.db")
+   bundle.writestr("resident_photos/","")
+   photo_dir=os.path.join(directory,"resident_photos")
+   if os.path.isdir(photo_dir):
+    for name in sorted(os.listdir(photo_dir)):
+     path=os.path.join(photo_dir,name)
+     if os.path.isfile(path) and not os.path.islink(path) and os.path.basename(name)==name:
+      bundle.write(path,"resident_photos/"+name)
+  return output.getvalue()
+
 @app.get("/backup")
 def backup():
  if super_guard(): return super_guard()
  directory=os.path.dirname(os.path.abspath(DB))
- target=os.path.join(directory,"rotation_backup_download.db")
- source=sqlite3.connect(DB,timeout=20)
- destination=sqlite3.connect(target)
- try:
-  source.backup(destination)
-  destination.commit()
- finally:
-  destination.close(); source.close()
- ctype="application/octet-stream"
- return send_file(target,mimetype=ctype,as_attachment=True,download_name="rotation_backup.db")
+ data=create_full_backup_bytes(directory)
+ return send_file(io.BytesIO(data),mimetype="application/zip",as_attachment=True,download_name="resimanage_full_backup.zip")
+
 @app.route("/restore",methods=["GET","POST"])
 def restore():
  if super_guard(): return super_guard()
  if request.method=="POST":
   uploaded=request.files.get("backup_file")
-  if not uploaded or not uploaded.filename or not uploaded.filename.lower().endswith((".db",".sqlite",".sqlite3")):
-   flash("Choose a valid .db/.sqlite backup file.")
+  if not uploaded or not uploaded.filename:
+   flash("Choose a .zip full backup or a legacy .db/.sqlite backup.")
+   return redirect("/restore")
+  extension=os.path.splitext(uploaded.filename.lower())[1]
+  if extension not in (".zip",".db",".sqlite",".sqlite3"):
+   flash("Unsupported backup type. Choose .zip, .db or .sqlite.")
    return redirect("/restore")
   directory=os.path.dirname(os.path.abspath(DB))
-  staged=None
+  workdir=None; old_db_path=None; old_photo_path=None; staged_db=None; staged_photos=None
+  db_replaced=False; photos_replaced=False
   try:
-   with tempfile.NamedTemporaryFile(prefix="rotation_restore_",suffix=".db",dir=directory,delete=False) as temp:
-    staged=temp.name
-    uploaded.save(staged)
-   check=sqlite3.connect("file:"+staged+"?mode=ro",uri=True,timeout=10)
+   workdir=tempfile.mkdtemp(prefix="resimanage_restore_",dir=directory)
+   uploaded_path=os.path.join(workdir,"uploaded"+extension)
+   uploaded.save(uploaded_path)
+   staged_db=os.path.join(workdir,"rotation.db")
+   restore_photos=False
+   if extension==".zip":
+    with zipfile.ZipFile(uploaded_path,"r") as bundle:
+     infos=bundle.infolist()
+     names=[info.filename for info in infos]
+     if names.count("rotation.db")!=1:
+      raise ValueError("Full backup must contain exactly one rotation.db.")
+     if sum(info.file_size for info in infos)>100*1024*1024:
+      raise ValueError("Backup expands beyond the 100 MB safety limit.")
+     for info in infos:
+      name=info.filename
+      if name=="rotation.db" or name=="resident_photos/" or (name.startswith("resident_photos/") and not name.endswith("/")):
+       if ".." in name.split("/") or name.startswith("/"):
+        raise ValueError("Backup contains an unsafe path.")
+      else:
+       raise ValueError("Backup contains an unsupported file path.")
+     with bundle.open("rotation.db") as source, open(staged_db,"wb") as destination:
+      shutil.copyfileobj(source,destination)
+     restore_photos="resident_photos/" in names or any(name.startswith("resident_photos/") for name in names)
+     if restore_photos:
+      staged_photos=os.path.join(workdir,"resident_photos")
+      os.makedirs(staged_photos,exist_ok=True)
+      for info in infos:
+       name=info.filename
+       if name.startswith("resident_photos/") and not name.endswith("/"):
+        photo_name=name[len("resident_photos/"):]
+        if not photo_name or "/" in photo_name or photo_name in (".","..") or info.file_size>8*1024*1024:
+         raise ValueError("Backup contains an invalid or oversized resident photo.")
+        with bundle.open(info) as source, open(os.path.join(staged_photos,photo_name),"wb") as destination:
+         shutil.copyfileobj(source,destination)
+   else:
+    shutil.copyfile(uploaded_path,staged_db)
+   check=sqlite3.connect("file:"+staged_db+"?mode=ro",uri=True,timeout=10)
    integrity=check.execute("PRAGMA integrity_check").fetchone()[0]
    tables={row[0] for row in check.execute("SELECT name FROM sqlite_master WHERE type='table'")}
    check.close()
@@ -942,24 +994,39 @@ def restore():
    if integrity!="ok" or not required.issubset(tables):
     raise ValueError("The uploaded file is not a valid Rotation App database backup.")
    timestamp=datetime.now().strftime("%Y%m%d_%H%M%S")
-   before=os.path.join(directory,"rotation_backup_before_restore_"+timestamp+".db")
-   current=sqlite3.connect(DB,timeout=20)
-   saved=sqlite3.connect(before)
-   try:
-    current.backup(saved); saved.commit()
-   finally:
-    saved.close(); current.close()
-   os.replace(staged,DB); staged=None
+   full_before=os.path.join(directory,"rotation_backup_before_restore_"+timestamp+".zip")
+   with open(full_before,"wb") as handle:
+    handle.write(create_full_backup_bytes(directory))
+   old_db_path=os.path.join(directory,"rotation_backup_before_restore_"+timestamp+".db")
+   shutil.copy2(DB,old_db_path)
+   photo_dir=os.path.join(directory,"resident_photos")
+   if restore_photos and os.path.exists(photo_dir):
+    old_photo_path=os.path.join(directory,"resident_photos_before_restore_"+timestamp)
+    os.replace(photo_dir,old_photo_path)
+   os.replace(staged_db,DB); staged_db=None; db_replaced=True
+   if restore_photos:
+    os.replace(staged_photos,photo_dir); staged_photos=None; photos_replaced=True
    app._ready=False
    init()
-   c=db(); audit_event(c,"database.restored",f"Restored from uploaded backup; pre-restore backup={os.path.basename(before)}"); c.commit(); c.close()
-   flash("Restore completed. A pre-restore backup was saved as "+os.path.basename(before))
+   c=db(); audit_event(c,"database.restored",f"Restored from {extension} backup; pre-restore full backup={os.path.basename(full_before)}"); c.commit(); c.close()
+   flash("Restore completed. Pre-restore full backup saved as "+os.path.basename(full_before))
   except Exception as exc:
-   flash("Restore failed; the current database was not intentionally replaced. Details: "+str(exc)[:250])
+   if db_replaced and old_db_path and os.path.exists(old_db_path):
+    try: shutil.copy2(old_db_path,DB); app._ready=False
+    except Exception: pass
+   if photos_replaced:
+    photo_dir=os.path.join(directory,"resident_photos")
+    try:
+     if os.path.isdir(photo_dir): shutil.rmtree(photo_dir)
+    except Exception: pass
+   if old_photo_path and os.path.exists(old_photo_path):
+    try: os.replace(old_photo_path,os.path.join(directory,"resident_photos"))
+    except Exception: pass
+   flash("Restore failed; a pre-restore full backup was saved if validation had completed. Details: "+str(exc)[:220])
   finally:
-   if staged and os.path.exists(staged): os.remove(staged)
+   if workdir and os.path.exists(workdir): shutil.rmtree(workdir,ignore_errors=True)
   return redirect("/restore")
- return page("""<section><h3>{{t('restore')}}</h3><p>{{t('restore_help')}} Upload only a backup made by this app.</p><form method="post" enctype="multipart/form-data"><label>{{t('file')}} (.db/.sqlite)</label><input type="file" name="backup_file" accept=".db,.sqlite,.sqlite3" required><button>{{t('restore')}}</button></form></section>""")
+ return page("""<section><h3>{{t('restore')}}</h3><p>{{t('restore_help')}} Upload a full .zip backup (database and resident photos) or a legacy .db/.sqlite database backup.</p><form method="post" enctype="multipart/form-data"><label>{{t('file')}} (.zip/.db/.sqlite)</label><input type="file" name="backup_file" accept=".zip,.db,.sqlite,.sqlite3" required><button>{{t('restore')}}</button></form></section>""")
 def rotation_period_bounds(year_label, period_name):
     try:
         y = int(str(year_label).split("-")[0])

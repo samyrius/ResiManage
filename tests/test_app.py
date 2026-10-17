@@ -2,6 +2,7 @@ import hashlib
 from flask.testing import FlaskClient
 import io
 import re
+import zipfile
 import sys
 from pathlib import Path
 
@@ -353,26 +354,37 @@ def test_standard_user_cannot_access_super_admin_pages(tmp_path, monkeypatch):
     assert client.get("/dems").status_code == 403
     assert client.get("/audit").status_code == 403
 
-def test_backup_and_restore_preserve_a_recoverable_database(tmp_path, monkeypatch):
+def test_backup_and_restore_preserve_database_and_resident_photos(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
+    photo_dir = tmp_path / "resident_photos"
+    photo_dir.mkdir(exist_ok=True)
+    photo_path = photo_dir / "test-resident.webp"
+    photo_path.write_bytes(b"original-photo-bytes")
     with rotation_app.db() as conn:
         conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)", ("BeforeBackup", "Resident", 2))
     backup_response = client.get("/backup")
     assert backup_response.status_code == 200
+    assert backup_response.mimetype == "application/zip"
     backup_bytes = backup_response.get_data()
-    assert backup_bytes.startswith(b"SQLite format 3")
+    with zipfile.ZipFile(io.BytesIO(backup_bytes)) as bundle:
+        assert "rotation.db" in bundle.namelist()
+        assert "resident_photos/test-resident.webp" in bundle.namelist()
+        assert bundle.read("resident_photos/test-resident.webp") == b"original-photo-bytes"
     with rotation_app.db() as conn:
         conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)", ("AddedAfterBackup", "Resident", 1))
+    photo_path.write_bytes(b"changed-photo-bytes")
     restored = client.post("/restore", data={
-        "backup_file": (io.BytesIO(backup_bytes), "rotation_backup.db")
+        "backup_file": (io.BytesIO(backup_bytes), "resimanage_full_backup.zip")
     }, content_type="multipart/form-data", follow_redirects=True)
     assert restored.status_code == 200
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM residents WHERE surname='BeforeBackup'").fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM residents WHERE surname='AddedAfterBackup'").fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='database.restored'").fetchone()[0] == 1
+    assert (tmp_path / "resident_photos" / "test-resident.webp").read_bytes() == b"original-photo-bytes"
     assert list(tmp_path.glob("rotation_backup_before_restore_*.db"))
+    assert list(tmp_path.glob("rotation_backup_before_restore_*.zip"))
 
 def test_csv_import_requires_preview_and_does_not_invent_history(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
@@ -505,7 +517,7 @@ def test_csv_export_includes_exam_objective_archive_and_audit_tables_but_not_use
     response = client.get("/export")
     assert response.status_code == 200
     content = response.get_data().decode("utf-8-sig")
-    for table in ("exam_records", "objectives", "dems_archive", "audit"):
+    for table in ("exam_records", "objectives", "dems_archive", "leave_years", "leave_entries", "external_rotations", "promotion_votes", "dems_votes", "audit"):
         assert table in content
     assert "users" not in content
     assert "password_hash" not in content
