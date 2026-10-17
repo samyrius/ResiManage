@@ -473,18 +473,25 @@ def check(c,rid,tid,pid,y):
  total=c.execute(
   "SELECT COUNT(*) FROM terrains WHERE kind IN ('mandatory','basic') AND active=1"
  ).fetchone()[0]
- done=c.execute("""
-  SELECT COUNT(DISTINCT terrain_id) FROM (
-   SELECT h.terrain_id FROM history h
-   JOIN terrains t ON t.id=h.terrain_id
-   WHERE h.resident_id=? AND t.kind IN ('mandatory','basic') AND t.active=1
-   UNION
-   SELECT a.terrain_id FROM assignments a
-   JOIN terrains t ON t.id=a.terrain_id
-   WHERE a.resident_id=? AND a.status='confirmed'
-   AND t.kind IN ('mandatory','basic') AND t.active=1
-  )
- """,(rid,rid)).fetchone()[0]
+ completed_terrains={row["terrain_id"] for row in c.execute("""
+  SELECT h.terrain_id FROM history h
+  JOIN terrains t ON t.id=h.terrain_id
+  WHERE h.resident_id=? AND t.kind IN ('mandatory','basic') AND t.active=1
+ """,(rid,)).fetchall()}
+ # A confirmed assignment is completion evidence only after its rotation period has ended.
+ # Future/current assignments must not unlock repetition of mandatory terrains.
+ completed_assignments=c.execute("""
+  SELECT a.terrain_id,p.year_label,p.name FROM assignments a
+  JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id
+  WHERE a.resident_id=? AND a.status='confirmed'
+    AND t.kind IN ('mandatory','basic') AND t.active=1
+ """,(rid,)).fetchall()
+ today=date.today()
+ for completed in completed_assignments:
+  _,period_end=rotation_period_bounds(completed["year_label"],completed["name"])
+  if period_end<today:
+   completed_terrains.add(completed["terrain_id"])
+ done=len(completed_terrains)
  if repeat and done<total:
   return False,tr("same_terrain_year")+repeat["name"]+" — "+repeat["period"],None
  cap=c.execute("SELECT places FROM capacities WHERE year_label=? AND terrain_id=? AND period_id=?",(y,tid,pid)).fetchone()
