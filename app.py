@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, request, redirect, session, render_template_string, flash, send_file, send_from_directory
 import sqlite3, os, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess, secrets, smtplib, time
-from datetime import datetime
+from datetime import datetime, date
 from werkzeug.utils import secure_filename
 
 BASE=os.path.dirname(os.path.abspath(__file__))
@@ -77,6 +77,9 @@ def init():
  CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,username TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('super_admin','user')),active INTEGER NOT NULL DEFAULT 1,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE IF NOT EXISTS pending_registrations(id INTEGER PRIMARY KEY,username TEXT NOT NULL,email TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,code_hash TEXT NOT NULL,expires_at INTEGER NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE IF NOT EXISTS import_previews(id INTEGER PRIMARY KEY,owner TEXT NOT NULL,rows_json TEXT NOT NULL,errors_json TEXT NOT NULL,filename TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+ CREATE TABLE IF NOT EXISTS leave_years(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL,year INTEGER NOT NULL,earned_days INTEGER NOT NULL DEFAULT 30,created_by TEXT DEFAULT '',UNIQUE(resident_id,year));
+ CREATE TABLE IF NOT EXISTS leave_entries(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL,start_date TEXT NOT NULL,end_date TEXT NOT NULL,days INTEGER NOT NULL,notes TEXT DEFAULT '',created_by TEXT DEFAULT '',created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+ CREATE TABLE IF NOT EXISTS external_rotations(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL,supervisor TEXT NOT NULL,destination TEXT NOT NULL,hospital TEXT NOT NULL,country TEXT NOT NULL,rotation_type TEXT NOT NULL,start_date TEXT NOT NULL,end_date TEXT NOT NULL,notes TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'active',created_by TEXT DEFAULT '',created_at TEXT DEFAULT CURRENT_TIMESTAMP,updated_at TEXT DEFAULT CURRENT_TIMESTAMP);
  """)
  # Migrate user email fields only after the users table exists (fresh DB and legacy DB).
  ensure_column(c,"users","email","TEXT DEFAULT ''")
@@ -305,7 +308,7 @@ def home():
  for r in rs:
   n=c.execute("SELECT COUNT(*) FROM assignments a JOIN periods p ON p.id=a.period_id WHERE a.resident_id=? AND p.year_label=? AND a.status='confirmed'",(r["id"],y)).fetchone()[0]; rows.append((r,n))
  c.close()
- return page("""<section><h3 class="rt-dashboard-title"><span class="rt-dot"></span>{{t('overview')}}</h3><p>{{t('priority')}}</p><div class="rt-stats"><div class="rt-stat"><span>{{t('residents')}}</span><strong>{{rows|length}}</strong></div><div class="rt-stat"><span>{{t('terrains')}}</span><strong>{{count}}</strong></div><div class="rt-stat"><span>{{t('confirmed')}}</span><strong>{{confirmed}}</strong></div><div class="rt-stat"><span>{{t('year')}}</span><strong style="font-size:17px">{{year}}</strong></div></div></section><div class="rt-quick-actions"><a class="rt-action-card" href="/residents"><span class="rt-action-icon">♙</span><span><strong>{{t('manage_residents')}}</strong><small>Profils · années · coordonnées</small></span></a><a class="rt-action-card" href="/assign"><span class="rt-action-icon">⇄</span><span><strong>{{t('assign')}}</strong><small>Répartition des stages</small></span></a><a class="rt-action-card" href="/terrains"><span class="rt-action-icon">✚</span><span><strong>{{t('terrains')}}</strong><small>Terrains obligatoires et optionnels</small></span></a><a class="rt-action-card" href="/import"><span class="rt-action-icon">⇧</span><span><strong>{{t('import_residents')}}</strong><small>Import avec aperçu et validation</small></span></a></div><section><h3 class="rt-dashboard-title"><span class="rt-dot"></span>{{t('four')}}</h3><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('count')}}</th></tr>{% for r,n in rows %}<tr><td><a class="rt-resident-link" href="/profile/{{r.id}}">{{r.surname}} {{r.firstname}}</a></td><td><span class="rt-year-chip">{{r.year}}</span></td><td><span class="rt-progress"><span style="width:{{[n*25,100]|min}}%"></span></span> {{n}} / 4</td></tr>{% else %}<tr><td colspan="3">{{t('none')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows,count=count,confirmed=confirmed,year=y)
+ return page("""<section><h3 class="rt-dashboard-title"><span class="rt-dot"></span>{{t('overview')}}</h3><p>{{t('priority')}}</p><div class="rt-stats"><div class="rt-stat"><span>{{t('residents')}}</span><strong>{{rows|length}}</strong></div><div class="rt-stat"><span>{{t('terrains')}}</span><strong>{{count}}</strong></div><div class="rt-stat"><span>{{t('confirmed')}}</span><strong>{{confirmed}}</strong></div><div class="rt-stat"><span>{{t('year')}}</span><strong style="font-size:17px">{{year}}</strong></div></div></section><div class="rt-quick-actions"><a class="rt-action-card" href="/leave"><span class="rt-action-icon">◷</span><span><strong>الإجازات / Congés / Leave</strong><small>30 days yearly · carry forward</small></span></a><a class="rt-action-card" href="/external-rotations"><span class="rt-action-icon">✈</span><span><strong>التربصات الخارجية / Stages à l’étranger / External rotations</strong><small>Supervisor · hospital · country · dates</small></span></a><a class="rt-action-card" href="/residents"><span class="rt-action-icon">♙</span><span><strong>{{t('manage_residents')}}</strong><small>Profils · années · coordonnées</small></span></a><a class="rt-action-card" href="/assign"><span class="rt-action-icon">⇄</span><span><strong>{{t('assign')}}</strong><small>Répartition des stages</small></span></a><a class="rt-action-card" href="/terrains"><span class="rt-action-icon">✚</span><span><strong>{{t('terrains')}}</strong><small>Terrains obligatoires et optionnels</small></span></a><a class="rt-action-card" href="/import"><span class="rt-action-icon">⇧</span><span><strong>{{t('import_residents')}}</strong><small>Import avec aperçu et validation</small></span></a></div><section><h3 class="rt-dashboard-title"><span class="rt-dot"></span>{{t('four')}}</h3><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('count')}}</th></tr>{% for r,n in rows %}<tr><td><a class="rt-resident-link" href="/profile/{{r.id}}">{{r.surname}} {{r.firstname}}</a></td><td><span class="rt-year-chip">{{r.year}}</span></td><td><span class="rt-progress"><span style="width:{{[n*25,100]|min}}%"></span></span> {{n}} / 4</td></tr>{% else %}<tr><td colspan="3">{{t('none')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows,count=count,confirmed=confirmed,year=y)
 @app.route("/residents",methods=["GET","POST"])
 def residents():
  if guard(): return redirect("/login")
@@ -368,6 +371,9 @@ def capacities():
 def check(c,rid,tid,pid,y):
  r=c.execute("SELECT * FROM residents WHERE id=? AND status='active'",(rid,)).fetchone(); t=c.execute("SELECT * FROM terrains WHERE id=?",(tid,)).fetchone(); p=c.execute("SELECT * FROM periods WHERE id=? AND year_label=?",(pid,y)).fetchone()
  if not r or not t or not t["active"] or not p: return False,tr("none"),None
+ start_day, end_day = rotation_period_bounds(p["year_label"], p["name"])
+ external = c.execute("SELECT hospital,country,start_date,end_date FROM external_rotations WHERE resident_id=? AND status='active' AND start_date<=? AND end_date>=? LIMIT 1",(rid,end_day.isoformat(),start_day.isoformat())).fetchone()
+ if external: return False,("External rotation blocks local assignment: "+external["hospital"]+", "+external["country"]+" ("+external["start_date"]+" to "+external["end_date"]+")"),None
  dup=c.execute("SELECT t.name FROM assignments a JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=? AND a.period_id=? AND a.status IN ('confirmed','pending')",(rid,pid)).fetchone()
  if dup:return False,tr("duplicate")+dup["name"],None
  repeat = c.execute(
@@ -876,5 +882,82 @@ def restore():
    if staged and os.path.exists(staged): os.remove(staged)
   return redirect("/restore")
  return page("""<section><h3>{{t('restore')}}</h3><p>{{t('restore_help')}} Upload only a backup made by this app.</p><form method="post" enctype="multipart/form-data"><label>{{t('file')}} (.db/.sqlite)</label><input type="file" name="backup_file" accept=".db,.sqlite,.sqlite3" required><button>{{t('restore')}}</button></form></section>""")
+def rotation_period_bounds(year_label, period_name):
+    try:
+        y = int(str(year_label).split("-")[0])
+    except (ValueError, IndexError):
+        y = date.today().year
+    n = str(period_name).lower()
+    if any(x in n for x in ("fév", "fev", "feb")): return date(y,2,1), date(y,4,30)
+    if any(x in n for x in ("mai", "may")): return date(y,5,1), date(y,7,30)
+    if any(x in n for x in ("août", "aout", "aug")): return date(y,8,1), date(y,10,30)
+    if "nov" in n: return date(y,11,1), date(y+1,1,30)
+    return date(y,2,1), date(y+1,1,30)
+
+@app.route("/leave", methods=["GET","POST"])
+def leave_management():
+    if guard(): return redirect("/login")
+    c=db()
+    if request.method=="POST":
+        if super_guard(): c.close(); return ("Forbidden — Super Admin only",403)
+        try:
+            rid=int(request.form["resident_id"])
+            start=date.fromisoformat(request.form["start_date"]); end=date.fromisoformat(request.form["end_date"])
+            if end<start: raise ValueError("End date must not precede start date.")
+            days=(end-start).days+1
+            overlap=c.execute("SELECT id FROM leave_entries WHERE resident_id=? AND start_date<=? AND end_date>=?",(rid,end.isoformat(),start.isoformat())).fetchone()
+            if overlap: raise ValueError("Leave dates overlap an existing entry.")
+            for yr in range(start.year,end.year+1):
+                c.execute("INSERT OR IGNORE INTO leave_years(resident_id,year,earned_days,created_by) VALUES(?,?,30,?)",(rid,yr,session.get("user","")))
+            earned=c.execute("SELECT COALESCE(SUM(earned_days),0) FROM leave_years WHERE resident_id=? AND year<=?",(rid,end.year)).fetchone()[0]
+            used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND end_date<=?",(rid,date(end.year,12,31).isoformat())).fetchone()[0]
+            if used+days>earned: raise ValueError("Insufficient accrued leave balance, including carry-forward.")
+            c.execute("INSERT INTO leave_entries(resident_id,start_date,end_date,days,notes,created_by) VALUES(?,?,?,?,?,?)",(rid,start.isoformat(),end.isoformat(),days,request.form.get("notes","").strip(),session.get("user","")))
+            audit_event(c,"leave.entry_created",f"resident_id={rid}; start={start}; end={end}; days={days}")
+            c.commit(); flash(f"Leave recorded: {days} calendar days. Unused entitlement carries forward.")
+        except Exception as exc: c.rollback(); flash("Leave not saved: "+str(exc)[:220])
+        c.close(); return redirect("/leave")
+    residents=c.execute("SELECT id,surname,firstname FROM residents ORDER BY year DESC,surname").fetchall()
+    now=date.today(); balances=[]
+    for r in residents:
+        first=c.execute("SELECT MIN(year) FROM leave_years WHERE resident_id=?",(r["id"],)).fetchone()[0]
+        first=first if first is not None else now.year
+        for yr in range(first,now.year+1):
+            c.execute("INSERT OR IGNORE INTO leave_years(resident_id,year,earned_days,created_by) VALUES(?,?,30,?)",(r["id"],yr,session.get("user","")))
+        earned=c.execute("SELECT COALESCE(SUM(earned_days),0) FROM leave_years WHERE resident_id=? AND year<=?",(r["id"],now.year)).fetchone()[0]
+        used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND end_date<=?",(r["id"],date(now.year,12,31).isoformat())).fetchone()[0]
+        balances.append({"name":r["surname"]+" "+r["firstname"],"earned":earned,"used":used,"remaining":earned-used})
+    entries=c.execute("SELECT l.*,r.surname,r.firstname FROM leave_entries l JOIN residents r ON r.id=l.resident_id ORDER BY l.start_date DESC").fetchall()
+    c.commit(); c.close()
+    return page("""<section><h3>الإجازات / Congés / Annual leave</h3><p>30 calendar days per year. Unused days carry forward.</p><form method="post"><label>Resident <select name="resident_id" required>{% for r in residents %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}}</option>{% endfor %}</select></label><div class="grid"><label>Start <input type="date" name="start_date" required></label><label>End <input type="date" name="end_date" required></label></div><label>Notes <input name="notes" maxlength="500"></label><button>Record leave</button></form></section><section><h3>Balances</h3><div class="wrap"><table><tr><th>Resident</th><th>Accrued</th><th>Used</th><th>Remaining</th></tr>{% for b in balances %}<tr><td>{{b.name}}</td><td>{{b.earned}}</td><td>{{b.used}}</td><td>{{b.remaining}}</td></tr>{% endfor %}</table></div></section><section><h3>History</h3><div class="wrap"><table><tr><th>Resident</th><th>Start</th><th>End</th><th>Days</th><th>Notes</th></tr>{% for e in entries %}<tr><td>{{e.surname}} {{e.firstname}}</td><td>{{e.start_date}}</td><td>{{e.end_date}}</td><td>{{e.days}}</td><td>{{e.notes}}</td></tr>{% endfor %}</table></div></section>""",residents=residents,balances=balances,entries=entries)
+
+@app.route("/external-rotations", methods=["GET","POST"])
+def external_rotations():
+    if guard(): return redirect("/login")
+    c=db()
+    if request.method=="POST":
+        if super_guard(): c.close(); return ("Forbidden — Super Admin only",403)
+        try:
+            rid=int(request.form["resident_id"])
+            supervisor=request.form["supervisor"].strip(); destination=request.form["destination"].strip()
+            hospital=request.form["hospital"].strip(); country=request.form["country"].strip(); kind=request.form["rotation_type"].strip()
+            start=date.fromisoformat(request.form["start_date"]); end=date.fromisoformat(request.form["end_date"])
+            if not all([supervisor,destination,hospital,country,kind]): raise ValueError("All external rotation fields are required.")
+            if end<start: raise ValueError("Return date must not precede start date.")
+            overlap=c.execute("SELECT id FROM external_rotations WHERE resident_id=? AND status='active' AND start_date<=? AND end_date>=?",(rid,end.isoformat(),start.isoformat())).fetchone()
+            if overlap: raise ValueError("External rotations for this resident cannot overlap.")
+            c.execute("INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,notes,created_by) VALUES(?,?,?,?,?,?,?,?,?,?)",(rid,supervisor,destination,hospital,country,kind,start.isoformat(),end.isoformat(),request.form.get("notes","").strip(),session.get("user","")))
+            audit_event(c,"external_rotation.created",f"resident_id={rid}; hospital={hospital}; country={country}; start={start}; end={end}")
+            c.commit(); flash("External rotation saved; overlapping local assignments are blocked.")
+        except Exception as exc: c.rollback(); flash("External rotation not saved: "+str(exc)[:220])
+        c.close(); return redirect("/external-rotations")
+    residents=c.execute("SELECT id,surname,firstname,year FROM residents ORDER BY year DESC,surname").fetchall()
+    today=date.today().isoformat()
+    c.execute("UPDATE external_rotations SET status='returned',updated_at=CURRENT_TIMESTAMP WHERE status='active' AND end_date<?",(today,))
+    rows=c.execute("SELECT x.*,r.surname,r.firstname FROM external_rotations x JOIN residents r ON r.id=x.resident_id ORDER BY x.start_date DESC").fetchall()
+    active={x[0] for x in c.execute("SELECT DISTINCT resident_id FROM external_rotations WHERE status='active' AND start_date<=? AND end_date>=?",(today,today)).fetchall()}
+    c.commit(); c.close()
+    return page("""<section><h3>التربصات في الخارج / Stages à l’étranger / External rotations</h3><p>Residents are blocked from local assignments for any overlapping internal period and become eligible after the return date.</p><form method="post"><label>Resident <select name="resident_id" required>{% for r in residents %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}} ({{r.year}})</option>{% endfor %}</select></label><div class="grid"><label>Responsible employee / Supervisor <input name="supervisor" required></label><label>Destination <input name="destination" required></label><label>Hospital <input name="hospital" required></label><label>Country <input name="country" required></label><label>Rotation type <input name="rotation_type" required></label><label>Start date <input type="date" name="start_date" required></label><label>Return date <input type="date" name="end_date" required></label></div><label>Notes <input name="notes"></label><button>Save external rotation</button></form></section><section><h3>External rotation history</h3><div class="wrap"><table><tr><th>Resident</th><th>Supervisor</th><th>Destination</th><th>Hospital</th><th>Country</th><th>Type</th><th>Dates</th><th>Status</th></tr>{% for x in rows %}<tr><td>{{x.surname}} {{x.firstname}}</td><td>{{x.supervisor}}</td><td>{{x.destination}}</td><td>{{x.hospital}}</td><td>{{x.country}}</td><td>{{x.rotation_type}}</td><td>{{x.start_date}} – {{x.end_date}}</td><td>{{x.status}}</td></tr>{% endfor %}</table></div></section>""",residents=residents,rows=rows)
+
 if __name__=="__main__":
  init(); app.run(host="127.0.0.1",port=int(os.environ.get("PORT","5000")),debug=False)
