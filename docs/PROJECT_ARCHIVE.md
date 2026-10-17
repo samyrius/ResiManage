@@ -490,3 +490,12 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** malformed study year and non-numeric theory mark produce a normal response and do not create exam or audit records.
 - **Branch:** `resimanage-2-exam-input-validation`; based on the current `resimanage-2-work`. CI pending.
 - **Safety:** no real resident data or database files changed; no APK build or phone test started.
+
+
+### RESI-2 / DEMS-FUTURE-DATE-001 — 2026-10-17
+
+- **Audit finding:** the DEMS voting endpoint accepted a syntactically valid exam date in the future, allowing an official vote to be recorded before the stated exam occurred.
+- **Fix proposed on isolated branch:** reject a future DEMS exam date before inserting a vote or audit event. Past and current dates remain accepted.
+- **Regression test added:** a future-dated vote returns a validation message and creates no DEMS vote, archive entry, or vote audit record.
+- **Branch:** `resimanage-2-dems-future-date-guard`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no resident data/database files/secrets/assets changed; no APK build or phone test started.
