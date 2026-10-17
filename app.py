@@ -219,9 +219,19 @@ th{background:#0b3552!important;color:#70eaf2!important}td{background:#061d32;bo
  inner=render_template_string(body,**context)
  return render_template_string(shell,body=inner,lang=lang,t=tr,year=setting(db(),"year"),user=bool(session.get("user")),role=session.get("role",""))
 def guard():
- if not session.get("user"): return redirect("/login")
+ username=session.get("user")
+ if not username: return redirect("/login")
+ c=db()
+ account=c.execute("SELECT role,active FROM users WHERE username=?",(username,)).fetchone()
+ c.close()
+ if not account or not account["active"]:
+  session.clear()
+  return redirect("/login")
+ # Reflect the current role from the database instead of trusting stale session data.
+ session["role"]=account["role"]
 def super_guard():
- if not session.get("user"): return redirect("/login")
+ denied=guard()
+ if denied: return denied
  if session.get("role")!="super_admin": return ("Forbidden — Super Admin only",403)
 @app.get("/lang/<lang>")
 def lang(lang):

@@ -1426,3 +1426,27 @@ def test_import_rejects_fractional_study_year_instead_of_truncating(tmp_path, mo
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM residents WHERE surname='Fractional'").fetchone()[0] == 0
 
+def test_deactivated_account_loses_existing_session_immediately(tmp_path, monkeypatch):
+    admin = setup_client(tmp_path, monkeypatch)
+    login(admin)
+    username = "revoked-session"
+    password = "strong-revoked-password-2026"
+    admin.post("/users", data={"username":username,"password":password,"role":"user"}, follow_redirects=True)
+
+    user_client = rotation_app.app.test_client()
+    signed_in = user_client.post(
+        "/login", data={"username":username,"password":password}, follow_redirects=True
+    )
+    assert signed_in.status_code == 200
+    assert user_client.get("/").status_code == 200
+
+    with rotation_app.db() as conn:
+        uid = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()[0]
+    admin.post("/users", data={"action":"deactivate","user_id":str(uid)}, follow_redirects=True)
+
+    revoked = user_client.get("/")
+    assert revoked.status_code == 302
+    assert "/login" in revoked.headers["Location"]
+    with user_client.session_transaction() as session:
+        assert "user" not in session
+
