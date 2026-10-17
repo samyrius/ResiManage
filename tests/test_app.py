@@ -1312,3 +1312,38 @@ def test_external_rotation_edit_rejects_overlap_with_existing_local_assignment(t
         row = conn.execute("SELECT start_date,end_date FROM external_rotations WHERE id=?", (xid,)).fetchone()
         assert tuple(row) == (nonoverlap_start.isoformat(), nonoverlap_end.isoformat())
 
+def test_resident_edit_persists_and_cannot_bypass_or_reverse_dems_graduation(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,2,'active')", ("Editable", "Resident"))
+        editable = conn.execute("SELECT id FROM residents WHERE surname='Editable'").fetchone()[0]
+        conn.execute("INSERT INTO residents(surname,firstname,year,status,dems_status) VALUES(?,?,4,'graduated','success')", ("Graduated", "Resident"))
+        graduated = conn.execute("SELECT id FROM residents WHERE surname='Graduated'").fetchone()[0]
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,4,'active')", ("Attempt", "Bypass"))
+        bypass = conn.execute("SELECT id FROM residents WHERE surname='Attempt'").fetchone()[0]
+
+    saved = client.post("/residents", data={
+        "action":"edit","rid":str(editable),"year":"3","repeat_year":"0","status":"inactive"
+    }, follow_redirects=True)
+    assert saved.status_code == 200
+    with rotation_app.db() as conn:
+        row = conn.execute("SELECT year,status FROM residents WHERE id=?", (editable,)).fetchone()
+        assert tuple(row) == (3,"inactive")
+
+    bypass_response = client.post("/residents", data={
+        "action":"edit","rid":str(bypass),"year":"4","repeat_year":"0","status":"graduated"
+    }, follow_redirects=True)
+    assert bypass_response.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT status FROM residents WHERE id=?", (bypass,)).fetchone()[0] == "active"
+
+    restore_response = client.post("/residents", data={
+        "action":"edit","rid":str(graduated),"year":"4","repeat_year":"0","status":"active"
+    }, follow_redirects=True)
+    assert restore_response.status_code == 200
+    assert b"Graduated residents are archived" in restore_response.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT status FROM residents WHERE id=?", (graduated,)).fetchone()[0] == "graduated"
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='resident.updated'").fetchone()[0] == 1
+
