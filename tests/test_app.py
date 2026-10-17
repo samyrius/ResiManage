@@ -1489,6 +1489,11 @@ def test_standard_user_cannot_create_rotation_assignments(tmp_path, monkeypatch)
 def test_inactive_resident_cannot_receive_promotion_votes(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
+    client.post("/users", data={
+        "username":"benhocine",
+        "password":"official-admin-password-2026",
+        "role":"super_admin",
+    }, follow_redirects=True)
     with rotation_app.db() as conn:
         conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,2,'inactive')", ("Inactive", "Promotion"))
         rid = conn.execute("SELECT id FROM residents WHERE surname='Inactive'").fetchone()[0]
