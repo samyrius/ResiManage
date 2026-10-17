@@ -931,7 +931,7 @@ def test_dems_archive_is_blocked_if_either_official_rejects(tmp_path, monkeypatc
         resident = conn.execute(
             "SELECT status,dems_status FROM residents WHERE id=?", (rid,)
         ).fetchone()
-        assert tuple(resident) == ("active", None)
+        assert tuple(resident) == ("active", "")
         assert conn.execute(
             "SELECT COUNT(*) FROM dems_archive WHERE resident_id=?", (rid,)
         ).fetchone()[0] == 0
