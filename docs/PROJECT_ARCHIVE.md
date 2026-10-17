@@ -393,3 +393,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** negative capacity and a period from academic year 2099–2100 are rejected and create no invalid capacity rows.
 - **Branch:** `resimanage-2-capacity-input-validation`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / IMPORT-CONFIRMATION-RECHECK-002 — 2026-10-17
+
+- **Audit finding:** import rows were checked for duplicates when the preview was created, but not rechecked when the administrator confirmed. A second administrator could create one of those residents between preview and confirmation; this could cause a partial import or duplicate/constraint failure.
+- **Fix proposed on isolated branch:** revalidate every row against the live database and against the other rows at confirmation time. If the source is stale or a write constraint fires, cancel the whole import without an import audit event; do not partially import rows.
+- **Regression test added:** a two-row preview becomes stale after one resident is added; confirmation imports neither row and records no import audit event.
+- **Branch:** `resimanage-2-import-confirmation-recheck-v3`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
