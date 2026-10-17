@@ -821,6 +821,8 @@ def exams():
   if not resident:
    flash("Resident not found")
   elif action=="record":
+   if session.get("role")!="super_admin":
+    c.close(); return ("Forbidden — Super Admin only",403)
    module=request.form["module"].strip(); theory=float(request.form["theory"]); practical=float(request.form["practical"])
    if sy not in (1,2,3,4) or not module or not (0<=theory<=20 and 0<=practical<=20):
     flash("Module and marks from 0 to 20 are required")
