@@ -518,3 +518,13 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression tests:** actual PNG upload and served image decode; corrupt PNG rejected without overwriting the current photo; profile save without replacement keeps the stored path.
 - **UI benchmark:** `docs/UX_BENCHMARK.md` records 10 comparable platforms and 14 related websites plus the design patterns selected for ResiManage.
 - **Status:** ResiManage 2 port is isolated on `resimanage-2-photo-ui-port`; its own CI must pass before considering the fix verified on ResiManage 2. The `resimanage-1-backup` branch remains unchanged. No APK build or phone test.
+
+
+### BRAND-3D-UX-001 — 2026-10-17 — User-approved visual direction (implementation pending)
+
+- **User instruction:** use the two image references attached in the conversation (glossy dimensional medical/ECG ResiTrack badge and mobile UI concept) to refine the app identity and interface. The product name must be **ResiManage**, replacing any remaining “ResiTrack” wordmarks.
+- **Requested visual direction:** polished 3D-inspired medical icon, futuristic navy/blue/cyan/teal theme, restrained luminous/flash-like motion, and a modern, organized, ergonomic interface. Motion must remain subtle, accessible, and disabled/reduced for users who prefer reduced motion; it must not distract from operational tasks.
+- **Research/benchmark:** candidate includes `docs/UX_BENCHMARK.md`, covering 10 comparable residency/scheduling platforms and 14 related websites. Findings favor role-aware concise navigation, resident profile cards, clear status/capacity/conflict signals, mobile-first touch targets, multilingual RTL/LTR, and restrained animation. Current code changes focus on the resident profile; full application-wide redesign is not yet implemented.
+- **Sequence confirmed by user:** implement first on the ResiManage 1 candidate, run automated checks and review the results; only then port verified changes to ResiManage 2, keeping the two work streams aligned. Do not change the protected `resimanage-1-backup` branch itself.
+- **Asset note:** the two reference images were supplied in chat; they are design references, not yet committed app assets. No launcher-icon/image asset replacement or animated theme has been implemented by this entry.
+- **Verification status:** photo/profile candidate PR #71 and ResiManage 2 port PR #72 are open. PR #71's current head has a successful Python application check; PR #72's earlier code/test head passed, but the currently reported PR head has no matching workflow run in the available check result. Recheck CI on the exact latest head before considering the port verified. Neither branch is merged by this archive entry. No APK build or phone test.
