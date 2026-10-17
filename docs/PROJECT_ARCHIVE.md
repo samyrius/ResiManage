@@ -508,3 +508,13 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** malformed decision and user IDs return normal responses and create no decision or audit records.
 - **Branch:** `resimanage-2-admin-id-validation`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real resident data/database files/secrets/assets changed; no APK build or phone test started.
+
+
+### RESI-2 / PHOTO-UPLOAD-UX-001 — 2026-10-17
+
+- **Finding:** resident photo upload accepted file-signature prefixes rather than verifying that the image could be decoded; a corrupt image could be stored but not displayed. The profile form also allowed direct editing of the stored photo path, and saving a form without that field could detach a photo.
+- **Verified candidate:** `resimanage-1-photo-ui-candidate` passed Python application checks on exact code/test head `01aaac6dd1f12a38ca8ea8298d0cdc86c20626aa` (run `39036901714`, conclusion success).
+- **Ported changes on this branch:** Pillow decode/verify and normalization, EXIF orientation handling, 1200×1200 resize, 4 MB limit, unique filenames, atomic writes, preserve-existing-photo behavior, profile photo preview and responsive profile card.
+- **Regression tests:** actual PNG upload and served image decode; corrupt PNG rejected without overwriting the current photo; profile save without replacement keeps the stored path.
+- **UI benchmark:** `docs/UX_BENCHMARK.md` records 10 comparable platforms and 14 related websites plus the design patterns selected for ResiManage.
+- **Status:** ResiManage 2 port is isolated on `resimanage-2-photo-ui-port`; its own CI must pass before considering the fix verified on ResiManage 2. The `resimanage-1-backup` branch remains unchanged. No APK build or phone test.
