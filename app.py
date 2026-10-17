@@ -426,10 +426,17 @@ def terrains():
    if action=="edit":
     tid=int(request.form["tid"]); name=request.form["name"].strip(); kind=request.form["kind"]; mandatory_year=int(request.form["mandatory_year"])
     if not name or kind not in ("mandatory","basic","optional") or mandatory_year not in (0,1,2,3,4): raise ValueError("Invalid terrain fields")
+    current=c.execute("SELECT * FROM terrains WHERE id=?",(tid,)).fetchone()
+    if not current: raise ValueError("Terrain not found.")
+    has_records=c.execute("SELECT (SELECT COUNT(*) FROM history WHERE terrain_id=?)+(SELECT COUNT(*) FROM assignments WHERE terrain_id=?)",(tid,tid)).fetchone()[0]>0
+    if has_records and (kind!=current["kind"] or mandatory_year!=current["mandatory_year"]):
+     raise ValueError("Terrain classification/year cannot be changed after rotation history or assignments exist. Preserve the audit trail and correct it before use or via a reviewed migration.")
     c.execute("UPDATE terrains SET name=?,kind=?,mandatory_year=? WHERE id=?",(name,kind,mandatory_year,tid))
     audit_event(c,"terrain.updated",f"terrain_id={tid}; name={name}; kind={kind}; mandatory_year={mandatory_year}")
    elif action in ("deactivate","activate"):
     tid=int(request.form["tid"]); active=0 if action=="deactivate" else 1
+    current=c.execute("SELECT * FROM terrains WHERE id=?",(tid,)).fetchone()
+    if not current: raise ValueError("Terrain not found.")
     c.execute("UPDATE terrains SET active=? WHERE id=?",(active,tid))
     audit_event(c,"terrain.deactivated" if not active else "terrain.activated",f"terrain_id={tid}")
    else:

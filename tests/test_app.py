@@ -1774,3 +1774,33 @@ def test_exam_recording_rejects_future_year_and_graduated_resident(tmp_path, mon
         assert conn.execute("SELECT COUNT(*) FROM exam_records WHERE resident_id IN (?,?)", (future_id,graduated_id)).fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action IN ('exam.recorded','exam.updated')").fetchone()[0] == 0
 
+def test_terrain_classification_cannot_change_after_rotation_records_exist(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        resident_id = conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,2) RETURNING id",
+            ("Terrain", "Audit"),
+        ).fetchone()[0]
+        terrain = conn.execute(
+            "SELECT id,kind,mandatory_year,name FROM terrains WHERE active=1 ORDER BY id LIMIT 1"
+        ).fetchone()
+        conn.execute(
+            "INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+            (resident_id,terrain["id"],"2025-2026","01 Fév - 30 Avr","2026-04-30"),
+        )
+        conn.commit()
+
+    response = client.post("/terrains", data={
+        "action":"edit","tid":str(terrain["id"]),"name":terrain["name"],
+        "kind":"optional" if terrain["kind"]!="optional" else "mandatory",
+        "mandatory_year":str(terrain["mandatory_year"]),
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"Terrain classification/year cannot be changed after rotation history or assignments exist" in response.data
+    with rotation_app.db() as conn:
+        unchanged = conn.execute("SELECT kind,mandatory_year FROM terrains WHERE id=?", (terrain["id"],)).fetchone()
+        assert unchanged["kind"] == terrain["kind"]
+        assert unchanged["mandatory_year"] == terrain["mandatory_year"]
+        assert conn.execute("SELECT COUNT(*) FROM history WHERE resident_id=? AND terrain_id=?", (resident_id,terrain["id"])).fetchone()[0] == 1
+
