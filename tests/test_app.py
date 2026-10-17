@@ -1569,7 +1569,8 @@ def test_future_confirmed_rotations_do_not_count_as_completed_for_repeat_eligibi
             (rid,target,"2025-2026","01 Fév - 30 Avr","2026-04-30"),
         )
         future_terrains = conn.execute(
-            "SELECT id FROM terrains WHERE active=1 AND kind IN ('mandatory','basic')"
+            "SELECT id FROM terrains WHERE active=1 AND kind IN ('mandatory','basic') AND id<>?",
+            (target,),
         ).fetchall()
         for index, terrain_row in enumerate(future_terrains):
             start_year = 2099 + index
@@ -1663,4 +1664,42 @@ def test_import_confirmation_rechecks_duplicates_and_imports_nothing_on_stale_pr
             "SELECT COUNT(*) FROM residents WHERE surname='Race' AND firstname='Condition' AND year=3"
         ).fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='residents.imported'").fetchone()[0] == 0
+
+def test_repeat_of_core_terrain_is_blocked_across_academic_years(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        rid = conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,4) RETURNING id",
+            ("CrossYear", "Repeat"),
+        ).fetchone()[0]
+        target = conn.execute(
+            "SELECT id FROM terrains WHERE active=1 AND kind IN ('mandatory','basic') ORDER BY id LIMIT 1"
+        ).fetchone()[0]
+        current_year = conn.execute("SELECT value FROM settings WHERE key='year'").fetchone()[0]
+        current_period = conn.execute(
+            "SELECT id,year_label FROM periods WHERE year_label=? ORDER BY id LIMIT 1",
+            (current_year,),
+        ).fetchone()
+        conn.execute(
+            "INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,1)",
+            (current_year,target,current_period["id"]),
+        )
+        previous_period = conn.execute(
+            "INSERT INTO periods(year_label,name) VALUES(?,?) RETURNING id",
+            ("2024-2025","01 Fév - 30 Avr"),
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",
+            (rid,target,previous_period),
+        )
+        conn.commit()
+
+    with rotation_app.app.test_request_context("/"):
+        with rotation_app.db() as conn:
+            allowed, message, status = rotation_app.check(
+                conn,rid,target,current_period["id"],current_year
+            )
+    assert allowed is False
+    assert status is None
 
