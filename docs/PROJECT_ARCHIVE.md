@@ -86,7 +86,8 @@ This file is the durable project handover log for `samyrius/rotation-app`. Read 
   - DEMS success archive stores the resident profile, stage history, assignments and exam snapshot, while preserving the original resident/history records.
   - Import preview/validation for CSV, XLS/XLSX, DOC/DOCX and text-based PDF; imported rows are grouped/sorted by study year and name. Import does not fabricate prior stages. Legacy .doc conversion requires antiword or LibreOffice; scanned PDFs without extractable text need OCR outside the app.
   - CSV export includes residents, terrains, periods, capacities, assignments, history, decisions, exams, objectives, DEMS archive and audit data, but excludes user credential hashes.
-  - SQLite-consistent backup and validated restore. Restore checks SQLite integrity and required tables and creates a separate pre-restore backup before replacement.  - Academic-year format validation, four-period creation with previous periods retained, year-priority ordering, exact five optional terrain classification, audit records for key administrative changes, and French/Arabic/English navigation labels for the added workflows.
+  - SQLite-consistent backup and validated restore. Restore checks SQLite integrity and required tables and creates a separate pre-restore backup before replacement.
+  - Academic-year format validation, four-period creation with previous periods retained, year-priority ordering, exact five optional terrain classification, audit records for key administrative changes, and French/Arabic/English navigation labels for the added workflows.
 - Updated `README.md` with local launch instructions, import limitations, backup/restore safety and branch status.
 - The reviewed work was merged from `prototype/verification-2026-10-13` through PR #8. The user-confirmed existing phone prototype and local database were not accessed or modified by these repository changes.
 - The CI test suite now covers the main rules, profile/objective workflows, first-year progression, DEMS archive, user roles, backup/restore, CSV/XLSX/DOCX import preview, CSV export, mandatory-year override/audit, priority, academic-year periods, photo upload, terrain deactivation, assignment cancellation, user deactivation, first-run setup and legacy password migration.
@@ -176,6 +177,25 @@ This repository log captures durable project decisions and progress; it is not a
 - **Observed:** prior tests checked only one leave entry and a single active external rotation. The external assignment guard considered only status 'active', so a rotation marked 'returned' could fail to block an assignment entered later for the historical period it covered. The assignment dropdown also showed all residents even where a selected period overlapped an external rotation. External rotation records had no edit/cancel controls.
 - **Fix applied on branch:** overlap checks now include active and returned external rotations and ignore only cancelled records; the assignment form marks conflicting resident options disabled based on the selected period; external rotation edit and cancel actions validate dates/required fields, preserve records, and write audit events. Added regression tests for multi-year leave carry-forward/overdraw, overlapping leave entries, returned-rotation period conflicts, assignment dropdown filtering, and audited edit/cancel.
 - **Status:** awaiting CI on the feature branch; not merged until checks pass.
+### CI-LEAVE-001: Refactor recovery and regression follow-up — 2026-10-17
+- The first CI run for PR #21 exposed a source-refactor boundary error: the annual-leave route's final response template had been truncated while replacing the following external-rotation route. This was caught before merge; no changes reached main.
+- Restored the complete annual-leave route verbatim from the current main baseline, then rechecked the boundary between the leave and external-rotation routes. The latest branch head is `097ed46032323368b82d5ab650ee785af02c0164`.
+- **Status:** a fresh CI run on this corrected head is still required. Do not merge based on the earlier failed runs.
+
+### SEC-001: CSRF protection and official administrator safeguards
+- **Observed:** current main had no CSRF validation on state-changing POST requests, and the user-management route allowed the official accounts named `benhocine` and `drdris` to be created with a normal-user role or deactivated.
+- **Fix applied on branch:** add session-bound CSRF tokens to POST forms at render time, validate tokens before POST handlers, and reject missing/invalid tokens. Require official accounts to be created as Super Admins and prevent deactivation. Test client now obtains a real rendered token for ordinary form submissions; a separate test explicitly submits without a token.
+- **Status:** awaiting CI; no merge until the full suite passes. No APK build started.
+
+### GOV-001: Dual-official decisions for progression and DEMS
+- **Observed:** the current exams route advanced year-2/year-3 residents immediately after a single Super Admin click, and the DEMS route archived a year-4 resident after one administrator action. This did not meet the requirement that Pr Benhocine and Dr Dris jointly decide progression/final graduation.
+- **Fix applied on branch:** added additive vote tables; restrict progression and DEMS votes to active Super Admin sessions for the exact official usernames `benhocine` and `drdris`; require a reason; keep the first vote pending; apply year advancement or DEMS-success archive only after both officials approve; if either rejects, do not advance/archive; log every vote and final decision to audit/decision records. Pending votes are visible on the corresponding pages.
+- **Status:** awaiting CI. DEMS archive remains a copy of profile/history/exams; the active resident is marked graduated only after dual approval.
+
+### BACKUP-001 / EXPORT-001: Include all new records and resident photos
+- **Observed:** CSV export did not include the new leave/external-rotation/official-vote tables. The database backup did not package resident photos, so restoring it on another device could leave profile photo paths broken.
+- **Fix applied on branch:** CSV export includes leave balances, leave entries, external rotations, and pending/final official vote tables while continuing to exclude user password records. The backup is now a ZIP containing a consistent SQLite snapshot and all files in `resident_photos/`; restore accepts both this ZIP and legacy .db/.sqlite backups, validates archive paths and database integrity, creates a pre-restore full ZIP and DB copy, and restores photos only when the ZIP includes the photo folder. Added tests for database and photo restoration, and expanded export coverage.
+- **Status:** awaiting CI. This does not build an APK or touch real resident data in the repository.
 
 
 ## ResiManage 1 / ResiManage 2 handover — 2026-10-17
