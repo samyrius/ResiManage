@@ -413,6 +413,42 @@ def test_standard_user_cannot_access_super_admin_pages(tmp_path, monkeypatch):
     assert client.get("/dems").status_code == 403
     assert client.get("/audit").status_code == 403
 
+def test_standard_user_cannot_create_residents(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    client.post(
+        "/users",
+        data={
+            "username": "standard-operator",
+            "password": "standard-operator-password-2026",
+            "role": "user",
+        },
+        follow_redirects=True,
+    )
+    with client.session_transaction() as sess:
+        sess["user"] = "standard-operator"
+        sess["role"] = "user"
+
+    response = client.post(
+        "/residents",
+        data={
+            "surname": "Unauthorized",
+            "firstname": "Resident",
+            "year": "2",
+            "phone": "",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 403
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM residents WHERE surname='Unauthorized'"
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM audit WHERE action='resident.created' AND details='Unauthorized Resident'"
+        ).fetchone()[0] == 0
+
+
 def test_backup_and_restore_preserve_database_and_resident_photos(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
