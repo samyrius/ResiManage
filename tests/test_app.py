@@ -477,7 +477,7 @@ def test_invalid_photo_is_rejected_and_existing_photo_is_preserved(tmp_path, mon
 
     response = client.post("/profile/" + str(rid), data={
         "surname": "PhotoKeep", "firstname": "Resident",
-        "photo": (io.BytesIO(b"\\x89PNG\\r\\n\\x1a\\nnot-a-real-image"), "broken.png")
+        "photo": (io.BytesIO(b"\x89PNG\r\n\x1a\nnot-a-real-image"), "broken.png")
     }, content_type="multipart/form-data", follow_redirects=True)
     assert response.status_code == 200
     assert b"not a readable PNG/JPG/WEBP" in response.data
