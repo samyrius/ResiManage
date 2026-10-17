@@ -294,3 +294,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression tests added:** creating and editing external rotations over a local period must fail and must not persist the conflicting dates/record.
 - **Branch:** `resimanage-2-external-local-conflict-guard`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no database/real resident data/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / DEMS-STATUS-BYPASS-001 — 2026-10-17
+
+- **Audit finding:** the resident management form accepted `status='graduated'` directly, bypassing the required two-official DEMS decision/archive flow. It also allowed already-graduated residents to be reactivated from the same form. The edit branch did not explicitly commit its update, so ordinary resident edits could be lost when the connection closed.
+- **Fix proposed on isolated branch:** only active/inactive status changes are accepted through resident management; graduation status is controlled by the DEMS workflow. Already-graduated residents are shown as archived rather than an editable status form. Valid resident edits are explicitly committed.
+- **Regression test added:** verify a normal edit persists, direct graduation is rejected, and an archived graduate cannot be reactivated.
+- **Branch:** `resimanage-2-dems-status-guard`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
