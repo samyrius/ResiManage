@@ -905,7 +905,7 @@ def exams():
       flash("Passed; resident advanced to year 2.")
      else:
       flash("Exam criteria passed, but progression was not applied; review the resident record.")
-   elif action=="approve_advance":
+  elif action=="approve_advance":
    actor=session.get("user","").lower()
    outcome=request.form.get("outcome","approve")
    reason=request.form.get("reason","").strip()
