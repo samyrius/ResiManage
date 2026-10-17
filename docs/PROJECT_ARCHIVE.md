@@ -409,3 +409,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** a two-row preview becomes stale after one resident is added; confirmation imports neither row and records no import audit event.
 - **Branch:** `resimanage-2-import-confirmation-recheck-v4`; based on the latest `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / REPEAT-ELIGIBILITY-CROSS-YEAR-001 — 2026-10-17
+
+- **Audit finding:** the repeat guard searched for an earlier assignment of the same terrain only within the current academic year. A resident with a confirmed assignment for a core terrain in a prior academic year and no manual history row could be assigned that terrain again before completing all mandatory/basic terrains.
+- **Fix proposed on isolated branch:** check prior confirmed/pending assignments for the same terrain across all academic years; repeat remains allowed only once all active mandatory/basic terrains have completion evidence.
+- **Regression tests:** prior-year confirmed assignment without a history row is blocked; the future-completion test excludes the terrain being tested so it specifically checks that future assignments do not count as completion evidence.
+- **Branch:** `resimanage-2-repeat-eligibility-cross-year-v2`; based on the latest `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.

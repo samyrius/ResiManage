@@ -475,8 +475,8 @@ def check(c,rid,tid,pid,y):
  dup=c.execute("SELECT t.name FROM assignments a JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=? AND a.period_id=? AND a.status IN ('confirmed','pending')",(rid,pid)).fetchone()
  if dup:return False,tr("duplicate")+dup["name"],None
  repeat = c.execute(
-  "SELECT t.name,p.name AS period FROM assignments a JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id WHERE a.resident_id=? AND a.terrain_id=? AND p.year_label=? AND a.period_id<>? AND a.status IN ('confirmed','pending') LIMIT 1",
-  (rid,tid,y,pid)
+  "SELECT t.name,p.name AS period,p.year_label FROM assignments a JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id WHERE a.resident_id=? AND a.terrain_id=? AND a.period_id<>? AND a.status IN ('confirmed','pending') LIMIT 1",
+  (rid,tid,pid)
  ).fetchone()
  total=c.execute(
   "SELECT COUNT(*) FROM terrains WHERE kind IN ('mandatory','basic') AND active=1"
