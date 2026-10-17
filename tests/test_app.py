@@ -1742,6 +1742,40 @@ def test_future_dated_history_does_not_unlock_core_terrain_repeats(tmp_path, mon
     assert allowed is False
     assert status is None
 
+def test_undated_future_history_does_not_unlock_core_terrain_repeats(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        rid = conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,4) RETURNING id",
+            ("UndatedFuture", "History"),
+        ).fetchone()[0]
+        current_period = conn.execute("SELECT * FROM periods ORDER BY id LIMIT 1").fetchone()
+        terrains = conn.execute(
+            "SELECT id FROM terrains WHERE active=1 AND kind IN ('mandatory','basic')"
+        ).fetchall()
+        target = terrains[0]["id"]
+        conn.execute(
+            "INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,1)",
+            (current_period["year_label"], target, current_period["id"]),
+        )
+        for terrain in terrains:
+            conn.execute(
+                "INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?, '')",
+                (rid, terrain["id"], "2098-2099", "01 Fév - 30 Avr"),
+            )
+        conn.commit()
+
+    with rotation_app.app.test_request_context("/"):
+        with rotation_app.db() as conn:
+            allowed, message, status = rotation_app.check(
+                conn, rid, target, current_period["id"], current_period["year_label"]
+            )
+    assert allowed is False
+    assert status is None
+    assert "repetition" not in message.lower() or "completed" not in message.lower()
+
+
 def test_exam_recording_rejects_future_year_and_graduated_resident(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
