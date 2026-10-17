@@ -1450,3 +1450,33 @@ def test_deactivated_account_loses_existing_session_immediately(tmp_path, monkey
     with user_client.session_transaction() as session:
         assert "user" not in session
 
+def test_standard_user_cannot_create_rotation_assignments(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    client.post("/users", data={
+        "username":"assignment-operator",
+        "password":"assignment-operator-password-2026",
+        "role":"user",
+    }, follow_redirects=True)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,2)", ("NoAssign", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='NoAssign'").fetchone()[0]
+        tid = conn.execute("SELECT id FROM terrains WHERE name='Réanimation chirurgicale'").fetchone()[0]
+        period = conn.execute("SELECT id,year_label FROM periods ORDER BY id LIMIT 1").fetchone()
+        conn.execute(
+            "INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,1)",
+            (period["year_label"],tid,period["id"]),
+        )
+        conn.commit()
+    with client.session_transaction() as session:
+        session["user"]="assignment-operator"
+        session["role"]="user"
+
+    response = client.post("/assign", data={
+        "resident":str(rid),"terrain":str(tid),"period":str(period["id"])
+    })
+    assert response.status_code == 403
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM assignments WHERE resident_id=?", (rid,)).fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='assignment.created'").fetchone()[0] == 0
+
