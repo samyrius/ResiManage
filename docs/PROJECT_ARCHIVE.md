@@ -508,3 +508,37 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** malformed decision and user IDs return normal responses and create no decision or audit records.
 - **Branch:** `resimanage-2-admin-id-validation`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real resident data/database files/secrets/assets changed; no APK build or phone test started.
+
+
+## User-approved delivery workflow — 2026-10-17 (highest priority)
+
+### WORKFLOW-ORDER-001: Verify in ResiManage 1 first, then synchronize ResiManage 2
+- **Explicit user instruction:** implement proposed changes on the ResiManage 1 candidate, run automated checks and controlled functional verification, and only after the changes are shown to work, port the same verified changes to ResiManage 2 so both lines remain at the same level of progress.
+- `resimanage-1-backup` is a protected reference/backup branch: do not commit changes directly to it. Make candidate changes on a separate branch based on that backup; keep the backup branch itself unchanged.
+- Do not port unverified code to ResiManage 2. A matching PR may be prepared for comparison, but it must remain unmerged/on hold until ResiManage 1's exact candidate head passes CI and the code/test diff is reviewed. Then port the verified patch onto the latest `resimanage-2-work` without dropping its newer safeguards, add/run regression tests, and verify CI on the exact ResiManage 2 PR head.
+- "Verified" means: CI passes on the exact head SHA; relevant regression tests pass; diff reviewed for unintended changes. Phone/WebView behavior remains explicitly unverified until the user authorizes a controlled phone test. Do not build an APK unless the user explicitly requests one.
+- Protect real data: no real database, resident records, stage history, photos, backups, passwords or tokens in Git. No destructive changes to either backup branch.
+
+### PHOTO-001: Resident profile photo upload and profile usability
+- **User report:** the resident photo upload previously failed in a phone test and must be investigated rather than assumed fixed.
+- **ResiManage 1 candidate:** PR #71 — https://github.com/samyrius/ResiManage/pull/71, branch `resimanage-1-photo-ui-candidate`, based on `resimanage-1-backup` without modifying the backup branch.
+- **Candidate changes described in PR:** decode and verify uploaded image content with Pillow (not signature-only checking); normalize EXIF orientation; resize to maximum 1200×1200; save with unique names and atomic writes; preserve an existing photo if no valid replacement is selected; remove manual photo-path editing; provide photo picker, preview/status feedback, responsive profile layout and visible keyboard focus.
+- **Candidate regression tests described in PR:** valid image upload-and-serve round trip; corrupt image rejected without replacing the current photo; saving profile fields without a new photo preserves the existing photo.
+- **Benchmark artifact:** `docs/UX_BENCHMARK.md` records a review of 10 comparable platforms and 14 related websites to inform an ergonomic, modern and practical internal interface. Review the actual document and candidate diff before claiming the benchmark findings are complete.
+- **Current evidence recorded in PR #71 description:** automated CI was requested; the description does not establish the current latest run status. Confirm the exact head SHA and CI result before calling the ResiManage 1 candidate verified. Android/WebView file-picker behavior still requires a later controlled phone test.
+- **ResiManage 2 port:** PR #72 — https://github.com/samyrius/ResiManage/pull/72, branch `resimanage-2-photo-ui-port`, is already prepared as a port candidate. Per WORKFLOW-ORDER-001, keep it unmerged and do not call it verified until PR #71 passes on its exact final head, then compare the patch and run CI on the exact final PR #72 head.
+- **No APK build or phone test was started as part of this work.**
+
+### UX-ORDER-001: Internal interface redesign
+- **Goal:** a polished, future-facing, elegant, modern, ergonomic, well-organized, practical and easy-to-use interface, especially on mobile and in Arabic RTL, without sacrificing core workflow speed.
+- **Research requirement from user:** assess at least 10 known comparable applications/platforms and at least 10 relevant websites in the same domain; summarize patterns and trade-offs in `docs/UX_BENCHMARK.md` before choosing design changes.
+- **Implementation order:** benchmark and document findings; prototype the interface on the ResiManage 1 candidate; verify responsive layout/navigation and regression tests; only then port the reviewed design to ResiManage 2. Do not start a build or phone test unless explicitly requested.
+- **Acceptance checklist:** clear information hierarchy; minimal top-level navigation with related tasks grouped; prominent daily actions (resident search, assignment, capacity and period); readable status/eligibility indicators that do not rely on color alone; responsive resident cards/profile photo; accessible form labels, errors and keyboard focus; safe confirmation for destructive/admin actions; Arabic RTL plus French/English consistency; no horizontal overflow on narrow screens; existing URLs and data behavior preserved.
+- **Status at time of entry:** requirement and workflow recorded; visual usability on an actual phone is not yet verified. Inspect `docs/UX_BENCHMARK.md` and the PR diff before claiming the 10-app/10-site review or redesign is complete.
+
+### Immediate next verification steps
+1. Fetch PR #71 and PR #72 current metadata, compare their latest head SHAs, and inspect the benchmark document and changed-file patches.
+2. Check GitHub Actions for the exact PR #71 head. If it fails, fix and rerun only on the candidate branch; never change `resimanage-1-backup`.
+3. After PR #71 passes and the patch is reviewed, verify that PR #72 is a clean port onto the latest `resimanage-2-work`; run its tests/CI on the exact head before considering merge.
+4. Keep photo upload round-trip, corrupt-file handling, preservation of existing photos, and mobile file-picker verification as separate evidence items. CI can verify Flask upload handling, but cannot by itself prove Android/WebView picker behavior.
+5. Continue the broader application audit only on isolated branches and keep this archive updated with exact SHA/run links and factual statuses.
