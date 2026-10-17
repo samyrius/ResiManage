@@ -1569,7 +1569,8 @@ def test_future_confirmed_rotations_do_not_count_as_completed_for_repeat_eligibi
             (rid,target,"2025-2026","01 Fév - 30 Avr","2026-04-30"),
         )
         future_terrains = conn.execute(
-            "SELECT id FROM terrains WHERE active=1 AND kind IN ('mandatory','basic')"
+            "SELECT id FROM terrains WHERE active=1 AND kind IN ('mandatory','basic') AND id<>?",
+            (target,),
         ).fetchall()
         for index, terrain_row in enumerate(future_terrains):
             start_year = 2099 + index
