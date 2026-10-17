@@ -792,11 +792,41 @@ def import_residents():
    rows=json.loads(preview["rows_json"]); errors=json.loads(preview["errors_json"])
    if errors:
     c.close(); flash("Fix the invalid rows in the source file before importing."); return redirect("/import")
-   inserted=0
+   # Re-check against the live database at confirmation time: another administrator
+   # may have added one of these residents after this preview was created.
+   seen=set(); confirmation_errors=[]
    for row in rows:
-    c.execute("INSERT INTO residents(surname,firstname,year,phone,birth_place,birth_date,status) VALUES(?,?,?,?,?,?, 'active')",
-      (row["surname"],row["firstname"],int(row["year"]),row.get("phone",""),row.get("birth_place",""),row.get("birth_date","")))
-    inserted+=1
+    surname=str(row.get("surname","")).strip()
+    firstname=str(row.get("firstname","")).strip()
+    try:
+     year=int(row.get("year"))
+     if year not in (1,2,3,4): raise ValueError()
+    except (ValueError,TypeError):
+     confirmation_errors.append({"row":row.get("row_number"),"message":"Year must be 1, 2, 3 or 4."})
+     continue
+    key=(surname.casefold(),firstname.casefold(),year)
+    if not surname or not firstname:
+     confirmation_errors.append({"row":row.get("row_number"),"message":"Surname and first name are required."})
+    elif key in seen:
+     confirmation_errors.append({"row":row.get("row_number"),"message":"Duplicate resident row in this file."})
+    elif c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=?",(surname,firstname,year)).fetchone():
+     confirmation_errors.append({"row":row.get("row_number"),"message":"Resident with same name and year already exists; upload a fresh preview."})
+    seen.add(key)
+   if confirmation_errors:
+    c.execute("UPDATE import_previews SET errors_json=? WHERE id=?",(json.dumps(confirmation_errors,ensure_ascii=False),preview_id))
+    c.commit(); c.close()
+    flash("The resident list changed after preview. Nothing was imported; upload the file again to review the current data.")
+    return redirect("/import")
+   inserted=0
+   try:
+    for row in rows:
+     c.execute("INSERT INTO residents(surname,firstname,year,phone,birth_place,birth_date,status) VALUES(?,?,?,?,?,?, 'active')",
+       (row["surname"],row["firstname"],int(row["year"]),row.get("phone",""),row.get("birth_place",""),row.get("birth_date","")))
+     inserted+=1
+   except sqlite3.IntegrityError:
+    c.rollback(); c.close()
+    flash("Import cancelled because the resident data changed during confirmation. Nothing was imported; upload a fresh preview.")
+    return redirect("/import")
    audit_event(c,"residents.imported",f"filename={preview['filename']}; imported={inserted}; history_not_imported=true")
    c.execute("DELETE FROM import_previews WHERE id=?",(preview_id,)); c.commit(); c.close()
    flash(f"Imported {inserted} residents. No past rotations were invented or imported.")
