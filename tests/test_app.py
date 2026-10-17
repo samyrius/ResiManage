@@ -1972,3 +1972,35 @@ def test_documented_history_import_requires_preview_and_rejects_future_dates(tmp
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM history h JOIN residents r ON r.id=h.resident_id WHERE r.surname='HistoryImport'").fetchone()[0] == 1
 
+def test_exam_route_rejects_malformed_ids_and_scores_without_server_error(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        rid = conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,1) RETURNING id",
+            ("Malformed", "ExamInput"),
+        ).fetchone()[0]
+        conn.commit()
+
+    bad_year = client.post("/exams", data={
+        "action":"record","resident":str(rid),"study_year":"not-a-year",
+        "module":"Module A","theory":"12","practical":"13",
+    }, follow_redirects=True)
+    assert bad_year.status_code == 200
+    assert b"Choose a valid resident and study year" in bad_year.data
+
+    bad_score = client.post("/exams", data={
+        "action":"record","resident":str(rid),"study_year":"1",
+        "module":"Module A","theory":"not-a-number","practical":"13",
+    }, follow_redirects=True)
+    assert bad_score.status_code == 200
+    assert b"numeric marks from 0 to 20 are required" in bad_score.data
+
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM exam_records WHERE resident_id=?", (rid,)
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM audit WHERE action IN ('exam.recorded','exam.updated')"
+        ).fetchone()[0] == 0
+

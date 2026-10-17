@@ -482,3 +482,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** all core terrains recorded in a future academic year with blank completion dates must not authorize a repeat.
 - **Branch:** `resimanage-2-history-undated-future-guard`; based on the current `resimanage-2-work`. CI pending.
 - **Safety:** no resident database or real records changed; no APK build or phone test started.
+
+### RESI-2 / EXAM-INPUT-VALIDATION-001 — 2026-10-17
+
+- **Audit finding:** malformed resident/year IDs or non-numeric exam marks raised uncaught conversion errors in the exam POST route, producing server errors rather than a safe validation response.
+- **Fix proposed on isolated branch:** validate ID/year conversion and numeric score conversion before querying or writing; return a clear message and redirect when invalid.
+- **Regression test added:** malformed study year and non-numeric theory mark produce a normal response and do not create exam or audit records.
+- **Branch:** `resimanage-2-exam-input-validation`; based on the current `resimanage-2-work`. CI pending.
+- **Safety:** no real resident data or database files changed; no APK build or phone test started.
