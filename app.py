@@ -726,10 +726,15 @@ def normalize_header(value):
   "year":"year","study year":"year","année":"year","annee":"year","niveau":"year","السنة":"year",
   "phone":"phone","telephone":"phone","téléphone":"phone","mobile":"phone","الهاتف":"phone",
   "birth place":"birth_place","lieu de naissance":"birth_place","مكان الميلاد":"birth_place",
-  "birth date":"birth_date","date de naissance":"birth_date","تاريخ الميلاد":"birth_date"
+  "birth date":"birth_date","date de naissance":"birth_date","تاريخ الميلاد":"birth_date",
+  "resident":"resident","resident name":"resident","resident full name":"resident","nom du résident":"resident","nom resident":"resident","المقيم":"resident",
+  "terrain":"terrain","service":"terrain","stage":"terrain","rotation":"terrain","service de stage":"terrain","المصلحة":"terrain","التربص":"terrain",
+  "academic year":"year_label","year label":"year_label","academic year label":"year_label","année universitaire":"year_label","annee universitaire":"year_label","السنة الجامعية":"year_label",
+  "period":"period","rotation period":"period","période":"period","periode":"period","الفترة":"period",
+  "date done":"date_done","completion date":"date_done","date completed":"date_done","date de réalisation":"date_done","date de fin":"date_done","تاريخ الإنجاز":"date_done"
  }
  return aliases.get(value,value.replace(" ","_"))
-def parse_import_file(path, extension):
+def parse_import_file(path, extension, import_type='residents'):
  rows=[]
  if extension==".csv":
   with open(path,"r",encoding="utf-8-sig",newline="") as handle:
@@ -779,8 +784,10 @@ def parse_import_file(path, extension):
   rows=[re.split(r"\s*[,;\t]\s*",line) for line in lines]
  if not rows: raise ValueError("No table rows could be read from this file.")
  header=[normalize_header(x) for x in rows[0]]
- required={"surname","firstname","year"}
+ required={"resident","terrain","year_label"} if import_type=="history" else {"surname","firstname","year"}
  if not required.issubset(set(header)):
+  if import_type=="history":
+   raise ValueError("History import requires resident name, terrain/service, and academic year (YYYY-YYYY) columns; period and completion date are optional.")
   raise ValueError("Missing required columns. Include surname/nom/اللقب, firstname/prénom/الاسم, and year/année/السنة in the first row.")
  parsed=[]
  for line_number,values in enumerate(rows[1:],start=2):
