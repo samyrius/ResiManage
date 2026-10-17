@@ -215,6 +215,7 @@ th{background:#0b3552!important;color:#70eaf2!important}td{background:#061d32;bo
 <div class="rt-language" aria-label="Language"><a href="/lang/ar" {% if lang=='ar' %}aria-current="page"{% endif %} title="العربية">ع</a><a href="/lang/fr" {% if lang=='fr' %}aria-current="page"{% endif %} title="Français">FR</a><a href="/lang/en" {% if lang=='en' %}aria-current="page"{% endif %} title="English">EN</a></div></nav>{% endif %}<main>{% for m in get_flashed_messages() %}<p class="msg">{{m}}</p>{% endfor %}{{body|safe}}</main></div><footer class="rt-footer">© <strong>Tous droits réservés · ResiManage · Dr Dris</strong><span class="rt-sep"> | </span><strong>All rights reserved · ResiManage · Dr Dris</strong><span class="rt-sep"> | </span><strong>جميع الحقوق محفوظة · ResiManage · Dr Dris</strong></footer></html>"""
  context={"t":tr,"lang":lang,"year":setting(db(),"year")}
  context.update(kw)
+ context.setdefault("role",session.get("role",""))
  context.setdefault("csrf_token",csrf_token)
  inner=render_template_string(body,**context)
  return render_template_string(shell,body=inner,lang=lang,t=tr,year=setting(db(),"year"),user=bool(session.get("user")),role=session.get("role",""))
