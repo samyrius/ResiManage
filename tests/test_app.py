@@ -1472,6 +1472,11 @@ def test_standard_user_cannot_create_rotation_assignments(tmp_path, monkeypatch)
         session["user"]="assignment-operator"
         session["role"]="user"
 
+    read_only = client.get("/assign")
+    assert read_only.status_code == 200
+    assert b"Only Super Admins can create assignments." in read_only.data
+    assert b'id="assignment-form"' not in read_only.data
+
     response = client.post("/assign", data={
         "resident":str(rid),"terrain":str(tid),"period":str(period["id"])
     })
