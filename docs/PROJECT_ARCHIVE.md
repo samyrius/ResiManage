@@ -270,3 +270,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression tests added:** deactivated terrain and newly overlapping external rotation each prevent confirmation.
 - **Branch:** `resimanage-2-pending-assignment-revalidation`; based on the updated `resimanage-2-work`. CI pending; verify the final head before merging.
 - **Safety:** no database/real resident data/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / TERRAIN-CLASSIFICATION-MIGRATION-001 — 2026-10-17
+
+- **Audit finding:** the startup seed used `INSERT OR IGNORE`, so existing databases kept outdated terrain categories even though fresh databases received the corrected classification. This could make legacy installations treat optional terrains as core, or Gynécologie as optional.
+- **Fix proposed on isolated branch:** a one-time settings-keyed migration corrects the five agreed optional terrains (Sédation, Maxillo-faciale, Chirurgie cardiaque, Brûlés, CAC DBK) and keeps Gynécologie core/basic. The migration marker prevents startup from overwriting future authorized admin changes.
+- **Regression test added:** start from a legacy database with incorrect categories, confirm migration, then change a category and verify a later initialization preserves the authorized change.
+- **Branch:** `resimanage-2-terrain-classification-migration`; based on `resimanage-2-work`. CI pending; verify before merge.
+- **Safety:** no real database or resident records accessed/modified; no APK build, phone test, secrets, or visual assets changed.

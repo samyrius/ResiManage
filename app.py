@@ -94,6 +94,13 @@ def init():
  c.execute("INSERT OR IGNORE INTO settings VALUES('director',?)",("Professor Benhocine",))
  for n,k in [("Réanimation chirurgicale","basic"),("Réanimation polyvalente","basic"),("Chirurgie générale","mandatory"),("Urologie","basic"),("Orthopédie","basic"),("Neurochirurgie","basic"),("Sédation","optional"),("Maxillo-faciale","optional"),("CCI","basic"),("Obstétrique","basic"),("Chirurgie cardiaque","optional"),("PU Médecine","basic"),("PU Chirurgie","basic"),("ORL","basic"),("Ophtalmologie","basic"),("Gynécologie","basic"),("Chirurgie thoracique","basic"),("Brûlés","optional"),("CAC DBK","optional")]:
   c.execute("INSERT OR IGNORE INTO terrains(name,kind) VALUES(?,?)",(n,k))
+ # One-time correction for databases created before the agreed terrain classification.
+ # Do not reapply on every startup, so later authorized admin edits remain intact.
+ if not setting(c,"terrain_classification_migration_20261017"):
+  for name in ("Sédation","Maxillo-faciale","Chirurgie cardiaque","Brûlés","CAC DBK"):
+   c.execute("UPDATE terrains SET kind='optional' WHERE name=?",(name,))
+  c.execute("UPDATE terrains SET kind='basic' WHERE name='Gynécologie'")
+  c.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",("terrain_classification_migration_20261017","1"))
  y=setting(c,"year",y)
  if not c.execute("SELECT 1 FROM periods WHERE year_label=?",(y,)).fetchone():
   for n in ["01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"]:

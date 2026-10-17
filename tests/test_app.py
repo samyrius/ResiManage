@@ -1,6 +1,7 @@
 import hashlib
 from flask.testing import FlaskClient
 import io
+import sqlite3
 import re
 import zipfile
 import sys
@@ -1204,4 +1205,35 @@ def test_pending_assignment_cannot_be_approved_during_new_external_overlap(tmp_p
     with rotation_app.db() as conn:
         assert conn.execute("SELECT status FROM assignments WHERE id=?", (aid,)).fetchone()[0] == "pending"
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='assignment.override_approved'").fetchone()[0] == 0
+
+def test_legacy_terrain_classification_migrates_once_without_rewriting_later_admin_edits(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    legacy = sqlite3.connect(rotation_app.DB)
+    legacy.execute(
+        "CREATE TABLE terrains(id INTEGER PRIMARY KEY,name TEXT UNIQUE NOT NULL,kind TEXT DEFAULT 'basic',mandatory_year INTEGER DEFAULT 0,active INTEGER NOT NULL DEFAULT 1)"
+    )
+    legacy.executemany(
+        "INSERT INTO terrains(name,kind) VALUES(?,?)",
+        [("Sédation", "basic"), ("Maxillo-faciale", "basic"),
+         ("Chirurgie cardiaque", "basic"), ("Brûlés", "basic"),
+         ("CAC DBK", "basic"), ("Gynécologie", "optional")],
+    )
+    legacy.commit()
+    legacy.close()
+
+    assert client.get("/login").status_code == 200
+    with rotation_app.db() as conn:
+        for name in ("Sédation", "Maxillo-faciale", "Chirurgie cardiaque", "Brûlés", "CAC DBK"):
+            assert conn.execute("SELECT kind FROM terrains WHERE name=?", (name,)).fetchone()[0] == "optional"
+        assert conn.execute("SELECT kind FROM terrains WHERE name='Gynécologie'").fetchone()[0] == "basic"
+        assert conn.execute(
+            "SELECT value FROM settings WHERE key='terrain_classification_migration_20261017'"
+        ).fetchone()[0] == "1"
+        conn.execute("UPDATE terrains SET kind='mandatory' WHERE name='Sédation'")
+        conn.commit()
+
+    monkeypatch.setattr(rotation_app.app, "_ready", False, raising=False)
+    assert client.get("/login").status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT kind FROM terrains WHERE name='Sédation'").fetchone()[0] == "mandatory"
 
