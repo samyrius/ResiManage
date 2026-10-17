@@ -894,3 +894,55 @@ def test_year_progression_is_not_approved_if_either_official_rejects(tmp_path, m
         decision = conn.execute("SELECT decision FROM decisions WHERE details LIKE '%Reject Resident — year 3%'").fetchone()
         assert decision[0] == "Rejected by official vote"
 
+
+
+def test_dems_archive_is_blocked_if_either_official_rejects(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    for username in ("benhocine", "drdris"):
+        client.post("/users", data={
+            "username": username,
+            "password": "strong-test-password-2026",
+            "role": "super_admin",
+        }, follow_redirects=True)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,4,'active')",
+            ("DEMSReject", "Resident"),
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='DEMSReject'"
+        ).fetchone()[0]
+        conn.commit()
+
+    for username, outcome in (("benhocine", "approve"), ("drdris", "reject")):
+        with client.session_transaction() as sess:
+            sess["user"] = username
+            sess["role"] = "super_admin"
+        response = client.post("/dems", data={
+            "resident": str(rid),
+            "success_date": "2026-10-15",
+            "outcome": outcome,
+            "reason": username + " reviewed the DEMS result",
+        }, follow_redirects=True)
+        assert response.status_code == 200
+
+    with rotation_app.db() as conn:
+        resident = conn.execute(
+            "SELECT status,dems_status FROM residents WHERE id=?", (rid,)
+        ).fetchone()
+        assert tuple(resident) == ("active", None)
+        assert conn.execute(
+            "SELECT COUNT(*) FROM dems_archive WHERE resident_id=?", (rid,)
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM dems_votes WHERE resident_id=?", (rid,)
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM audit WHERE action='dems.vote_rejected'"
+        ).fetchone()[0] == 1
+        decision = conn.execute(
+            "SELECT decision FROM decisions WHERE details LIKE '%DEMSReject Resident — DEMS%'"
+        ).fetchone()
+        assert decision is not None
+        assert decision["decision"] == "Not approved by official vote"
