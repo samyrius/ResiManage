@@ -441,3 +441,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** after a resident has a history record for a terrain, an attempt to change its classification is rejected and the existing classification/history remain unchanged.
 - **Branch:** `resimanage-2-terrain-classification-history-guard`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / PROFILE-INPUT-VALIDATION-001 — 2026-10-17
+
+- **Audit finding:** profile updates accepted blank/overlong identity fields and future/invalid birth dates. The handler also defaulted a missing `photo_path` field to an empty string, so a crafted or partial update could unintentionally detach the existing resident photo.
+- **Fix proposed on isolated branch:** validate surname/first name, birth place, phone, and ISO birth date (not in the future) before processing uploads; preserve the existing photo path when the field is omitted.
+- **Regression test added:** invalid identity input is rejected without changing the record, and a valid partial profile update preserves the existing photo.
+- **Branch:** `resimanage-2-profile-input-validation`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.

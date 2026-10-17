@@ -1804,3 +1804,34 @@ def test_terrain_classification_cannot_change_after_rotation_records_exist(tmp_p
         assert unchanged["mandatory_year"] == terrain["mandatory_year"]
         assert conn.execute("SELECT COUNT(*) FROM history WHERE resident_id=? AND terrain_id=?", (resident_id,terrain["id"])).fetchone()[0] == 1
 
+def test_profile_rejects_invalid_identity_and_preserves_photo_when_omitted(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        rid = conn.execute(
+            "INSERT INTO residents(surname,firstname,year,birth_place,birth_date,photo_path,phone) VALUES(?,?,?,?,?,?,?) RETURNING id",
+            ("Original","Resident",2,"Tizi Ouzou","1990-01-01","/photos/resident_1.png","0550000000"),
+        ).fetchone()[0]
+        conn.commit()
+    client.get(f"/profile/{rid}")
+
+    invalid = client.post(f"/profile/{rid}", data={
+        "surname":"   ","firstname":"Resident","birth_date":"2099-01-01"
+    }, follow_redirects=True)
+    assert invalid.status_code == 200
+    assert b"Surname and first name are required" in invalid.data
+    with rotation_app.db() as conn:
+        row = conn.execute("SELECT surname,photo_path FROM residents WHERE id=?",(rid,)).fetchone()
+        assert row["surname"] == "Original"
+        assert row["photo_path"] == "/photos/resident_1.png"
+
+    valid = client.post(f"/profile/{rid}", data={
+        "surname":"Updated","firstname":"Resident","birth_place":"Tizi Ouzou",
+        "birth_date":"1990-01-01","phone":"0550000000"
+    }, follow_redirects=True)
+    assert valid.status_code == 200
+    with rotation_app.db() as conn:
+        row = conn.execute("SELECT surname,photo_path FROM residents WHERE id=?",(rid,)).fetchone()
+        assert row["surname"] == "Updated"
+        assert row["photo_path"] == "/photos/resident_1.png"
+
