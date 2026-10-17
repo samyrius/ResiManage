@@ -536,3 +536,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Files:** app header/favicon references, Android manifest launcher resource, optimized user-provided 3D icon binary in static and drawable-nodpi, regression test, and archive entry.
 - **Asset/brand caveat:** the artwork itself includes the old wordmark "ResiTrack"; launcher label remains ResiManage. Original image is retained in Library.
 - **Status:** port is committed to the PR candidate; CI must pass on the new exact ResiManage 2 head before calling the port verified. No APK build or phone test.
+
+
+### CI-CANDIDATE-PUSH-001 — 2026-10-17
+
+- **Reason:** GitHub Actions had not launched a run for the latest isolated ResiManage 2 photo/icon candidate commit, although the same tests passed on an earlier PR head. The workflow's push filter only named `resimanage-2-work`, excluding candidate branches.
+- **Change:** broaden the CI push filter to `resimanage-2-**` so isolated ResiManage 2 candidate branches are tested on their exact pushed SHA as well as PR base checks.
+- **Scope:** workflow configuration and archive only; no production/runtime behavior or resident data changed. This commit is on `resimanage-2-photo-ui-port`, not on `resimanage-2-work` or `main`.
+- **Status:** awaiting CI on this exact resulting commit; icon integration remains unverified on ResiManage 2 until that run passes.
