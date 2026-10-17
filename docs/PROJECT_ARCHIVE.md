@@ -465,3 +465,12 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression tests added:** invalid year, inactive terrain, and duplicate objective are rejected; only one valid row is saved.
 - **Branch:** `resimanage-2-objective-input-validation-v3`; based on the latest `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / DOCUMENTED-HISTORY-IMPORT-001 — 2026-10-17
+
+- **Audit finding:** the active import screen supported resident records only; it did not provide a workflow for importing documented historical stages, despite this being a core requirement.
+- **Fix proposed on isolated branch:** add a separate `/import-history` preview-first flow for CSV/XLS/XLSX/DOC/DOCX/text-PDF. Resident and terrain must resolve to existing records; academic year, official period, date, duplicate rows, and future completion dates are validated. Confirmation rechecks live data and imports only the documented rows. No inferred history is generated.
+- **Schema migration:** add `import_type` to existing import-preview tables with default `residents`, preserving existing previews and databases.
+- **Regression test added:** valid history is written only after preview confirmation; future-dated history is rejected without extra history rows.
+- **Branch:** `resimanage-2-documented-history-import`; based on the latest `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.

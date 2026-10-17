@@ -1890,3 +1890,51 @@ def test_objectives_reject_invalid_year_inactive_terrain_and_duplicates(tmp_path
         assert conn.execute("SELECT COUNT(*) FROM objectives WHERE terrain_id=? AND study_year=1 AND objective='Clinical skills'",(terrain,)).fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM objectives WHERE terrain_id=? AND study_year=5",(terrain,)).fetchone()[0] == 0
 
+def test_documented_history_import_requires_preview_and_rejects_future_dates(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,3)", ("HistoryImport", "Resident"))
+        conn.commit()
+
+    valid_csv = (
+        "resident,terrain,year_label,period,date_done\n"
+        "HistoryImport Resident,Réanimation chirurgicale,2025-2026,01 Fév - 30 Avr,2026-04-30\n"
+    ).encode("utf-8")
+    preview = client.post(
+        "/import-history",
+        data={"file":(io.BytesIO(valid_csv),"history.csv")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert preview.status_code == 200
+    assert b"HistoryImport Resident" in preview.data
+    assert b"Confirm import" in preview.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM history").fetchone()[0] == 0
+    match = re.search(rb'name="preview_id" value="(\d+)"', preview.data)
+    assert match
+    confirmed = client.post("/import-history", data={
+        "action":"confirm","preview_id":match.group(1).decode()
+    }, follow_redirects=True)
+    assert confirmed.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM history h JOIN residents r ON r.id=h.resident_id WHERE r.surname='HistoryImport'").fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='history.imported'").fetchone()[0] == 1
+
+    future_csv = (
+        "resident,terrain,year_label,period,date_done\n"
+        "HistoryImport Resident,Réanimation polyvalente,2026-2027,01 Fév - 30 Avr,2099-03-01\n"
+    ).encode("utf-8")
+    future_preview = client.post(
+        "/import-history",
+        data={"file":(io.BytesIO(future_csv),"future-history.csv")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert future_preview.status_code == 200
+    assert b"A historical rotation date cannot be in the future" in future_preview.data
+    assert b"disabled" in future_preview.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM history h JOIN residents r ON r.id=h.resident_id WHERE r.surname='HistoryImport'").fetchone()[0] == 1
+
