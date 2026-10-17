@@ -335,3 +335,11 @@ This repository log captures durable project decisions and progress; it is not a
 - **Regression test added:** a CSV row with year 2.5 must show a validation error and must not create a resident.
 - **Branch:** `resimanage-2-import-year-validation`; based on `resimanage-2-work`. CI pending.
 - **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
+
+### RESI-2 / SESSION-REVOCATION-001 — 2026-10-17
+
+- **Audit finding:** user deactivation prevented future logins but an already-authenticated session remained trusted because protected routes checked only the session cookie.
+- **Fix proposed on isolated branch:** every protected request now verifies that the account still exists and is active, refreshes the role from the database, and clears/redirects inactive sessions.
+- **Regression test added:** log in as a standard user, deactivate that account from the admin session, then verify the existing session is redirected to login and cleared.
+- **Branch:** `resimanage-2-session-revocation-guard`; based on `resimanage-2-work`. CI pending.
+- **Safety:** no real database/records/secrets/assets changed; no APK build or phone test started.
