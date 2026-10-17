@@ -304,20 +304,37 @@ def test_first_year_progression_requires_every_component_at_least_ten(tmp_path, 
 def test_dems_archive_keeps_resident_and_history(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
+    for username in ("benhocine", "drdris"):
+        client.post("/users", data={"username": username, "password": "strong-test-password-2026", "role": "super_admin"}, follow_redirects=True)
     with rotation_app.db() as conn:
         conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,4)", ("Graduate", "Resident"))
         rid = conn.execute("SELECT id FROM residents WHERE surname='Graduate'").fetchone()[0]
         tid = conn.execute("SELECT id FROM terrains WHERE name='Urologie'").fetchone()[0]
         conn.execute("INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
                      (rid, tid, "2025-2026", "01 Mai - 30 Juillet", "2025-07-30"))
-    response = client.post("/dems", data={"resident":str(rid),"success_date":"2026-10-01"}, follow_redirects=True)
-    assert response.status_code == 200
+        conn.commit()
+
+    with client.session_transaction() as sess:
+        sess["user"] = "benhocine"
+        sess["role"] = "super_admin"
+    first_vote = client.post("/dems", data={"resident":str(rid),"success_date":"2026-10-01","outcome":"approve","reason":"DEMS passed"}, follow_redirects=True)
+    assert first_vote.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT status FROM residents WHERE id=?", (rid,)).fetchone()[0] == "active"
+        assert conn.execute("SELECT COUNT(*) FROM dems_archive WHERE resident_id=?", (rid,)).fetchone()[0] == 0
+
+    with client.session_transaction() as sess:
+        sess["user"] = "drdris"
+        sess["role"] = "super_admin"
+    second_vote = client.post("/dems", data={"resident":str(rid),"success_date":"2026-10-01","outcome":"approve","reason":"Reviewed and approved"}, follow_redirects=True)
+    assert second_vote.status_code == 200
     with rotation_app.db() as conn:
         row = conn.execute("SELECT status,dems_status FROM residents WHERE id=?", (rid,)).fetchone()
         assert tuple(row) == ("graduated", "success")
         assert conn.execute("SELECT COUNT(*) FROM history WHERE resident_id=?", (rid,)).fetchone()[0] == 1
         archive = conn.execute("SELECT history_json FROM dems_archive WHERE resident_id=?", (rid,)).fetchone()
         assert "Urologie" in archive["history_json"]
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='dems.vote_recorded'").fetchone()[0] == 2
 
 
 def test_standard_user_cannot_access_super_admin_pages(tmp_path, monkeypatch):
@@ -809,4 +826,59 @@ def test_official_admin_accounts_must_be_super_admin_and_cannot_be_disabled(tmp_
         assert b"Official accounts cannot be deactivated" in deactivated.data
         with rotation_app.db() as conn:
             assert conn.execute("SELECT active FROM users WHERE id=?", (uid,)).fetchone()[0] == 1
+
+def test_year_progression_requires_approval_from_both_official_admins(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    for username in ("benhocine", "drdris"):
+        client.post("/users", data={"username": username, "password": "strong-test-password-2026", "role": "super_admin"}, follow_redirects=True)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,2,'active')", ("Promotion", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Promotion'").fetchone()[0]
+        conn.commit()
+
+    unauthorized = client.post("/exams", data={"action":"approve_advance","resident":str(rid),"study_year":"2","outcome":"approve","reason":"ok"}, follow_redirects=False)
+    assert unauthorized.status_code == 403
+
+    with client.session_transaction() as sess:
+        sess["user"] = "benhocine"
+        sess["role"] = "super_admin"
+    first = client.post("/exams", data={"action":"approve_advance","resident":str(rid),"study_year":"2","outcome":"approve","reason":"First official approves"}, follow_redirects=True)
+    assert first.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT year FROM residents WHERE id=?", (rid,)).fetchone()[0] == 2
+        assert conn.execute("SELECT COUNT(*) FROM promotion_votes WHERE resident_id=?", (rid,)).fetchone()[0] == 1
+
+    with client.session_transaction() as sess:
+        sess["user"] = "drdris"
+        sess["role"] = "super_admin"
+    second = client.post("/exams", data={"action":"approve_advance","resident":str(rid),"study_year":"2","outcome":"approve","reason":"Second official approves"}, follow_redirects=True)
+    assert second.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT year FROM residents WHERE id=?", (rid,)).fetchone()[0] == 3
+        assert conn.execute("SELECT COUNT(*) FROM promotion_votes WHERE resident_id=?", (rid,)).fetchone()[0] == 0
+        decision = conn.execute("SELECT decision,actor FROM decisions WHERE details LIKE '%Promotion Resident — year 2%'").fetchone()
+        assert decision["decision"] == "Approved by both official administrators"
+        assert decision["actor"] == "benhocine+drdris"
+
+
+def test_year_progression_is_not_approved_if_either_official_rejects(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    for username in ("benhocine", "drdris"):
+        client.post("/users", data={"username": username, "password": "strong-test-password-2026", "role": "super_admin"}, follow_redirects=True)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,3,'active')", ("Reject", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Reject'").fetchone()[0]
+        conn.commit()
+    for username,outcome in (("benhocine","approve"),("drdris","reject")):
+        with client.session_transaction() as sess:
+            sess["user"] = username
+            sess["role"] = "super_admin"
+        response = client.post("/exams", data={"action":"approve_advance","resident":str(rid),"study_year":"3","outcome":outcome,"reason":username+" reviewed"}, follow_redirects=True)
+        assert response.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT year FROM residents WHERE id=?", (rid,)).fetchone()[0] == 3
+        decision = conn.execute("SELECT decision FROM decisions WHERE details LIKE '%Reject Resident — year 3%'").fetchone()
+        assert decision[0] == "Rejected by official vote"
 
