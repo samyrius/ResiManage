@@ -321,6 +321,46 @@ def test_first_year_progression_requires_every_component_at_least_ten(tmp_path, 
         assert conn.execute("SELECT year FROM residents WHERE id=?", (fail_id,)).fetchone()[0] == 1
 
 
+def test_first_year_progression_does_not_advance_inactive_resident(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,1,'inactive')",
+            ("InactivePass", "Resident"),
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='InactivePass'"
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO exam_records(resident_id,study_year,module,theory,practical) VALUES(?,1,?,?,?)",
+            (rid, "Module A", 12, 12),
+        )
+        conn.commit()
+
+    response = client.post(
+        "/exams",
+        data={
+            "action": "evaluate_first_year",
+            "resident": str(rid),
+            "study_year": "1",
+            "all_modules_confirmed": "yes",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "resident is inactive".encode() in response.data
+    with rotation_app.db() as conn:
+        resident = conn.execute(
+            "SELECT year,status FROM residents WHERE id=?", (rid,)
+        ).fetchone()
+        assert (resident["year"], resident["status"]) == (1, "inactive")
+        assert conn.execute(
+            "SELECT COUNT(*) FROM audit WHERE action='resident.year_advanced' AND details LIKE ?",
+            (f"%resident_id={rid};%",),
+        ).fetchone()[0] == 0
+
+
 def test_dems_archive_keeps_resident_and_history(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
