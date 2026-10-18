@@ -96,3 +96,14 @@ Branche de travail visée : `resimanage-2-work`
 - La décision « local maintenant + synchronisation sur le réseau local ; serveur web plus tard » est validée et consignée.
 - Ce registre est une archive de décisions et d’exigences, pas un rapport de tests.
 - La présence effective d’un service de synchronisation LAN, de l’authentification réseau, de la résolution des conflits et du mode hors connexion reste à vérifier dans le code avant de les annoncer comme opérationnels.
+
+## 8. Mise à jour du 18 octobre 2026 — première correction visuelle sur la référence confirmée
+
+- **Version de référence confirmée par l’utilisateur :** branche `resimanage-2-work`, commit de départ `b3f6d3fc34532a1067f32a05f0560221874d2903`.
+- Commit de correction visuelle : `876dcc5ee14e36855be3433814a3581748bca891`.
+- Changements intégrés dans `app.py` :
+  - Le symbole cœur animé de l’écran de connexion a été remplacé par l’image 3D déjà présente dans le dépôt, `static/resimanage-3d-icon.jpg`, avec un texte alternatif.
+  - Le cadre photo du profil résident a été agrandi : largeur/hauteur adaptatives jusqu’à 240 px sur grand écran et 180 px sur petit écran.
+- **Vérification :** les quatre remplacements ont chacun correspondu exactement à un emplacement dans le code. Les tests automatisés et l’affichage sur téléphone restent à vérifier après ce commit.
+- **Aucune compilation APK/EXE n’a été lancée.** ResiManage 1 reste inchangée.
+- Prochaine priorité : exécuter les tests automatiques déclenchés par le commit, puis auditer les fonctions et l’interface avant de traiter la synchronisation réseau. Le service Android actuel écoute sur `127.0.0.1` ; il ne constitue donc pas encore une synchronisation PC ↔ téléphone sur le réseau local.
