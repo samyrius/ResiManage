@@ -80,6 +80,9 @@ def test_login_branding_uses_resimanage_and_navy_cyan_identity(tmp_path, monkeyp
     assert b"#00dff755" in response.data
     assert b"#19dfbd" in response.data
     assert b"prefers-reduced-motion:reduce" in response.data
+    assert "💓".encode() in response.data
+    assert b"login-heartbeat" in response.data
+    assert b"resimanage-3d-icon.jpg" not in response.data
     assert b"Tous droits r\xc3\xa9serv\xc3\xa9s" in response.data
     assert b"All rights reserved" in response.data
     assert "جميع الحقوق محفوظة".encode() in response.data
