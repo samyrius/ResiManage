@@ -89,6 +89,19 @@ def test_login_branding_uses_resimanage_and_navy_cyan_identity(tmp_path, monkeyp
     assert "✚".encode() not in response.data
 
 
+
+def test_android_launcher_has_resimanage_name_and_doctor_icon():
+    project_root = Path(__file__).resolve().parents[1]
+    manifest = (project_root / "android/app/src/main/AndroidManifest.xml").read_text(
+        encoding="utf-8"
+    )
+    launcher_icon = project_root / "android/app/src/main/res/drawable-nodpi/resimanage_3d_launcher.jpg"
+    assert 'android:label="ResiManage"' in manifest
+    assert 'android:icon="@drawable/resimanage_3d_launcher"' in manifest
+    assert 'android:roundIcon="@drawable/resimanage_3d_launcher"' in manifest
+    assert launcher_icon.is_file()
+
+
 def test_login_and_protected_dashboard(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     response = login(client)
