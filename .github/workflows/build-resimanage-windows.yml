@@ -1,4 +1,4 @@
-name: ResiManage Windows test EXE
+name: ResiManage Windows EXE and installer
 
 on:
   push:
@@ -9,15 +9,16 @@ on:
       - "app.py"
       - "requirements.txt"
       - "windows_launcher.py"
+      - "windows/ResiManage-Setup.iss"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build-windows-exe:
+  build-windows:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
     steps:
       - name: Checkout ResiManage 2
         uses: actions/checkout@v4
@@ -35,31 +36,42 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller pywebview
 
-      - name: Package standalone Windows executable
+      - name: Build GUI executable (no console)
         run: |
           pyinstaller --noconfirm --clean --onefile --noconsole --name ResiManage --collect-all webview --collect-all flask --collect-all werkzeug --collect-all openpyxl --collect-all xlrd --collect-all docx --collect-all pypdf --collect-all PIL windows_launcher.py
 
-      - name: Verify executable and prepare test bundle
+      - name: Install Inno Setup
         shell: pwsh
         run: |
-          $exe = "dist/ResiManage.exe"
-          if (!(Test-Path $exe) -or (Get-Item $exe).Length -eq 0) { throw "EXE build output is missing or empty." }
-          New-Item -ItemType Directory -Force -Path release-test | Out-Null
-          Copy-Item $exe "release-test/ResiManage-2-Windows-test.exe"
-          @"
-          ResiManage 2 — Windows test build
-          1. Extract this artifact ZIP to a folder you control.
-          2. Double-click ResiManage-2-Windows-test.exe.
-          3. Keep the black console window open; the app opens in your browser at http://127.0.0.1:5000.
-          4. The local database and secret are stored beside the EXE. Back up that folder before testing with real resident records.
-          5. Press Ctrl+C in the console to stop the app.
-          "@ | Set-Content "release-test/LISEZ-MOI.txt" -Encoding UTF8
-          Get-FileHash "release-test/ResiManage-2-Windows-test.exe" -Algorithm SHA256 | Format-List | Out-String | Set-Content "release-test/SHA256.txt"
+          choco install innosetup --yes --no-progress
+          if (!(Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) { throw "Inno Setup compiler was not found." }
 
-      - name: Upload Windows test package
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "windows/ResiManage-Setup.iss"
+          if (!(Test-Path "release-installer/ResiManage-2-Setup.exe")) { throw "Setup.exe was not created." }
+
+      - name: Prepare release bundle and checksum
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release-test | Out-Null
+          Copy-Item "dist/ResiManage.exe" "release-test/ResiManage-2-Portable.exe"
+          Copy-Item "release-installer/ResiManage-2-Setup.exe" "release-test/ResiManage-2-Setup.exe"
+          @"
+          ResiManage 2 — Windows test
+          - Pour une installation classique : lancez ResiManage-2-Setup.exe. L'assistant installe l'application dans votre profil Windows et peut créer un raccourci Bureau.
+          - Pour la version portable : lancez ResiManage-2-Portable.exe.
+          - L'application ouvre sa propre fenêtre. Elle utilise un serveur Flask local en arrière-plan; aucune adresse n'est à saisir.
+          - Microsoft Edge WebView2 Runtime est requis pour afficher la fenêtre intégrée.
+          - La base locale et le secret sont créés à côté de l'application installée. Faites une sauvegarde du dossier avant tout essai avec des dossiers réels.
+          "@ | Set-Content "release-test/LISEZ-MOI.txt" -Encoding UTF8
+          Get-FileHash "release-test/ResiManage-2-Setup.exe","release-test/ResiManage-2-Portable.exe" -Algorithm SHA256 | Format-Table -AutoSize | Out-String | Set-Content "release-test/SHA256.txt"
+
+      - name: Upload Windows setup and portable app
         uses: actions/upload-artifact@v4
         with:
-          name: ResiManage-2-Windows-test-exe
+          name: ResiManage-2-Windows-Setup-and-Portable
           path: release-test/*
           if-no-files-found: error
           retention-days: 14
