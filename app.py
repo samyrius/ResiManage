@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, request, redirect, session, render_template_string, flash, send_file, send_from_directory
-import sqlite3, os, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess, secrets, smtplib, time, zipfile
+import sqlite3, os, sys, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess, secrets, smtplib, time, zipfile
 import warnings
 from PIL import Image, ImageOps
 from datetime import datetime, date
 from werkzeug.utils import secure_filename
 
-BASE=os.path.dirname(os.path.abspath(__file__))
+BASE=os.path.dirname(os.path.abspath(sys.executable)) if getattr(sys,"frozen",False) else os.path.dirname(os.path.abspath(__file__))
 DB=os.path.join(BASE,"rotation.db")
 def local_secret_key():
  path=os.path.join(BASE,".rotation_secret")
