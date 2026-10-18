@@ -4,6 +4,7 @@
     <application
         android:allowBackup="false"
         android:icon="@drawable/resimanage_3d_launcher"
+        android:roundIcon="@drawable/resimanage_3d_launcher"
         android:label="ResiManage"
         android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
