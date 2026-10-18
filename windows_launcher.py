@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Windows launcher for the ResiManage local Flask app."""
+"""ResiManage desktop launcher: local Flask backend + native WebView window."""
 import os
 import threading
-import time
-import webbrowser
 from werkzeug.serving import make_server
 import app as resimanage
 
@@ -14,16 +12,19 @@ def main():
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     url = f"http://127.0.0.1:{port}"
-    print("ResiManage is running locally. Keep this window open.")
-    print(f"Open: {url}")
-    time.sleep(1)
-    webbrowser.open(url)
+
     try:
-        while thread.is_alive():
-            thread.join(1)
-    except KeyboardInterrupt:
-        print("\nStopping ResiManage...")
-        server.shutdown()
+        import webview
+        window = webview.create_window("ResiManage", url, width=1280, height=820, min_size=(900, 600))
+        window.events.closed += lambda: server.shutdown()
+        webview.start()
+    except ImportError:
+        import webbrowser
+        webbrowser.open(url)
+        thread.join()
+    finally:
+        if thread.is_alive():
+            server.shutdown()
 
 if __name__ == "__main__":
     main()
