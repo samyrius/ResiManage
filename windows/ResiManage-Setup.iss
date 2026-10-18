@@ -13,7 +13,7 @@ DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
-OutputDir=release-installer
+OutputDir=..\release-installer
 OutputBaseFilename=ResiManage-2-Setup
 Compression=lzma
 SolidCompression=yes
@@ -26,7 +26,7 @@ ArchitecturesAllowed=x64compatible
 Name: "desktopicon"; Description: "Créer un raccourci sur le Bureau"; GroupDescription: "Raccourcis :"; Flags: unchecked
 
 [Files]
-Source: "dist\ResiManage.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\ResiManage.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\ResiManage"; Filename: "{app}\{#MyAppExeName}"
