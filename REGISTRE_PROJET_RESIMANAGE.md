@@ -253,3 +253,7 @@ Complément opérationnel à la pause Android :
 - La saisie actuelle enregistre une matière avec deux notes (théorie/pratique) par année, et le premier passage en année 1 utilise ces notes pour le calcul de promotion.
 - Le formulaire ne distingue pas encore explicitement les catégories « virtuel », « réel », « rattrapage » et les sessions DEMS ; les différentes tentatives d’une même matière ne sont pas conservées comme tentatives distinctes.
 - Avant d’ajouter ces catégories, il faut préserver l’historique des notes et définir sans ambiguïté quelle tentative sert au calcul de progression (notamment quand un rattrapage remplace une note insuffisante). Ne pas écraser les notes existantes ni modifier silencieusement les règles de promotion.
+
+
+- `61596ccbac909e1b6f780d0d6c3a9babf81eabd8` : connexion par e-mail limitée aux adresses marquées comme vérifiées ; le nom d’utilisateur reste utilisable.
+- `8acf0873c8e9ebaeffb1632f6add8a9acc8de6c0` et `6f0e6148650a1507f15d9245c189abf05b3fb42d` : tests pour accepter un e-mail vérifié et rejeter un e-mail non vérifié.
