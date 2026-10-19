@@ -136,3 +136,10 @@ Complément opérationnel à la pause Android :
 - `915157322af55ee4556f0237466433597d762254` : les déclencheurs automatiques push/PR du workflow Android principal sont désactivés ; le workflow complet (y compris diagnostics et captures en cas d’échec) est conservé pour un lancement manuel en fin de programme.
 - `0ac9b1792d25faa12155f41ce0c4f8508a295066` : le workflow de compilation APK séparé est lui aussi manuel uniquement.
 - Les contrôles Python généraux peuvent encore se déclencher séparément via `ci.yml`; cela ne relance pas la compilation ni le smoke-test Android.
+
+
+### Corrections complémentaires de cohérence visuelle
+- `fd17860c01e3aebc9302f02180bcb28a26a26350` : correction du type MIME de l’icône navigateur : le fichier JPG est maintenant déclaré `image/jpeg` au lieu de `image/svg+xml`.
+- `60035d69d877dc050126d89c87e12f740c4f8564` : test de régression pour empêcher le retour de ce mauvais type MIME.
+- `b0961f2ae52643f242c5c9b2cc01d81c8949517c` : README mis à jour pour désigner l’image actuelle du médecin/stéthoscope 3D plutôt que l’ancien fichier SVG.
+- Ces changements ont été enregistrés ; les tests ne sont pas déclarés exécutés/réussis. La vérification Android reste en pause.
