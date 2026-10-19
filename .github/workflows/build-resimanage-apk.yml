@@ -49,7 +49,7 @@ jobs:
           test -s "$APK"
           mkdir -p release-test
           cp "$APK" release-test/ResiManage-2-baseline-reference.apk
-          sha256sum release-test/ResiManage-2-photo-fix-test.apk | tee release-test/SHA256SUMS.txt
+          sha256sum release-test/ResiManage-2-baseline-reference.apk | tee release-test/SHA256SUMS.txt
           ls -lh release-test/
 
       - name: Upload test APK
