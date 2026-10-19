@@ -2359,3 +2359,17 @@ def test_objective_completion_column_migrates_legacy_database(tmp_path, monkeypa
         assert conn.execute(
             "SELECT dflt_value FROM pragma_table_info('objectives') WHERE name='completed'"
         ).fetchone()[0] == "0"
+
+
+def test_selected_language_persists_after_login(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    client.get("/lang/fr", headers={"Referer": "http://localhost/login"})
+    with client.session_transaction() as session:
+        assert session.get("lang") == "fr"
+
+    response = login(client)
+    assert response.status_code == 200
+    assert "Accueil".encode() in response.data
+    assert "Résidents".encode() in response.data
+    with client.session_transaction() as session:
+        assert session.get("lang") == "fr"
