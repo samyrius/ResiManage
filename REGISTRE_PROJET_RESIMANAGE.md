@@ -313,3 +313,13 @@ Complément opérationnel à la pause Android :
 **État honnête :** des corrections importantes sont enregistrées sur `resimanage-2-work`, mais le programme n’est pas encore terminé. Aucun test Python/Windows n’est déclaré réussi sans résultat effectif ; aucun nouveau test Android n’a été lancé pendant la pause.
 
 - `51b76964a5067445518626fb2946331cc0f69560` : correction du solde de congés quand un résident possède déjà des droits enregistrés pour une année future : l’année courante conserve son droit de 30 jours dans le profil et la page Congés initialise aussi l’année courante. Un test dédié reste à ajouter/exécuter.
+
+
+## 15. Gestion des comptes et configuration SMTP — 19 octobre 2026
+
+- `aa44790c0a303d8340cb72f62a6cc3251bf29df9` : configuration SMTP renommée avec priorité à `RESIMANAGE_SMTP_*`, tout en gardant temporairement la compatibilité avec `RESITRACK_SMTP_*`. Le port SMTP invalide produit maintenant une erreur claire. Aucun secret n’est intégré dans le code ou dans l’APK.
+- `58fb511e16dd20089fd14125b2db09d0c99a20e3` : tests de régression ajoutés pour la configuration SMTP actuelle, le chiffrement TLS, l’absence de secret dans le message et le rejet d’un port invalide.
+- `6f23e85be2dd8fa363786087c30e1550cfcda3df` : README complété avec les variables d’environnement SMTP et la consigne de ne pas placer les identifiants dans le dépôt ou l’APK.
+- `5eb165434abaf70476e1894ff45169ac21c7c878` : page de gestion des comptes complétée avec modification de rôle et réinitialisation du mot de passe d’un autre compte. Les changements sont journalisés ; les comptes Benhocine et Dr Dris ne peuvent pas être rétrogradés, et le dernier Super Admin actif est protégé.
+- `cba3d07c436d6d11c1f68eb2ac9b2c6756ebe5e2` : tests de régression ajoutés pour les changements de rôle, la réinitialisation du mot de passe, le journal d’audit et les protections de rôle.
+- Les tests n’ont pas été exécutés ici ; leur présence ne signifie pas qu’ils passent. Les workflows Android restent manuels uniquement et ne doivent pas être lancés avant la fin du programme.
