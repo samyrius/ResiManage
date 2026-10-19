@@ -247,3 +247,9 @@ Complément opérationnel à la pause Android :
 
 - `1b63bfc430408768dcdf922c5a4451208428b174` : nom du projet Gradle Android harmonisé avec `ResiManage` au lieu de `RotationApp`.
 - `6e487bd1fe796705c60aaebc6af45b55ab7a58f9` : test de cohérence du nom du projet Android.
+
+
+### Précision sur les examens — travail restant
+- La saisie actuelle enregistre une matière avec deux notes (théorie/pratique) par année, et le premier passage en année 1 utilise ces notes pour le calcul de promotion.
+- Le formulaire ne distingue pas encore explicitement les catégories « virtuel », « réel », « rattrapage » et les sessions DEMS ; les différentes tentatives d’une même matière ne sont pas conservées comme tentatives distinctes.
+- Avant d’ajouter ces catégories, il faut préserver l’historique des notes et définir sans ambiguïté quelle tentative sert au calcul de progression (notamment quand un rattrapage remplace une note insuffisante). Ne pas écraser les notes existantes ni modifier silencieusement les règles de promotion.
