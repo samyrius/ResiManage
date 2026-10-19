@@ -247,7 +247,7 @@ def login():
  if request.method=="POST":
   username=request.form.get("username","admin").strip()
   password=request.form.get("password","")
-  account=c.execute("SELECT * FROM users WHERE username=? AND active=1",(username,)).fetchone()
+  account=c.execute("SELECT * FROM users WHERE (username=? OR lower(email)=?) AND active=1",(username,username.lower())).fetchone()
   if not p:
    confirm=request.form.get("confirm_password","")
    if username!="admin" or len(password)<12 or password!=confirm:
