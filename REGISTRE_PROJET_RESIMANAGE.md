@@ -364,3 +364,10 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 
 - `9c79393c026840471418c5a6ea54198b159b564c` : le profil résident utilise maintenant une photo de 240 px sur téléphone et place les informations sous la photo au lieu de les comprimer à côté.
 - `7ab0a8ddbd1dbdf1b7a342c2332432806f7b7931` : test de non-régression mis à jour pour cette disposition mobile plus lisible. La validation est en attente du workflow Python/Windows ; Android reste suspendu.
+
+
+## 17. Validation des congés — 19 octobre 2026
+
+- `c59c235852bb4a94ae031b461c230d8026210718` : la route des congés vérifie désormais explicitement que le résident existe avant de créer les droits annuels ou d’enregistrer des jours. Cela évite les entrées orphelines si la base historique ne possède pas de contrainte de clé étrangère.
+- `6fc0c77ba585adbf2b8d2ef0daec71e6a21a3fc4` : test de régression ajouté pour un identifiant résident inconnu ; il vérifie qu’aucun congé ni droit annuel n’est créé.
+- Vérification non exécutée à cette étape. Aucune compilation Android n’est déclenchée.
