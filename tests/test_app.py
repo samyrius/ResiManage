@@ -2720,3 +2720,38 @@ def test_dems_insertion_records_two_mark_components_for_year_four(tmp_path, monk
             (rid,),
         ).fetchone()
         assert tuple(row) == (13.5, 15.0, "dems_insertion", 1)
+
+
+def test_first_year_evaluation_blocks_modules_with_only_virtual_marks(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,1)", ("Incomplete", "Sessions"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Incomplete'").fetchone()[0]
+
+    for module, exam_type, theory, practical in [
+        ("Module A", "actual", 12, 12),
+        ("Module B", "virtual", 18, 18),
+    ]:
+        client.post("/exams", data={
+            "action": "record",
+            "resident": str(rid),
+            "study_year": "1",
+            "module": module,
+            "exam_type": exam_type,
+            "attempt": "1",
+            "theory": str(theory),
+            "practical": str(practical),
+        })
+
+    response = client.post("/exams", data={
+        "action": "evaluate_first_year",
+        "resident": str(rid),
+        "study_year": "1",
+        "all_modules_confirmed": "yes",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"virtual marks alone do not count" in response.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT year FROM residents WHERE id=?", (rid,)).fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM decisions WHERE details LIKE '%Incomplete Sessions%'").fetchone()[0] == 0
