@@ -2132,3 +2132,32 @@ def test_resident_profile_photo_frame_is_large_and_responsive(tmp_path, monkeypa
     assert ".rt-profile-avatar{display:block;width:100%;height:clamp(190px,28vw,240px);object-fit:cover" in html
     assert ".rt-avatar-wrap{width:180px;flex-basis:180px}" in html
     assert ".rt-profile-avatar{height:180px;border-radius:20px}" in html
+
+
+
+def test_windows_launcher_keeps_user_data_and_secret_outside_install_folder(tmp_path, monkeypatch):
+    import windows_launcher as desktop_launcher
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "LocalAppData"))
+    data_dir = desktop_launcher._prepare_user_data()
+    secret_path = data_dir / ".rotation_secret"
+    secret_before = secret_path.read_text(encoding="ascii")
+
+    assert data_dir == tmp_path / "LocalAppData" / "ResiManage" / "data"
+    assert secret_path.is_file()
+    assert len(secret_before) >= 32
+    assert desktop_launcher._prepare_user_data() == data_dir
+    assert secret_path.read_text(encoding="ascii") == secret_before
+
+
+def test_windows_packaging_bundles_static_assets_and_uses_separate_user_data():
+    project_root = Path(__file__).resolve().parents[1]
+    workflow = (project_root / ".github/workflows/build-resimanage-windows.yml").read_text(
+        encoding="utf-8"
+    )
+    launcher = (project_root / "windows_launcher.py").read_text(encoding="utf-8")
+
+    assert '--add-data "static;static"' in workflow
+    assert 'root / "ResiManage" / "data"' in launcher
+    assert 'resimanage.DB = str(data_dir / "rotation.db")' in launcher
+    assert 'host="127.0.0.1"' in launcher
