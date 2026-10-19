@@ -2330,12 +2330,17 @@ def test_windows_launcher_migrates_existing_database_and_photos_without_deleting
         conn.execute("INSERT INTO preserved_records(value) VALUES('keep-me')")
     legacy_photos = legacy_root / "resident_photos"
     legacy_photos.mkdir()
-    (legacy_photos / "resident_1.jpg").write_bytes(b"test-photo-bytes")
+    (legacy_photos / "resident_1.jpg").write_bytes(b"legacy-photo")
+    (legacy_photos / "resident_2.jpg").write_bytes(b"new-photo")
+    target_photos = data_dir / "resident_photos"
+    target_photos.mkdir()
+    (target_photos / "resident_1.jpg").write_bytes(b"keep-newer-photo")
 
     desktop_launcher._migrate_legacy_data(data_dir, legacy_root)
 
     with sqlite3.connect(data_dir / "rotation.db") as conn:
         assert conn.execute("SELECT value FROM preserved_records").fetchone()[0] == "keep-me"
-    assert (data_dir / "resident_photos" / "resident_1.jpg").read_bytes() == b"test-photo-bytes"
+    assert (target_photos / "resident_1.jpg").read_bytes() == b"keep-newer-photo"
+    assert (target_photos / "resident_2.jpg").read_bytes() == b"new-photo"
     assert legacy_db.is_file()
     assert (legacy_photos / "resident_1.jpg").is_file()
