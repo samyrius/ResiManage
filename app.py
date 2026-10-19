@@ -219,12 +219,17 @@ th{background:#0b3552!important;color:#70eaf2!important}td{background:#061d32;bo
 <details class="nav-group" {% if request.path in ['/decisions','/summary'] %}open{% endif %}><summary><span class="nav-icon">▤</span><span>{% if lang=='ar' %}المتابعة والتقارير{% elif lang=='fr' %}Suivi et rapports{% else %}Monitoring & reports{% endif %}</span></summary><div class="nav-menu"><a href="/decisions" class="{% if request.path=='/decisions' %}is-active{% endif %}">{{t('decisions')}}</a><a href="/summary" class="{% if request.path=='/summary' %}is-active{% endif %}">{{t('summary')}}</a></div></details>
 <details class="nav-group" {% if request.path in ['/settings','/users','/audit','/backup','/export','/restore'] %}open{% endif %}><summary><span class="nav-icon">⚙</span><span>{{t('settings')}}</span></summary><div class="nav-menu"><a href="/settings" class="{% if request.path=='/settings' %}is-active{% endif %}">{{t('settings_page')}}</a><a href="/users" class="{% if request.path=='/users' %}is-active{% endif %}">{{t('users')}}</a><a href="/audit" class="{% if request.path=='/audit' %}is-active{% endif %}">{{t('audit')}}</a><a href="/backup" class="{% if request.path=='/backup' %}is-active{% endif %}">{{t('backup')}}</a><a href="/export" class="{% if request.path=='/export' %}is-active{% endif %}">{{t('export')}}</a><a href="/restore" class="{% if request.path=='/restore' %}is-active{% endif %}">{{t('restore')}}</a><a href="/logout">{{t('logout')}}</a></div></details>
 <div class="rt-language" aria-label="Language"><a href="/lang/ar" {% if lang=='ar' %}aria-current="page"{% endif %} title="العربية">🇩🇿</a><a href="/lang/fr" {% if lang=='fr' %}aria-current="page"{% endif %} title="Français">🇫🇷</a><a href="/lang/en" {% if lang=='en' %}aria-current="page"{% endif %} title="English">🇬🇧</a></div></nav>{% endif %}<main>{% for m in get_flashed_messages() %}<p class="msg">{{m}}</p>{% endfor %}{{body|safe}}</main></div><footer class="rt-footer">© <strong>Tous droits réservés · ResiManage · Dr Dris</strong><span class="rt-sep"> | </span><strong>All rights reserved · ResiManage · Dr Dris</strong><span class="rt-sep"> | </span><strong>جميع الحقوق محفوظة · ResiManage · Dr Dris</strong></footer></html>"""
- context={"t":tr,"lang":lang,"year":setting(db(),"year")}
+ c=db()
+ try:
+  current_year=setting(c,"year")
+ finally:
+  c.close()
+ context={"t":tr,"lang":lang,"year":current_year}
  context.update(kw)
  context.setdefault("role",session.get("role",""))
  context.setdefault("csrf_token",csrf_token)
  inner=render_template_string(body,**context)
- return render_template_string(shell,body=inner,lang=lang,t=tr,year=setting(db(),"year"),user=bool(session.get("user")),role=session.get("role",""))
+ return render_template_string(shell,body=inner,lang=lang,t=tr,year=current_year,user=bool(session.get("user")),role=session.get("role",""))
 def guard():
  username=session.get("user")
  if not username: return redirect("/login")
