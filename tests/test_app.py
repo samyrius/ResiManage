@@ -2495,3 +2495,60 @@ def test_resident_profile_shows_external_internship_details(tmp_path, monkeypatc
     assert "Dr Test" in html
     assert "2026-05-01" in html
     assert "2026-06-30" in html
+
+
+def test_email_verification_uses_resimanage_smtp_environment_without_exposing_secret(monkeypatch):
+    monkeypatch.setenv("RESIMANAGE_SMTP_HOST", "smtp.example.test")
+    monkeypatch.setenv("RESIMANAGE_SMTP_PORT", "587")
+    monkeypatch.setenv("RESIMANAGE_SMTP_FROM", "noreply@example.test")
+    monkeypatch.setenv("RESIMANAGE_SMTP_USER", "mailer@example.test")
+    monkeypatch.setenv("RESIMANAGE_SMTP_PASSWORD", "test-secret")
+    for name in ("HOST", "PORT", "FROM", "USER"):
+        monkeypatch.delenv("RESITRACK_SMTP_" + name, raising=False)
+    monkeypatch.delenv("RESITRACK_SMTP_PASSWORD", raising=False)
+
+    sent = {}
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout):
+            sent["connection"] = (host, port, timeout)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def starttls(self):
+            sent["tls"] = True
+
+        def login(self, username, password):
+            sent["login"] = (username, password)
+
+        def send_message(self, message):
+            sent["message"] = message
+
+    monkeypatch.setattr(rotation_app.smtplib, "SMTP", FakeSMTP)
+    rotation_app.send_verification_email("resident@example.test", "123456")
+
+    assert sent["connection"] == ("smtp.example.test", 587, 15)
+    assert sent["tls"] is True
+    assert sent["login"] == ("mailer@example.test", "test-secret")
+    assert sent["message"]["To"] == "resident@example.test"
+    assert "123456" in sent["message"].get_content()
+    assert "test-secret" not in sent["message"].as_string()
+
+
+def test_email_verification_rejects_invalid_smtp_port(monkeypatch):
+    monkeypatch.setenv("RESIMANAGE_SMTP_HOST", "smtp.example.test")
+    monkeypatch.setenv("RESIMANAGE_SMTP_PORT", "not-a-port")
+    monkeypatch.setenv("RESIMANAGE_SMTP_FROM", "noreply@example.test")
+    monkeypatch.setenv("RESIMANAGE_SMTP_USER", "mailer@example.test")
+    monkeypatch.setenv("RESIMANAGE_SMTP_PASSWORD", "test-secret")
+
+    try:
+        rotation_app.send_verification_email("resident@example.test", "123456")
+    except RuntimeError as exc:
+        assert "SMTP port" in str(exc)
+    else:
+        raise AssertionError("Invalid SMTP port should be rejected.")
