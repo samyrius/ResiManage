@@ -280,3 +280,5 @@ Complément opérationnel à la pause Android :
 - `69abd473bcd06bacfec8012298b8ae85829c1dd0` : correction du nom d’artefact dans les instructions d’installation.
 - `900b370cf4222e31803e4223d949e0cfdcf75e9a` : suppression de l’affirmation non vérifiée selon laquelle le dernier APK serait déjà construit ; le guide indique honnêtement que les dernières modifications attendent une compilation et un test finaux.
 - `50fb078514b5be850b5c33add9affa5ecb66f016` : documentation SMTP mise à jour pour mentionner la connexion par e-mail vérifiée.
+
+- `a99b94237d7deb3378093d092730c3a1cc389cf4` : README clarifié sur la branche de référence active `resimanage-2-work`, le caractère historique des tests anciens et la pause des workflows Android.
