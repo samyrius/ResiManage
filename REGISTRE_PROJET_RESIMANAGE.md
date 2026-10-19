@@ -206,3 +206,10 @@ Complément opérationnel à la pause Android :
 
 ### Cohérence du nom de l’application
 - `a20649cf807a5dd708916ed127bf79508018a9ce` : le message d’erreur de restauration n’utilise plus l’ancien nom générique « Rotation App » et mentionne maintenant ResiManage.
+
+
+### Protection des données existantes lors de la migration Windows
+- `178885ca3cc02b46760d40e63b2f40edb5723f77` : migration de première exécution depuis l’ancien dossier de l’exécutable vers le dossier utilisateur : copie SQLite via l’API backup SQLite, photos copiées sans suppression des sources, et reprise de l’ancienne clé secrète si elle existe. La migration n’écrase pas une base cible déjà présente.
+- `3bfce1aeea2238ef0d8f8e5e217bf8ccb934beea` : test de migration de la base et des photos.
+- `29a6d95adaa2b47d4af88825519900f058c4aace` : documentation de la migration.
+- Tests non exécutés ici ; la sauvegarde de l’application reste obligatoire avant des essais avec données réelles.
