@@ -257,14 +257,14 @@ def login():
    p=hash_password(password)
    c.execute("INSERT INTO settings(key,value) VALUES('password',?)",(p,))
    c.execute("INSERT OR IGNORE INTO users(username,password_hash,role) VALUES('admin',?,'super_admin')",(p,))
-   c.commit(); c.close(); session.clear(); session["user"]="admin"; session["role"]="super_admin"; return redirect("/")
+   c.commit(); c.close(); lang=session.get("lang","ar"); session.clear(); session["lang"]=lang; session["user"]="admin"; session["role"]="super_admin"; return redirect("/")
   if account and verify_password(password,account["password_hash"]):
-   c.close(); session.clear(); session["user"]=account["username"]; session["role"]=account["role"]; return redirect("/")
+   c.close(); lang=session.get("lang","ar"); session.clear(); session["lang"]=lang; session["user"]=account["username"]; session["role"]=account["role"]; return redirect("/")
   if username=="admin" and not account and verify_password(password,p):
    secure_hash=hash_password(password)
    c.execute("UPDATE settings SET value=? WHERE key='password'",(secure_hash,))
    c.execute("INSERT OR IGNORE INTO users(username,password_hash,role) VALUES('admin',?,'super_admin')",(secure_hash,))
-   c.commit(); c.close(); session.clear(); session["user"]="admin"; session["role"]="super_admin"; return redirect("/")
+   c.commit(); c.close(); lang=session.get("lang","ar"); session.clear(); session["lang"]=lang; session["user"]="admin"; session["role"]="super_admin"; return redirect("/")
   c.close(); flash(tr("badpass"))
  else:
   c.close()
