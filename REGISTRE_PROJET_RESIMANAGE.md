@@ -202,3 +202,7 @@ Complément opérationnel à la pause Android :
 - `2a654556841b02fc91f26822f38588b4598ce55c` : le profil ne considère plus une affectation confirmée future comme un stage déjà terminé. Les historiques et affectations ne passent à « terminé » qu’après leur date de fin effective.
 - `49ddf8c91055613f165c98e27edae1f4f9bd3cb4` : test de régression pour une affectation future.
 - Tests non exécutés ici ; validation Android toujours en pause.
+
+
+### Cohérence du nom de l’application
+- `a20649cf807a5dd708916ed127bf79508018a9ce` : le message d’erreur de restauration n’utilise plus l’ancien nom générique « Rotation App » et mentionne maintenant ResiManage.
