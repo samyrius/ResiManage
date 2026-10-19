@@ -1,6 +1,6 @@
 # Registre de décisions et d’archive — ResiManage 2
 
-Dernière mise à jour : 18 octobre 2026  
+Dernière mise à jour : 19 octobre 2026  
 Dépôt : https://github.com/samyrius/ResiManage  
 Branche de travail visée : `resimanage-2-work`
 
