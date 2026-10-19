@@ -2650,3 +2650,73 @@ def test_windows_launcher_migrates_legacy_database_photos_and_secret_without_del
     assert (data_dir / "resident_photos" / "resident_1.jpg").read_bytes() == b"test-photo"
     assert legacy_db.exists()
     assert (legacy_root / "resident_photos" / "resident_1.jpg").exists()
+
+
+def test_exam_sessions_and_attempts_are_stored_separately_and_remedial_counts_for_progression(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,1)", ("Session", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Session'").fetchone()[0]
+
+    for exam_type, attempt, theory, practical in [
+        ("virtual", "1", 6, 7),
+        ("actual", "1", 9, 9),
+        ("remedial", "1", 12, 11),
+    ]:
+        response = client.post("/exams", data={
+            "action": "record",
+            "resident": str(rid),
+            "study_year": "1",
+            "module": "Anesthesia",
+            "exam_type": exam_type,
+            "attempt": attempt,
+            "theory": str(theory),
+            "practical": str(practical),
+        }, follow_redirects=True)
+        assert response.status_code == 200
+
+    with rotation_app.db() as conn:
+        rows = conn.execute(
+            "SELECT exam_type,attempt,theory,practical FROM exam_records WHERE resident_id=? ORDER BY id",
+            (rid,),
+        ).fetchall()
+        assert [(row["exam_type"], row["attempt"]) for row in rows] == [
+            ("virtual", 1), ("actual", 1), ("remedial", 1)
+        ]
+
+    response = client.post("/exams", data={
+        "action": "evaluate_first_year",
+        "resident": str(rid),
+        "study_year": "1",
+        "all_modules_confirmed": "yes",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT year FROM residents WHERE id=?", (rid,)).fetchone()[0] == 2
+
+
+def test_dems_insertion_records_two_mark_components_for_year_four(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,4)", ("Dems", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Dems'").fetchone()[0]
+
+    response = client.post("/exams", data={
+        "action": "record",
+        "resident": str(rid),
+        "study_year": "4",
+        "module": "DEMS insertion",
+        "exam_type": "dems_insertion",
+        "attempt": "1",
+        "theory": "13.5",
+        "practical": "15",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        row = conn.execute(
+            "SELECT theory,practical,exam_type,attempt FROM exam_records WHERE resident_id=?",
+            (rid,),
+        ).fetchone()
+        assert tuple(row) == (13.5, 15.0, "dems_insertion", 1)
