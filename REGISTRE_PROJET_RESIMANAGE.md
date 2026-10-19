@@ -243,3 +243,7 @@ Complément opérationnel à la pause Android :
 - `234ec5a475b411e01c7571ddb08cb42f9455d07f` : version Android passée à `versionCode 2` / `versionName 2.0.0` afin d’identifier clairement cette ligne de travail et de permettre une mise à jour par-dessus la version de test précédente.
 - `edd592a9c0e1dcd9845543b008f87636605e0029` : test de cohérence du numéro de version.
 - Aucune compilation n’a été lancée ; vérification Android en pause.
+
+
+- `1b63bfc430408768dcdf922c5a4451208428b174` : nom du projet Gradle Android harmonisé avec `ResiManage` au lieu de `RotationApp`.
+- `6e487bd1fe796705c60aaebc6af45b55ab7a58f9` : test de cohérence du nom du projet Android.
