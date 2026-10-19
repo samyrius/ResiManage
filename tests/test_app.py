@@ -2463,3 +2463,35 @@ def test_resident_profile_shows_annual_leave_dates_and_balance(tmp_path, monkeyp
     assert "Used: 3 days" in html
     assert "Remaining: 27 days" in html
     assert "Annual leave" in html
+
+
+def test_resident_profile_shows_external_internship_details(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)",
+            ("AbroadProfile", "Resident", 3),
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='AbroadProfile'"
+        ).fetchone()[0]
+        conn.execute(
+            """INSERT INTO external_rotations(
+                resident_id,supervisor,destination,hospital,country,rotation_type,
+                start_date,end_date,notes,status
+            ) VALUES(?,?,?,?,?,?,?,?,?,'active')""",
+            (
+                rid, "Dr Test", "Paris", "Hôpital Test", "France", "Anesthésie",
+                "2026-05-01", "2026-06-30", "Stage de perfectionnement",
+            ),
+        )
+    response = client.get(f"/profile/{rid}")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "External internships / Stages à l’étranger / التربصات بالخارج" in html
+    assert "Hôpital Test" in html
+    assert "France" in html
+    assert "Dr Test" in html
+    assert "2026-05-01" in html
+    assert "2026-06-30" in html
