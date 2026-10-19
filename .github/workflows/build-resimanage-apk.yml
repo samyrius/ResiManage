@@ -1,15 +1,8 @@
 name: ResiManage Android test APK
 # Test build requested for the current ResiManage 2 source on resimanage-2-work.
 
+# Paused by user request until all ResiManage 2 directives are implemented.
 on:
-  push:
-    branches:
-      - "resimanage-2-work"
-    paths:
-      - ".github/workflows/build-resimanage-apk.yml"
-      - "app.py"
-      - "requirements.txt"
-      - "android/**"
   workflow_dispatch:
 
 permissions:
