@@ -186,3 +186,9 @@ Complément opérationnel à la pause Android :
 - `22795868fb8f09ae5089d706528159384356dbab` : libellé de connexion clarifié en français, anglais et arabe.
 - `cb6459ff2f0d0ec450f602260bdc1cd6e5e16162` : test de régression pour la connexion avec l’adresse e-mail.
 - Le test n’a pas été exécuté à cette étape. L’envoi SMTP réel et la configuration sécurisée sur Android restent des points ouverts.
+
+
+### Objectifs de stage — suivi d’avancement
+- `f80b20d551a612891b1ac8a2247ff1085b7a60c9` : ajout d’un état `completed` avec migration additive de la base existante ; chaque objectif peut être marqué terminé ou à faire. L’affichage utilise rouge pour terminé et vert pour à faire, par service et année d’étude ; chaque changement est audité.
+- `1de47aed5fb78422eee5c47343a34bfb87e2d1b2` : test de régression du changement d’état, des couleurs et du journal d’audit.
+- Test non exécuté ici ; validation Android toujours en pause.
