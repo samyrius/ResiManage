@@ -2344,3 +2344,18 @@ def test_windows_launcher_migrates_existing_database_and_photos_without_deleting
     assert (target_photos / "resident_2.jpg").read_bytes() == b"new-photo"
     assert legacy_db.is_file()
     assert (legacy_photos / "resident_1.jpg").is_file()
+
+
+def test_objective_completion_column_migrates_legacy_database(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    with sqlite3.connect(rotation_app.DB) as conn:
+        conn.execute(
+            "CREATE TABLE objectives(id INTEGER PRIMARY KEY,terrain_id INTEGER NOT NULL,study_year INTEGER NOT NULL,objective TEXT NOT NULL)"
+        )
+    login(client)
+    with rotation_app.db() as conn:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(objectives)")}
+        assert "completed" in columns
+        assert conn.execute(
+            "SELECT dflt_value FROM pragma_table_info('objectives') WHERE name='completed'"
+        ).fetchone()[0] == "0"
