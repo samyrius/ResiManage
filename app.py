@@ -1429,7 +1429,7 @@ def restore():
    check.close()
    required={"residents","terrains","periods","assignments","history","settings"}
    if integrity!="ok" or not required.issubset(tables):
-    raise ValueError("The uploaded file is not a valid Rotation App database backup.")
+    raise ValueError("The uploaded file is not a valid ResiManage database backup.")
    timestamp=datetime.now().strftime("%Y%m%d_%H%M%S")
    full_before=os.path.join(directory,"rotation_backup_before_restore_"+timestamp+".zip")
    with open(full_before,"wb") as handle:
