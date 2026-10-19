@@ -157,3 +157,13 @@ Complément opérationnel à la pause Android :
 - Vérifier et compléter la gestion des comptes : l’interface actuelle permet la création/activation/désactivation et les paramètres permettent de changer le mot de passe courant ; l’édition du rôle et la réinitialisation du mot de passe d’un autre compte ne sont pas encore confirmées comme disponibles.
 - Poursuivre la revue fonctionnelle des profils résidents, examens, congés, stages externes, règles d’affectation, archives DEMS, export/sauvegarde et traductions.
 - Les tests Python et Windows restent à exécuter ; la validation Android demeure suspendue jusqu’à la fin des directives.
+
+
+## 13. Audit — prérequis e-mail et gestion des comptes
+
+- Document ajouté : `docs/EMAIL_VERIFICATION_SETUP.md` (commit `519e1d9725c4a16e79ef2f0085528654582c8c67`).
+- Le code de vérification par e-mail existe, mais il dépend des cinq variables SMTP et aucun fournisseur/secret SMTP n’a été fourni. La livraison réelle n’est donc pas confirmée.
+- L’inscription exige un e-mail, mais l’écran de connexion actuel accepte le nom d’utilisateur et non l’adresse e-mail : la connexion par e-mail reste à implémenter si elle est requise comme indiqué dans les directives.
+- Le paquet Android ne propose pas encore de configuration SMTP sécurisée ; ne pas embarquer de secrets SMTP dans l’APK.
+- La gestion des comptes permet actuellement de créer/activer/désactiver des comptes. L’édition du rôle et la réinitialisation du mot de passe d’un autre compte restent à finaliser dans l’interface.
+- Ces points sont consignés comme **travaux restants**, pas comme fonctionnalités achevées. La vérification Android reste en pause.
