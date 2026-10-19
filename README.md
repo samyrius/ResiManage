@@ -1,6 +1,6 @@
 # ResiManage
 
-ResiManage is the resident rotation management application (formerly titled Rotation App in parts of the codebase). The interface supports Arabic, French, and English, with right-to-left layout for Arabic. Its medical shield icon is provided as `static/resitrack-icon.svg`.
+ResiManage is the resident rotation management application (formerly titled Rotation App in parts of the codebase). The interface supports Arabic, French, and English, with right-to-left layout for Arabic. The current 3D doctor/stethoscope image is `static/resimanage-3d-icon.jpg` and is used for the in-app brand and browser favicon; the Android launcher uses the same artwork.
 
 Flask application for managing resident rotations, with Arabic/French/English UI and Arabic RTL.
 
