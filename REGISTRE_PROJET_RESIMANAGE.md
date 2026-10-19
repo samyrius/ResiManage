@@ -196,3 +196,9 @@ Complément opérationnel à la pause Android :
 
 - `d5269a1017a3714e5167be5d073c09b56b6cfdfc` : le profil résident affiche lui aussi les objectifs en rouge lorsqu’ils sont terminés et en vert lorsqu’ils restent à faire.
 - `1d4202d8a1d5922a0c33e52170ae37f82221217e` : test de régression de l’affichage des objectifs dans le profil.
+
+
+### Exactitude de l’avancement des terrains
+- `2a654556841b02fc91f26822f38588b4598ce55c` : le profil ne considère plus une affectation confirmée future comme un stage déjà terminé. Les historiques et affectations ne passent à « terminé » qu’après leur date de fin effective.
+- `49ddf8c91055613f165c98e27edae1f4f9bd3cb4` : test de régression pour une affectation future.
+- Tests non exécutés ici ; validation Android toujours en pause.
