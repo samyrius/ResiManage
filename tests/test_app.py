@@ -2373,3 +2373,17 @@ def test_selected_language_persists_after_login(tmp_path, monkeypatch):
     assert "Résidents".encode() in response.data
     with client.session_transaction() as session:
         assert session.get("lang") == "fr"
+
+
+def test_language_selectors_show_algerian_french_and_english_flags(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login_page = client.get("/login")
+    assert "🇩🇿 العربية".encode() in login_page.data
+    assert "🇫🇷 Français".encode() in login_page.data
+    assert "🇬🇧 English".encode() in login_page.data
+
+    login(client)
+    home_page = client.get("/")
+    assert "🇩🇿".encode() in home_page.data
+    assert "🇫🇷".encode() in home_page.data
+    assert "🇬🇧".encode() in home_page.data
