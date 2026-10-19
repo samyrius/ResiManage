@@ -2805,3 +2805,23 @@ def test_resident_profile_displays_exam_session_and_attempt(tmp_path, monkeypatc
     assert b"<td>2</td>" in response.data
     assert b"14.0/20" in response.data
     assert b"16.0/20" in response.data
+
+
+def test_resident_summary_includes_external_rotation_dates_and_country(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,3)", ("Away", "Resident"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Away'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,status) VALUES(?,?,?,?,?,?,?,?,?)",
+            (rid, "Dr Supervisor", "Paris", "Hôpital Test", "France", "Réanimation", "2026-11-01", "2026-12-01", "active"),
+        )
+        conn.commit()
+
+    response = client.get("/summary")
+    assert response.status_code == 200
+    assert b"HÃ´pital Test" in response.data
+    assert b"France" in response.data
+    assert b"2026-11-01" in response.data
+    assert b"2026-12-01" in response.data
