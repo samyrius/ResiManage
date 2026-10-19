@@ -2288,3 +2288,30 @@ def test_resident_profile_displays_objective_completion_status(tmp_path, monkeyp
     assert "#fee2e2" in html
     assert "Airway objective" in html
     assert "Completed" in html
+
+
+def test_future_confirmed_rotation_is_not_shown_as_completed_in_profile(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)",
+            ("FutureProfile", "Resident", 3),
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='FutureProfile'"
+        ).fetchone()[0]
+        terrain_id = conn.execute(
+            "SELECT id FROM terrains WHERE name='Réanimation chirurgicale'"
+        ).fetchone()[0]
+        period = conn.execute(
+            "SELECT id,year_label,name FROM periods WHERE name='01 Nov - 30 Jan' ORDER BY year_label DESC LIMIT 1"
+        ).fetchone()
+        conn.execute(
+            "INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",
+            (rid, terrain_id, period["id"]),
+        )
+    response = client.get(f"/profile/{rid}")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'class="good">Remaining / À faire /' in html
