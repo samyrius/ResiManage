@@ -2621,3 +2621,32 @@ def test_official_admins_cannot_be_demoted_and_last_super_admin_is_protected(tmp
     with rotation_app.db() as conn:
         role = conn.execute("SELECT role FROM users WHERE id=?", (official_id,)).fetchone()[0]
         assert role == "super_admin"
+
+
+def test_windows_launcher_migrates_legacy_database_photos_and_secret_without_deleting_source(tmp_path, monkeypatch):
+    import sqlite3
+    import windows_launcher as desktop_launcher
+
+    legacy_root = tmp_path / "old-install"
+    legacy_root.mkdir()
+    legacy_db = legacy_root / "rotation.db"
+    with sqlite3.connect(legacy_db) as conn:
+        conn.execute("CREATE TABLE migration_probe(value TEXT)")
+        conn.execute("INSERT INTO migration_probe(value) VALUES('keep-me')")
+    old_secret = "a" * 64
+    (legacy_root / ".rotation_secret").write_text(old_secret, encoding="ascii")
+    photo_dir = legacy_root / "resident_photos"
+    photo_dir.mkdir()
+    (photo_dir / "resident_1.jpg").write_bytes(b"test-photo")
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "LocalAppData"))
+    monkeypatch.setattr(desktop_launcher.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(desktop_launcher.sys, "executable", str(legacy_root / "ResiManage.exe"))
+
+    data_dir = desktop_launcher._prepare_user_data()
+    with sqlite3.connect(data_dir / "rotation.db") as conn:
+        assert conn.execute("SELECT value FROM migration_probe").fetchone()[0] == "keep-me"
+    assert (data_dir / ".rotation_secret").read_text(encoding="ascii") == old_secret
+    assert (data_dir / "resident_photos" / "resident_1.jpg").read_bytes() == b"test-photo"
+    assert legacy_db.exists()
+    assert (legacy_root / "resident_photos" / "resident_1.jpg").exists()
