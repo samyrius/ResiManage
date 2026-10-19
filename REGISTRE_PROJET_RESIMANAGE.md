@@ -376,3 +376,8 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 ### Ergonomie de la saisie des examens
 - `f2fbc1325033765e985b2314d9ecdef700ecdcca` : le formulaire désactive les sessions DEMS tant que l’année 4 n’est pas sélectionnée et revient sur « Actual » si l’utilisateur change vers une année 1–3. Le serveur conserve sa validation indépendante.
 - `fd3d24b85abb86a7487b60d518d2d7012e3f40f5` : test de régression ajouté pour la présence de cette aide dans le formulaire. Test non exécuté à ce stade.
+
+
+### Affichage complet des notes dans le dossier résident
+- `f3126928172b9245ca883339c36cff7464d4b420` : le tableau des notes dans le profil résident affiche maintenant le type de session, le numéro de tentative et les deux composantes, y compris les deux parties de l’insertion DEMS. Avant cette correction, ces informations étaient enregistrées mais masquées dans le profil.
+- `f8192b850c9cbabd9ecd3cf93fb0ac1ef82ad84c` : test de régression ajouté pour vérifier l’affichage d’une insertion DEMS de deuxième tentative avec ses deux notes. Test non exécuté ici.
