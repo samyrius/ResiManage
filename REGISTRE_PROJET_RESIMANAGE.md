@@ -284,3 +284,5 @@ Complément opérationnel à la pause Android :
 - `a99b94237d7deb3378093d092730c3a1cc389cf4` : README clarifié sur la branche de référence active `resimanage-2-work`, le caractère historique des tests anciens et la pause des workflows Android.
 
 - `06f1223f12eaeeff3cc7597fd081c73d076e2015` : la colonne d’état des objectifs est maintenant définie dès la création d’une base neuve ; la migration additive reste en place pour les bases existantes.
+
+- `91d3fe3a004b9c5215cab5758377f917a1b7f326` : le workflow Windows exécute maintenant la suite de régression Python sur Windows avant la création de l’exécutable et de l’installateur. Cette vérification Windows est distincte des workflows Android, toujours manuels uniquement.
