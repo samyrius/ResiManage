@@ -2396,3 +2396,11 @@ def test_android_python_bundle_includes_static_brand_assets():
     assert "copyRotationStaticAssets" in gradle
     assert 'into(layout.projectDirectory.dir("src/main/python/static"))' in gradle
     assert brand_image.is_file()
+
+
+def test_android_package_version_identifies_resimanage_2():
+    gradle = (
+        Path(__file__).resolve().parents[1] / "android/app/build.gradle"
+    ).read_text(encoding="utf-8")
+    assert "versionCode 2" in gradle
+    assert 'versionName "2.0.0"' in gradle
