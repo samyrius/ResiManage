@@ -115,3 +115,18 @@ Branche de travail visée : `resimanage-2-work`
 - Workflow modifié sur `resimanage-2-work` dans le commit `e66a9c7cf110a79f5b8107d47821181f1e77a14c` : tests Python, assemblage APK debug, lancement dans un émulateur Android API 35, vérification de l’activité au premier plan et détection d’exceptions fatales ; artefacts APK et preuves de test conservés 14 jours.
 - À la rédaction de cette note, le commit workflow n’affichait pas encore de statut CI ; ne pas prétendre que le premier passage Android a réussi tant que le run et ses artefacts ne sont pas inspectés.
 - Étape suivante de la feuille de route : audit des fonctions et de l’interface en corrigeant les anomalies confirmées, puis stabilisation Windows locale avant de concevoir la synchronisation LAN PC ↔ Android.
+
+
+## 10. Mise à jour du 19 octobre 2026 — stabilisation Windows et pause des vérifications Android
+
+À la demande de l’utilisateur, la vérification Android via GitHub Actions (émulateur, logs et inspection des artefacts APK) est **en pause jusqu’à l’intégration de l’ensemble des directives**. Ne pas relancer ni présenter ces contrôles comme accomplis pendant cette phase. La compilation et la vérification globales seront reprises à la fin.
+
+Corrections appliquées sur `resimanage-2-work` :
+- `c709b8c4f905bb3835b58a052c00cf4853004066` : le lanceur Windows place désormais la base SQLite et le secret dans `%LOCALAPPDATA%\\ResiManage\\data`, hors du dossier d’installation ; il sélectionne un port local libre et n’écoute que sur `127.0.0.1`.
+- `e5a1bcedaf817a2e6c15be2c70c9646e81c06516` : le workflow Windows inclut les fichiers `static/` dans l’exécutable PyInstaller et réagit aux changements de ces ressources.
+- `7e124468d133d70a99b11faea84a4af4d216dde2` : tests de régression ajoutés pour la persistance du secret et l’inclusion des ressources Windows.
+- `d7f17f72c6d7c483a2626477d99657cb1ffdb69a` : README documentant l’emplacement des données et la sauvegarde avant essais.
+- `94af435ae3c10d1526d11ba4ed1bd97042e5b595` : pied de page de connexion harmonisé avec le nom actuel « ResiManage » dans les trois langues.
+- `02291d3df04852824a92c64929d9c74ad429b533` : assertion de non-régression pour le nom actuel dans le pied de page.
+
+**État de vérification :** ces modifications ont été enregistrées sur GitHub ; les tests Windows et Python ne sont pas déclarés réussis car ils n’ont pas été exécutés dans le cadre de cette étape. La vérification Android reste volontairement suspendue. Étape suivante : poursuivre l’audit fonctionnel et la préparation du plan de synchronisation locale, sans lancer de contrôle Android.
