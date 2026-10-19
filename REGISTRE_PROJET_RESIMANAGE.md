@@ -237,3 +237,9 @@ Complément opérationnel à la pause Android :
 - `66fca1d6e6c48cbe89cc19e2aa88205a7e5ce70d` : correction du script Gradle : les ressources du dossier `static/`, dont l’image 3D utilisée dans l’en-tête et le favicon, sont maintenant copiées vers le répertoire Python embarqué d’Android.
 - `873fc85a295fcf86f85c8c5ef192b300330bc2b1` : test de régression de la présence de la tâche de copie.
 - Le paquet Android n’a pas été reconstruit conformément à la pause demandée ; cette correction reste à confirmer lors de la vérification finale.
+
+
+### Versionnement du paquet Android
+- `234ec5a475b411e01c7571ddb08cb42f9455d07f` : version Android passée à `versionCode 2` / `versionName 2.0.0` afin d’identifier clairement cette ligne de travail et de permettre une mise à jour par-dessus la version de test précédente.
+- `edd592a9c0e1dcd9845543b008f87636605e0029` : test de cohérence du numéro de version.
+- Aucune compilation n’a été lancée ; vérification Android en pause.
