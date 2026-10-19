@@ -89,6 +89,7 @@ def init():
  ensure_column(c,"users","email","TEXT DEFAULT ''")
  ensure_column(c,"users","email_verified","INTEGER NOT NULL DEFAULT 0")
  ensure_column(c,"import_previews","import_type","TEXT NOT NULL DEFAULT 'residents'")
+ ensure_column(c,"objectives","completed","INTEGER NOT NULL DEFAULT 0")
  y=str(datetime.now().year)+"-"+str(datetime.now().year+1)
  c.execute("INSERT OR IGNORE INTO settings VALUES('year',?)",(y,))
  initial_password=os.environ.get("ROTATION_INITIAL_PASSWORD")
@@ -1120,22 +1121,35 @@ def manage_objectives():
  if super_guard(): return super_guard()
  c=db()
  if request.method=="POST":
-  try:
-   tid=int(request.form["terrain"]); sy=int(request.form["study_year"]); obj=request.form.get("objective","").strip()
-   terrain=c.execute("SELECT id FROM terrains WHERE id=? AND active=1",(tid,)).fetchone()
-   if not terrain: raise ValueError("Choose an active terrain.")
-   if sy not in (1,2,3,4): raise ValueError("Objective study year must be 1, 2, 3 or 4.")
-   if not obj or len(obj)>1000: raise ValueError("Objective text is required and must be at most 1000 characters.")
-   duplicate=c.execute("SELECT 1 FROM objectives WHERE terrain_id=? AND study_year=? AND lower(objective)=lower(?)",(tid,sy,obj)).fetchone()
-   if duplicate: raise ValueError("This objective already exists for the selected terrain and year.")
-   c.execute("INSERT INTO objectives(terrain_id,study_year,objective) VALUES(?,?,?)",(tid,sy,obj))
-   audit_event(c,"objective.created",f"terrain_id={tid}; study_year={sy}")
-   c.commit(); flash(tr("done"))
-  except (ValueError,TypeError,KeyError,sqlite3.IntegrityError) as exc:
-   c.rollback(); flash(str(exc) or "Invalid objective input.")
+  action=request.form.get("action","create")
+  if action=="toggle":
+   try:
+    oid=int(request.form["objective_id"]); completed=int(request.form["completed"])
+    if completed not in (0,1): raise ValueError("Invalid completion status.")
+    objective=c.execute("SELECT * FROM objectives WHERE id=?",(oid,)).fetchone()
+    if not objective: raise ValueError("Objective not found.")
+    c.execute("UPDATE objectives SET completed=? WHERE id=?",(completed,oid))
+    audit_event(c,"objective.completed" if completed else "objective.reopened",f"objective_id={oid}; terrain_id={objective['terrain_id']}; study_year={objective['study_year']}")
+    c.commit(); flash(tr("done"))
+   except (ValueError,TypeError,KeyError,sqlite3.IntegrityError) as exc:
+    c.rollback(); flash(str(exc) or "Invalid objective status.")
+  else:
+   try:
+    tid=int(request.form["terrain"]); sy=int(request.form["study_year"]); obj=request.form.get("objective","").strip()
+    terrain=c.execute("SELECT id FROM terrains WHERE id=? AND active=1",(tid,)).fetchone()
+    if not terrain: raise ValueError("Choose an active terrain.")
+    if sy not in (1,2,3,4): raise ValueError("Objective study year must be 1, 2, 3 or 4.")
+    if not obj or len(obj)>1000: raise ValueError("Objective text is required and must be at most 1000 characters.")
+    duplicate=c.execute("SELECT 1 FROM objectives WHERE terrain_id=? AND study_year=? AND lower(objective)=lower(?)",(tid,sy,obj)).fetchone()
+    if duplicate: raise ValueError("This objective already exists for the selected terrain and year.")
+    c.execute("INSERT INTO objectives(terrain_id,study_year,objective) VALUES(?,?,?)",(tid,sy,obj))
+    audit_event(c,"objective.created",f"terrain_id={tid}; study_year={sy}")
+    c.commit(); flash(tr("done"))
+   except (ValueError,TypeError,KeyError,sqlite3.IntegrityError) as exc:
+    c.rollback(); flash(str(exc) or "Invalid objective input.")
  ts=c.execute("SELECT * FROM terrains WHERE active=1 ORDER BY name").fetchall()
- rows=c.execute("SELECT o.*,t.name terrain FROM objectives o JOIN terrains t ON t.id=o.terrain_id ORDER BY study_year,t.name").fetchall(); c.close()
- return page("""<section><h3>{{t('objectives')}}</h3><form method="post"><label>{{t('terrain')}}</label><select name="terrain">{% for t in ts %}<option value="{{t.id}}">{{t.name}}</option>{% endfor %}</select><label>{{t('study_year')}}</label><select name="study_year">{% for y in range(1,5) %}<option>{{y}}</option>{% endfor %}</select><label>{{t('objective')}}</label><input name="objective" required><button>{{t('save')}}</button></form></section><section>{% for o in rows %}<p>Year {{o.study_year}} — {{o.terrain}}: {{o.objective}}</p>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",ts=ts,rows=rows)
+ rows=c.execute("SELECT o.*,t.name terrain FROM objectives o JOIN terrains t ON t.id=o.terrain_id ORDER BY study_year,t.name,o.id").fetchall(); c.close()
+ return page("""<section><h3>{{t('objectives')}}</h3><form method="post"><input type="hidden" name="action" value="create"><label>{{t('terrain')}}</label><select name="terrain">{% for t in ts %}<option value="{{t.id}}">{{t.name}}</option>{% endfor %}</select><label>{{t('study_year')}}</label><select name="study_year">{% for y in range(1,5) %}<option>{{y}}</option>{% endfor %}</select><label>{{t('objective')}}</label><input name="objective" maxlength="1000" required><button>{{t('save')}}</button></form></section><section><h3>Progress by terrain and study year</h3>{% for o in rows %}<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px;margin:8px 0;border-radius:12px;background:{{'#fee2e2' if o.completed else '#dcfce7'}};color:{{'#991b1b' if o.completed else '#166534'}};border:1px solid {{'#fca5a5' if o.completed else '#86efac'}}"><div style="flex:1;min-width:180px"><strong>Year {{o.study_year}} — {{o.terrain}}</strong><p style="margin:6px 0 0">{{o.objective}}</p><small>{{'Completed' if o.completed else 'Not done'}}</small></div><form method="post"><input type="hidden" name="action" value="toggle"><input type="hidden" name="objective_id" value="{{o.id}}"><input type="hidden" name="completed" value="{{0 if o.completed else 1}}"><button type="submit">{{'Mark not done' if o.completed else 'Mark completed'}}</button></form></div>{% else %}<p>{{t('none')}}</p>{% endfor %}</section>""",ts=ts,rows=rows)
 @app.route("/exams",methods=["GET","POST"])
 def exams():
  if guard(): return redirect("/login")
