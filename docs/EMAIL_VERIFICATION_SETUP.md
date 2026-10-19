@@ -4,13 +4,13 @@ Statut : le flux de code de vérification existe dans l’application, mais il d
 
 ## Variables requises
 
-Le code lit les variables d’environnement suivantes :
+Le code privilégie les variables d’environnement `RESIMANAGE_SMTP_*` suivantes (les anciens noms `RESITRACK_SMTP_*` restent acceptés temporairement pour compatibilité) :
 
-- `RESITRACK_SMTP_HOST` : serveur SMTP du fournisseur de messagerie.
-- `RESITRACK_SMTP_PORT` : port SMTP STARTTLS, généralement 587 selon le fournisseur.
-- `RESITRACK_SMTP_FROM` : adresse d’expédition vérifiée.
-- `RESITRACK_SMTP_USER` : identifiant SMTP.
-- `RESITRACK_SMTP_PASSWORD` : mot de passe d’application ou secret SMTP fourni par le service.
+- `RESIMANAGE_SMTP_HOST` : serveur SMTP du fournisseur de messagerie.
+- `RESIMANAGE_SMTP_PORT` : port SMTP STARTTLS, généralement 587 selon le fournisseur.
+- `RESIMANAGE_SMTP_FROM` : adresse d’expédition vérifiée.
+- `RESIMANAGE_SMTP_USER` : identifiant SMTP.
+- `RESIMANAGE_SMTP_PASSWORD` : mot de passe d’application ou secret SMTP fourni par le service.
 
 Ne jamais mettre ces valeurs dans Git, dans une capture d’écran, dans le code source, ni dans un fichier de configuration partagé. Utiliser un mot de passe d’application lorsque le fournisseur le propose. Le serveur doit accepter STARTTLS ; les paramètres exacts dépendent du fournisseur choisi.
 
