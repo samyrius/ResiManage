@@ -371,3 +371,8 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 - `c59c235852bb4a94ae031b461c230d8026210718` : la route des congés vérifie désormais explicitement que le résident existe avant de créer les droits annuels ou d’enregistrer des jours. Cela évite les entrées orphelines si la base historique ne possède pas de contrainte de clé étrangère.
 - `6fc0c77ba585adbf2b8d2ef0daec71e6a21a3fc4` : test de régression ajouté pour un identifiant résident inconnu ; il vérifie qu’aucun congé ni droit annuel n’est créé.
 - Vérification non exécutée à cette étape. Aucune compilation Android n’est déclenchée.
+
+
+### Ergonomie de la saisie des examens
+- `f2fbc1325033765e985b2314d9ecdef700ecdcca` : le formulaire désactive les sessions DEMS tant que l’année 4 n’est pas sélectionnée et revient sur « Actual » si l’utilisateur change vers une année 1–3. Le serveur conserve sa validation indépendante.
+- `fd3d24b85abb86a7487b60d518d2d7012e3f40f5` : test de régression ajouté pour la présence de cette aide dans le formulaire. Test non exécuté à ce stade.
