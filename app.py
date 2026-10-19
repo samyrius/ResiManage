@@ -641,9 +641,11 @@ def summary():
  c=db(); y=setting(c,"year"); rs=c.execute("SELECT * FROM residents ORDER BY year DESC,surname").fetchall(); rows=[]
  for r in rs:
   a=c.execute("SELECT p.name period,t.name terrain,a.status FROM assignments a JOIN periods p ON p.id=a.period_id JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=? AND p.year_label=? ORDER BY p.id",(r["id"],y)).fetchall()
-  h=c.execute("SELECT t.name terrain,h.year_label,h.period,h.date_done FROM history h JOIN terrains t ON t.id=h.terrain_id WHERE h.resident_id=?",(r["id"],)).fetchall(); rows.append((r,a,h))
+  h=c.execute("SELECT t.name terrain,h.year_label,h.period,h.date_done FROM history h JOIN terrains t ON t.id=h.terrain_id WHERE h.resident_id=?",(r["id"],)).fetchall()
+  x=c.execute("SELECT hospital,country,rotation_type,start_date,end_date,status FROM external_rotations WHERE resident_id=? AND status<>'cancelled' ORDER BY start_date DESC",(r["id"],)).fetchall()
+  rows.append((r,a,h,x))
  c.close()
- return page("""<section><h3>{{t('summary')}} — {{year}}</h3><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('assign')}}</th><th>{{t('history')}}</th></tr>{% for r,a,h in rows %}<tr><td>{{r.surname}} {{r.firstname}}</td><td>{{r.year}}</td><td>{% for x in a %}<div>{{x.period}} — {{x.terrain}} ({{x.status}})</div>{% else %}—{% endfor %}</td><td>{% for x in h %}<div>{{x.terrain}} — {{x.year_label}} / {{x.period}} / {{x.date_done}}</div>{% else %}—{% endfor %}</td></tr>{% endfor %}</table></div></section>""",rows=rows,year=y)
+ return page("""<section><h3>{{t('summary')}} — {{year}}</h3><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('assign')}}</th><th>{{t('history')}}</th><th>External rotation / Stage à l’étranger / تربص خارجي</th></tr>{% for r,a,h,x in rows %}<tr><td>{{r.surname}} {{r.firstname}}</td><td>{{r.year}}</td><td>{% for item in a %}<div>{{item.period}} — {{item.terrain}} ({{item.status}})</div>{% else %}—{% endfor %}</td><td>{% for item in h %}<div>{{item.terrain}} — {{item.year_label}} / {{item.period}} / {{item.date_done}}</div>{% else %}—{% endfor %}</td><td>{% for item in x %}<div><strong>{{item.hospital}}, {{item.country}}</strong><br>{{item.rotation_type}} · {{item.start_date}} → {{item.end_date}} · {{item.status}}</div>{% else %}—{% endfor %}</td></tr>{% endfor %}</table></div></section>""",rows=rows,year=y)
 @app.route("/decisions",methods=["GET","POST"])
 def decisions():
  if super_guard():return super_guard()
