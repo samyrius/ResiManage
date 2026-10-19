@@ -347,3 +347,12 @@ Complément opérationnel à la pause Android :
 
 
 - `52a2f36a75065848671e77f1b0b5778d506d05c9` : guide de configuration SMTP aligné avec les noms `RESIMANAGE_SMTP_*` ; la compatibilité avec les anciens noms reste explicitement temporaire. L’envoi réel n’est toujours pas testé, car aucun compte SMTP n’a été fourni.
+
+
+## 17. Revue de la suite Python/Windows — 19 octobre 2026
+
+Les résultats des workflows Python et Windows (pas Android) ont mis en évidence des tests obsolètes et un cas de verrouillage SQLite sous Windows. Corrections enregistrées :
+- `4bd83af62bbfc233870dadd03d239e4f21d9a29d` : les sélecteurs de langue après connexion affichent les drapeaux français et anglais, et le message de notes invalides conserve un texte explicite.
+- `d3b2fe0043df2745f56ab0c9046738eaa098427a` : assertions de tests alignées avec le favicon JPG, le lanceur qui écoute sur la boucle locale via `make_server`, et fermeture explicite d’une connexion SQLite dans le test de restauration Windows.
+- `483e33a5878f68522c475f8941ade39134d99011` : le workflow Windows se déclenche aussi quand les tests changent ; le texte d’installation précise le vrai dossier de données `%LOCALAPPDATA%\\ResiManage\\data`.
+- Les workflows Python et Windows ont été relancés automatiquement après ces corrections et leur résultat est en attente. La vérification Android reste manuelle uniquement et n’a pas été relancée.
