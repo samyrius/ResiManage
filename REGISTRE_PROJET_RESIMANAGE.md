@@ -192,3 +192,7 @@ Complément opérationnel à la pause Android :
 - `f80b20d551a612891b1ac8a2247ff1085b7a60c9` : ajout d’un état `completed` avec migration additive de la base existante ; chaque objectif peut être marqué terminé ou à faire. L’affichage utilise rouge pour terminé et vert pour à faire, par service et année d’étude ; chaque changement est audité.
 - `1de47aed5fb78422eee5c47343a34bfb87e2d1b2` : test de régression du changement d’état, des couleurs et du journal d’audit.
 - Test non exécuté ici ; validation Android toujours en pause.
+
+
+- `d5269a1017a3714e5167be5d073c09b56b6cfdfc` : le profil résident affiche lui aussi les objectifs en rouge lorsqu’ils sont terminés et en vert lorsqu’ils restent à faire.
+- `1d4202d8a1d5922a0c33e52170ae37f82221217e` : test de régression de l’affichage des objectifs dans le profil.
