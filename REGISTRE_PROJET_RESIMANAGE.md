@@ -266,3 +266,8 @@ Complément opérationnel à la pause Android :
 - `711f63e4e80f7fbac88832161702671ee1b0569a` : ajout dans le profil résident du tableau des congés (dates de début/fin, jours, notes) et du bilan acquis/utilisé/restant, en complément de la page globale de gestion des congés.
 - `0e0175964c722abc39079595f5ad33eee02021fd` : test de régression du détail et du solde des congés dans le profil.
 - Test non exécuté ici ; vérification Android toujours en pause.
+
+
+### Dossier résident — stages à l’étranger
+- `b30c2ca283efead33ad49c70f5218493b9de40eb` : le profil résident affiche désormais les stages à l’étranger avec destination, hôpital, pays, type, dates, responsable, notes et statut.
+- `93140be81fbac2df1ffe757c90e2302f8ac2ca80` : test de régression du détail des stages externes dans le profil.
