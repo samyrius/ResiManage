@@ -381,3 +381,10 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 ### Affichage complet des notes dans le dossier résident
 - `f3126928172b9245ca883339c36cff7464d4b420` : le tableau des notes dans le profil résident affiche maintenant le type de session, le numéro de tentative et les deux composantes, y compris les deux parties de l’insertion DEMS. Avant cette correction, ces informations étaient enregistrées mais masquées dans le profil.
 - `f8192b850c9cbabd9ecd3cf93fb0ac1ef82ad84c` : test de régression ajouté pour vérifier l’affichage d’une insertion DEMS de deuxième tentative avec ses deux notes. Test non exécuté ici.
+
+
+### Distribution et stages à l’étranger
+- `ad21070aebe151160b20a9386ae2c8e7a4e2893e` : le tableau de synthèse des résidents affiche aussi les stages à l’étranger (hôpital, pays, type, dates et statut). Le planning local continue à bloquer les affectations qui chevauchent les dates d’un stage externe.
+- `8fb31e0b38e105a1580ce71d27a14f978c028ac3` : test ajouté pour la présence du pays, de l’hôpital et des dates dans la synthèse.
+- `9da36a243a8653b1f337d78fc7f758a35f5d28ca` : assertion du test corrigée pour comparer correctement le texte UTF-8.
+- Tests non exécutés. La compilation et les contrôles Android restent en pause.
