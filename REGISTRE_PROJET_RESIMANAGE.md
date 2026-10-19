@@ -213,3 +213,7 @@ Complément opérationnel à la pause Android :
 - `3bfce1aeea2238ef0d8f8e5e217bf8ccb934beea` : test de migration de la base et des photos.
 - `29a6d95adaa2b47d4af88825519900f058c4aace` : documentation de la migration.
 - Tests non exécutés ici ; la sauvegarde de l’application reste obligatoire avant des essais avec données réelles.
+
+
+- `e787cff6a42b71b5256b8174972a3c1ac75c64f1` : durcissement de la migration des photos : les fichiers déjà présents dans le nouveau dossier ne sont jamais écrasés ; seuls les fichiers manquants sont copiés.
+- `39752a13979f77a4eb277e4a318f23785e260748` : test couvrant la conservation des fichiers plus récents et la copie des photos manquantes.
