@@ -34,7 +34,7 @@ Keep the local secret key, database, backups, uploaded resident photos, and pers
 لا تحذف قاعدة البيانات `rotation.db` عند تحديث الكود. تم دمج التعديلات في `main` بعد نجاح 25 اختبارًا آليًا على الفرع قبل الدمج؛ يجب انتظار نتيجة CI بعد الدمج أيضًا. قبل استرجاع نسخة احتياطية، ينشئ التطبيق نسخة من قاعدة البيانات الحالية.
 ## Windows data safety
 
-ResiManage 2 keeps its Windows database, resident photos, and session-signing secret in `%LOCALAPPDATA%\\ResiManage\\data`, separately from the installed executable. Updating or reinstalling the program should therefore not replace the data folder. Before testing with real records, use the in-app backup feature and keep a copy of that backup outside the computer. The Windows installer and portable build are test packages until their build and launch checks have been reviewed.
+ResiManage 2 keeps its Windows database, resident photos, and session-signing secret in `%LOCALAPPDATA%\\ResiManage\\data`, separately from the installed executable. Updating or reinstalling the program should therefore not replace the data folder. On first launch after this change, the launcher copies a legacy `rotation.db`, resident-photo folder, and existing secret from the old executable directory when present; it keeps the originals and never overwrites an existing new data folder. Before testing with real records, use the in-app backup feature and keep a copy of that backup outside the computer. The Windows installer and portable build are test packages until their build and launch checks have been reviewed.
 
 ## E-mail verification and synchronization status
 
