@@ -86,7 +86,7 @@ def test_login_branding_uses_resimanage_and_navy_cyan_identity(tmp_path, monkeyp
     assert b'class="login-emblem"' in response.data
     assert b"Tous droits r\xc3\xa9serv\xc3\xa9s" in response.data
     assert b"All rights reserved" in response.data
-    assert b"ResiManage \\xc2\\xb7 Dr Dris" in response.data
+    assert "ResiManage · Dr Dris".encode() in response.data
     assert "جميع الحقوق محفوظة".encode() in response.data
     assert "✚".encode() not in response.data
 
