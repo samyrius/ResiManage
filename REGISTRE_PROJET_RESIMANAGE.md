@@ -356,3 +356,7 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 - `d3b2fe0043df2745f56ab0c9046738eaa098427a` : assertions de tests alignées avec le favicon JPG, le lanceur qui écoute sur la boucle locale via `make_server`, et fermeture explicite d’une connexion SQLite dans le test de restauration Windows.
 - `483e33a5878f68522c475f8941ade39134d99011` : le workflow Windows se déclenche aussi quand les tests changent ; le texte d’installation précise le vrai dossier de données `%LOCALAPPDATA%\\ResiManage\\data`.
 - Les workflows Python et Windows ont été relancés automatiquement après ces corrections et leur résultat est en attente. La vérification Android reste manuelle uniquement et n’a pas été relancée.
+
+
+- `c4e0dda3cdd98ed7bc0d609e60a89b42d5811fbc` : correction d’une assertion UTF-8 du pied de page ; l’échec venait de la chaîne de test, pas du rendu de l’application.
+- `2d020cf192eb8ee268f348d67126440f02311e52` : document de synchronisation actualisé pour inclure les nouveaux champs d’examens et les contrôles de comptes comme prérequis de versionnement. La synchronisation reste non implémentée et aucune API réseau n’est activée.
