@@ -311,3 +311,5 @@ Complément opérationnel à la pause Android :
 7. Faire la revue finale des exigences, des sauvegardes/restaurations et de la sécurité avant d’utiliser des données réelles.
 
 **État honnête :** des corrections importantes sont enregistrées sur `resimanage-2-work`, mais le programme n’est pas encore terminé. Aucun test Python/Windows n’est déclaré réussi sans résultat effectif ; aucun nouveau test Android n’a été lancé pendant la pause.
+
+- `51b76964a5067445518626fb2946331cc0f69560` : correction du solde de congés quand un résident possède déjà des droits enregistrés pour une année future : l’année courante conserve son droit de 30 jours dans le profil et la page Congés initialise aussi l’année courante. Un test dédié reste à ajouter/exécuter.
