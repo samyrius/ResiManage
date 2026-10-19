@@ -4,7 +4,7 @@ This project wraps the Flask/SQLite application in an Android WebView and starts
 
 ## Build
 
-The GitHub Actions workflow **Android APK build** runs Gradle and uploads the artifact `rotation-app-debug-apk`. To build locally, install JDK 17, Android SDK platform 35/build-tools 35, and Gradle 8.13, then run:
+The Android build workflows are currently **manual-only** by user request while the remaining directives are implemented. Do not start the APK build or emulator smoke test until the final review. At that point, run the relevant workflow manually from GitHub Actions; the main validation workflow runs Python tests, builds the APK, and performs an emulator smoke test. To build locally, install JDK 17, Android SDK platform 35/build-tools 35, and Gradle 8.13, then run:
 
 ```bash
 cd android
