@@ -32,11 +32,15 @@ def copyRotationPythonApp = tasks.register("copyRotationPythonApp", Copy) {
     from(rootProject.file("../app.py"))
     into(layout.projectDirectory.dir("src/main/python"))
 }
+def copyRotationStaticAssets = tasks.register("copyRotationStaticAssets", Copy) {
+    from(rootProject.file("../static"))
+    into(layout.projectDirectory.dir("src/main/python/static"))
+}
 tasks.named("preBuild").configure {
-    dependsOn(copyRotationPythonApp)
+    dependsOn(copyRotationPythonApp, copyRotationStaticAssets)
 }
 tasks.configureEach {
-    if (name.toLowerCase().contains("python") && name != "copyRotationPythonApp") {
-        dependsOn(copyRotationPythonApp)
+    if (name.toLowerCase().contains("python") && name != "copyRotationPythonApp" && name != "copyRotationStaticAssets") {
+        dependsOn(copyRotationPythonApp, copyRotationStaticAssets)
     }
 }
