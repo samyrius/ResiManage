@@ -217,3 +217,6 @@ Complément opérationnel à la pause Android :
 
 - `e787cff6a42b71b5256b8174972a3c1ac75c64f1` : durcissement de la migration des photos : les fichiers déjà présents dans le nouveau dossier ne sont jamais écrasés ; seuls les fichiers manquants sont copiés.
 - `39752a13979f77a4eb277e4a318f23785e260748` : test couvrant la conservation des fichiers plus récents et la copie des photos manquantes.
+
+
+- `f142bcd03a913664b72a473a29ebe8b9ede5ae73` : ajout d’un test de migration depuis une ancienne base dont la table `objectives` ne possède pas encore la colonne `completed`.
