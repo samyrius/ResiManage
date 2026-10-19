@@ -2130,11 +2130,12 @@ def test_resident_profile_photo_frame_is_large_and_responsive(tmp_path, monkeypa
     response = client.get(f"/profile/{rid}")
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    # Desktop/tablet: scale fluidly up to 240 px; narrow phone layout: 180 px square.
+    # Desktop/tablet: scale fluidly up to 240 px; phones stack the header and use a 240 px photo.
     assert ".rt-avatar-wrap{flex:0 0 auto;width:clamp(190px,28vw,240px)}" in html
     assert ".rt-profile-avatar{display:block;width:100%;height:clamp(190px,28vw,240px);object-fit:cover" in html
-    assert ".rt-avatar-wrap{width:180px;flex-basis:180px}" in html
-    assert ".rt-profile-avatar{height:180px;border-radius:20px}" in html
+    assert ".rt-profile-head{align-items:stretch;flex-direction:column;gap:14px}" in html
+    assert ".rt-avatar-wrap{width:min(240px,100%);flex-basis:auto;align-self:center}" in html
+    assert ".rt-profile-avatar{height:240px;border-radius:20px}" in html
 
 
 
