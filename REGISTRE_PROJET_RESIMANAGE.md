@@ -167,3 +167,9 @@ Complément opérationnel à la pause Android :
 - Le paquet Android ne propose pas encore de configuration SMTP sécurisée ; ne pas embarquer de secrets SMTP dans l’APK.
 - La gestion des comptes permet actuellement de créer/activer/désactiver des comptes. L’édition du rôle et la réinitialisation du mot de passe d’un autre compte restent à finaliser dans l’interface.
 - Ces points sont consignés comme **travaux restants**, pas comme fonctionnalités achevées. La vérification Android reste en pause.
+
+
+### Amélioration UX — affichage des mots de passe à l’inscription
+- `7e1701f0e80abfc070893dc20effd10eb2a443f0` : ajout de boutons d’affichage/masquage sur le mot de passe et sa confirmation dans le formulaire d’inscription, en cohérence avec l’écran de connexion.
+- `2f18c013fed8515f95b9031530051dc7daacd953` : test de régression du formulaire d’inscription.
+- Tests non exécutés ici ; validation Android toujours en pause.
