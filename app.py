@@ -1237,7 +1237,7 @@ def exams():
     theory=float(request.form.get("theory",""))
     practical=float(request.form.get("practical",""))
    except (TypeError,ValueError):
-    c.close(); flash("Module, valid exam session, attempt number and marks from 0 to 20 are required."); return redirect("/exams")
+    c.close(); flash("Module and numeric marks from 0 to 20 are required; choose a valid exam session and attempt."); return redirect("/exams")
    allowed_exam_types=("virtual","actual","remedial","dems_virtual","dems_actual","dems_remedial","dems_insertion")
    dems_types=("dems_virtual","dems_actual","dems_remedial","dems_insertion")
    if resident["status"]=="graduated" or sy>resident["year"]:
