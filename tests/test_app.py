@@ -82,7 +82,8 @@ def test_login_branding_uses_resimanage_and_navy_cyan_identity(tmp_path, monkeyp
     assert b"prefers-reduced-motion:reduce" in response.data
     assert "💓".encode() in response.data
     assert b"login-heartbeat" in response.data
-    assert b"resimanage-3d-icon.jpg" not in response.data
+    assert b'type="image/jpeg" href="/static/resimanage-3d-icon.jpg"' in response.data
+    assert b'<div class="login-emblem">' in response.data
     assert b"Tous droits r\xc3\xa9serv\xc3\xa9s" in response.data
     assert b"All rights reserved" in response.data
     assert b"ResiManage \\xc2\\xb7 Dr Dris" in response.data
@@ -542,6 +543,7 @@ def test_backup_and_restore_preserve_database_and_resident_photos(tmp_path, monk
         assert bundle.read("resident_photos/test-resident.webp") == b"original-photo-bytes"
     with rotation_app.db() as conn:
         conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)", ("AddedAfterBackup", "Resident", 1))
+    conn.close()  # Windows cannot atomically replace a SQLite file while this handle remains open.
     photo_path.write_bytes(b"changed-photo-bytes")
     restored = client.post("/restore", data={
         "backup_file": (io.BytesIO(backup_bytes), "resimanage_full_backup.zip")
@@ -2161,7 +2163,7 @@ def test_windows_packaging_bundles_static_assets_and_uses_separate_user_data():
     assert '--add-data "static;static"' in workflow
     assert 'root / "ResiManage" / "data"' in launcher
     assert 'resimanage.DB = str(data_dir / "rotation.db")' in launcher
-    assert 'host="127.0.0.1"' in launcher
+    assert 'make_server("127.0.0.1", port, resimanage.app, threaded=True)' in launcher
 
 
 def test_internal_favicon_declares_the_jpeg_mime_type(tmp_path, monkeypatch):
