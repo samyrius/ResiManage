@@ -2784,3 +2784,24 @@ def test_exam_form_guides_dems_sessions_to_year_four(tmp_path, monkeypatch):
     assert b'id="exam-session-type"' in response.data
     assert b'if(!isYearFour&&t.value.indexOf("dems_")===0)t.value="actual"' in response.data
     assert b'if(o.value.indexOf("dems_")===0)o.disabled=!isYearFour' in response.data
+
+
+def test_resident_profile_displays_exam_session_and_attempt(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,4)", ("ExamSession", "Profile"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='ExamSession'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO exam_records(resident_id,study_year,module,theory,practical,exam_type,attempt) VALUES(?,?,?,?,?,?,?)",
+            (rid, 4, "DEMS insertion", 14, 16, "dems_insertion", 2),
+        )
+        conn.commit()
+
+    response = client.get(f"/profile/{rid}")
+    assert response.status_code == 200
+    assert b"DEMS insertion" in response.data
+    assert b"dems_insertion" in response.data
+    assert b"<td>2</td>" in response.data
+    assert b"14.0/20" in response.data
+    assert b"16.0/20" in response.data
