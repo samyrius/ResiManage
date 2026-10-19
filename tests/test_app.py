@@ -2216,3 +2216,49 @@ def test_login_accepts_registered_email_as_identifier(tmp_path, monkeypatch):
     )
     assert response.status_code == 200
     assert b"Resident" in response.data or "المقيمون".encode() in response.data
+
+
+def test_objective_completion_is_toggleable_audited_and_color_coded(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        terrain_id = conn.execute(
+            "SELECT id FROM terrains WHERE name='Réanimation chirurgicale'"
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO objectives(terrain_id,study_year,objective) VALUES(?,?,?)",
+            (terrain_id, 2, "Manage airway"),
+        )
+        objective_id = conn.execute(
+            "SELECT id FROM objectives WHERE objective='Manage airway'"
+        ).fetchone()[0]
+
+    response = client.post(
+        "/objectives",
+        data={"action": "toggle", "objective_id": str(objective_id), "completed": "1"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "#fee2e2" in html
+    assert "Completed" in html
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT completed FROM objectives WHERE id=?", (objective_id,)
+        ).fetchone()[0] == 1
+        assert conn.execute(
+            "SELECT COUNT(*) FROM audit WHERE action='objective.completed'"
+        ).fetchone()[0] == 1
+
+    client.post(
+        "/objectives",
+        data={"action": "toggle", "objective_id": str(objective_id), "completed": "0"},
+        follow_redirects=True,
+    )
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT completed FROM objectives WHERE id=?", (objective_id,)
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM audit WHERE action='objective.reopened'"
+        ).fetchone()[0] == 1
