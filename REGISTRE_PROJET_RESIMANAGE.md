@@ -220,3 +220,9 @@ Complément opérationnel à la pause Android :
 
 
 - `f142bcd03a913664b72a473a29ebe8b9ede5ae73` : ajout d’un test de migration depuis une ancienne base dont la table `objectives` ne possède pas encore la colonne `completed`.
+
+
+### Correction de la persistance de langue
+- `43b5d218fc25db008ade2118da3b8d57aba57323` : la langue sélectionnée est conservée dans la session lors de la connexion réussie au lieu d’être effacée avec le reste de la session. Cela corrige la cause probable du retour à l’arabe après sélection du français ou de l’anglais.
+- `5e45f4dc123eafbf8a8f8b96b6348afcbeb7640b` : test de régression de la persistance de la langue après connexion.
+- Test non exécuté ici ; validation Android toujours en pause.
