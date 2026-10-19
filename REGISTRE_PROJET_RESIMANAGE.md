@@ -327,3 +327,14 @@ Complément opérationnel à la pause Android :
 
 ### Migration Windows non destructive
 - `5bd699c3842bd46bbb35119b38fab584dfdc88b4` : ajout d’un test qui vérifie que la première ouverture de ResiManage 2 copie l’ancienne base SQLite, les photos des résidents et le secret de session vers le dossier utilisateur, tout en conservant les fichiers d’origine. Ce test n’a pas encore été exécuté.
+
+
+## 16. Historique des examens et DEMS — 19 octobre 2026
+
+- `049ca2eb2cd0c95f9bc58eab4e25b8c9025073f5` : migration additive des champs `exam_type` et `attempt`; les anciennes notes sont conservées comme session réelle, tentative 1.
+- `bbcba1b831e5081fa21b5cb909421262f35026f4` : l’enregistrement permet de distinguer virtuel, réel, rattrapage et sessions DEMS ; les notes sont séparées par type de session et numéro de tentative. Les sessions DEMS sont réservées à l’année 4.
+- `3fb2c1b36a4fdc4f3a231f3e90b48b9fff5ca04f` : formulaire et tableau d’examens affichent les sessions, tentatives et deux composantes des notes. Pour l’insertion DEMS, les deux champs représentent les deux parties de la note.
+- `b7fe279c6bf714a4dbe475cd870983f3f291ecb2` : correction de placement des migrations SQLite, exécutées en Python après la création de la table et non à l’intérieur du script SQL.
+- `6112043d39b636ef4abb247175bc067a11d4d998` : tests ajoutés pour la conservation de plusieurs sessions, l’utilisation du rattrapage dans l’évaluation de première année et les deux notes d’insertion DEMS.
+- Règle de progression conservée : moyenne d’au moins 10/20 et chaque composante au moins 10/20 ; les notes virtuelles ne déterminent pas l’avancement. Le rattrapage remplace le résultat réel du module lorsqu’il existe. Ce choix doit être validé lors de la revue finale.
+- Aucun test n’est déclaré passé. La vérification Android reste en pause jusqu’à la fin de toutes les directives.
