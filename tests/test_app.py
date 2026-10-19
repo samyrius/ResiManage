@@ -2552,3 +2552,72 @@ def test_email_verification_rejects_invalid_smtp_port(monkeypatch):
         assert "SMTP port" in str(exc)
     else:
         raise AssertionError("Invalid SMTP port should be rejected.")
+
+
+def test_admin_can_change_role_and_reset_password_with_audit(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    client.post("/users", data={
+        "username": "account-control-test",
+        "password": "old-test-password-2026",
+        "role": "user",
+    })
+    with rotation_app.db() as conn:
+        uid = conn.execute(
+            "SELECT id FROM users WHERE username='account-control-test'"
+        ).fetchone()[0]
+
+    role_response = client.post("/users", data={
+        "action": "change_role",
+        "user_id": str(uid),
+        "new_role": "super_admin",
+    }, follow_redirects=True)
+    assert role_response.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT role FROM users WHERE id=?", (uid,)).fetchone()[0] == "super_admin"
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='user.role_changed'").fetchone()[0] == 1
+
+    new_password = "new-test-password-2026"
+    reset_response = client.post("/users", data={
+        "action": "reset_password",
+        "user_id": str(uid),
+        "new_password": new_password,
+    }, follow_redirects=True)
+    assert reset_response.status_code == 200
+    with rotation_app.db() as conn:
+        stored = conn.execute("SELECT password_hash FROM users WHERE id=?", (uid,)).fetchone()[0]
+        assert rotation_app.verify_password(new_password, stored)
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='user.password_reset'").fetchone()[0] == 1
+        audit_details = " ".join(
+            row[0] for row in conn.execute(
+                "SELECT details FROM audit WHERE action='user.password_reset'"
+            ).fetchall()
+        )
+        assert new_password not in audit_details
+
+    client.get("/logout")
+    response = client.post("/login", data={
+        "username": "account-control-test",
+        "password": new_password,
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"account-control-test" not in response.data  # resident-facing UI does not expose admin account data
+
+
+def test_official_admins_cannot_be_demoted_and_last_super_admin_is_protected(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        official_id = conn.execute(
+            "SELECT id FROM users WHERE lower(username)='admin'"
+        ).fetchone()[0]
+
+    response = client.post("/users", data={
+        "action": "change_role",
+        "user_id": str(official_id),
+        "new_role": "user",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        role = conn.execute("SELECT role FROM users WHERE id=?", (official_id,)).fetchone()[0]
+        assert role == "super_admin"
