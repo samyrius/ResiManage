@@ -338,3 +338,9 @@ Complément opérationnel à la pause Android :
 - `6112043d39b636ef4abb247175bc067a11d4d998` : tests ajoutés pour la conservation de plusieurs sessions, l’utilisation du rattrapage dans l’évaluation de première année et les deux notes d’insertion DEMS.
 - Règle de progression conservée : moyenne d’au moins 10/20 et chaque composante au moins 10/20 ; les notes virtuelles ne déterminent pas l’avancement. Le rattrapage remplace le résultat réel du module lorsqu’il existe. Ce choix doit être validé lors de la revue finale.
 - Aucun test n’est déclaré passé. La vérification Android reste en pause jusqu’à la fin de toutes les directives.
+
+
+### Protection supplémentaire des décisions de promotion
+- `e08f0f1be41f28aaae90d6ae736ac44dcc54d662` : l’évaluation de première année exige désormais des notes réelles ou de rattrapage pour chaque module déjà enregistré ; les notes virtuelles seules ne suffisent pas pour un module.
+- `cdc602b02660b061f85ad96ee052264f0ba3fdcd` : test de non-régression pour empêcher le passage en deuxième année si un module n’a que des notes virtuelles.
+- Cette vérification supplémentaire est enregistrée, mais elle n’a pas été exécutée. La suite Android demeure suspendue.
