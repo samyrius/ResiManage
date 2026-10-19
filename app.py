@@ -1273,8 +1273,10 @@ def exams():
      if previous is None or priority>(1 if previous["exam_type"]=="remedial" else 0,previous["attempt"],previous["id"]):
       chosen[key]=record
     records=list(chosen.values())
-    if not records:
-     flash("Enter first-year exam modules before evaluation")
+    all_modules={row["module"].strip().casefold() for row in c.execute("SELECT DISTINCT module FROM exam_records WHERE resident_id=? AND study_year=1",(rid,)).fetchall()}
+    missing_actual_or_remedial=all_modules-set(chosen.keys())
+    if not records or missing_actual_or_remedial:
+     flash("Enter actual or remedial marks for every first-year module before evaluation; virtual marks alone do not count.")
     else:
      average=sum((x["theory"]+x["practical"])/2 for x in records)/len(records)
      passed=average>=10 and all(x["theory"]>=10 and x["practical"]>=10 for x in records)
