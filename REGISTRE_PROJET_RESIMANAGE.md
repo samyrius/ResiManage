@@ -282,3 +282,5 @@ Complément opérationnel à la pause Android :
 - `50fb078514b5be850b5c33add9affa5ecb66f016` : documentation SMTP mise à jour pour mentionner la connexion par e-mail vérifiée.
 
 - `a99b94237d7deb3378093d092730c3a1cc389cf4` : README clarifié sur la branche de référence active `resimanage-2-work`, le caractère historique des tests anciens et la pause des workflows Android.
+
+- `06f1223f12eaeeff3cc7597fd081c73d076e2015` : la colonne d’état des objectifs est maintenant définie dès la création d’une base neuve ; la migration additive reste en place pour les bases existantes.
