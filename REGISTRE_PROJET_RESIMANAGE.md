@@ -344,3 +344,6 @@ Complément opérationnel à la pause Android :
 - `e08f0f1be41f28aaae90d6ae736ac44dcc54d662` : l’évaluation de première année exige désormais des notes réelles ou de rattrapage pour chaque module déjà enregistré ; les notes virtuelles seules ne suffisent pas pour un module.
 - `cdc602b02660b061f85ad96ee052264f0ba3fdcd` : test de non-régression pour empêcher le passage en deuxième année si un module n’a que des notes virtuelles.
 - Cette vérification supplémentaire est enregistrée, mais elle n’a pas été exécutée. La suite Android demeure suspendue.
+
+
+- `52a2f36a75065848671e77f1b0b5778d506d05c9` : guide de configuration SMTP aligné avec les noms `RESIMANAGE_SMTP_*` ; la compatibilité avec les anciens noms reste explicitement temporaire. L’envoi réel n’est toujours pas testé, car aucun compte SMTP n’a été fourni.
