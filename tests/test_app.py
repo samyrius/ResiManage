@@ -2262,3 +2262,29 @@ def test_objective_completion_is_toggleable_audited_and_color_coded(tmp_path, mo
         assert conn.execute(
             "SELECT COUNT(*) FROM audit WHERE action='objective.reopened'"
         ).fetchone()[0] == 1
+
+
+def test_resident_profile_displays_objective_completion_status(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)",
+            ("ObjectiveColor", "Resident", 2),
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='ObjectiveColor'"
+        ).fetchone()[0]
+        terrain_id = conn.execute(
+            "SELECT id FROM terrains WHERE name='Réanimation chirurgicale'"
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO objectives(terrain_id,study_year,objective,completed) VALUES(?,?,?,?)",
+            (terrain_id, 2, "Airway objective", 1),
+        )
+    response = client.get(f"/profile/{rid}")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "#fee2e2" in html
+    assert "Airway objective" in html
+    assert "Completed" in html
