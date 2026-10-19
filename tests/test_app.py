@@ -2202,7 +2202,7 @@ def test_login_accepts_registered_email_as_identifier(tmp_path, monkeypatch):
     login(client)
     with rotation_app.db() as conn:
         conn.execute(
-            "UPDATE users SET email=? WHERE username='admin'",
+            "UPDATE users SET email=?,email_verified=1 WHERE username='admin'",
             ("admin.login@example.com",),
         )
     client.get("/logout")
