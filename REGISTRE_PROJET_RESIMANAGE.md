@@ -323,3 +323,7 @@ Complément opérationnel à la pause Android :
 - `5eb165434abaf70476e1894ff45169ac21c7c878` : page de gestion des comptes complétée avec modification de rôle et réinitialisation du mot de passe d’un autre compte. Les changements sont journalisés ; les comptes Benhocine et Dr Dris ne peuvent pas être rétrogradés, et le dernier Super Admin actif est protégé.
 - `cba3d07c436d6d11c1f68eb2ac9b2c6756ebe5e2` : tests de régression ajoutés pour les changements de rôle, la réinitialisation du mot de passe, le journal d’audit et les protections de rôle.
 - Les tests n’ont pas été exécutés ici ; leur présence ne signifie pas qu’ils passent. Les workflows Android restent manuels uniquement et ne doivent pas être lancés avant la fin du programme.
+
+
+### Migration Windows non destructive
+- `5bd699c3842bd46bbb35119b38fab584dfdc88b4` : ajout d’un test qui vérifie que la première ouverture de ResiManage 2 copie l’ancienne base SQLite, les photos des résidents et le secret de session vers le dossier utilisateur, tout en conservant les fichiers d’origine. Ce test n’a pas encore été exécuté.
