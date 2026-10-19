@@ -130,3 +130,9 @@ Corrections appliquées sur `resimanage-2-work` :
 - `02291d3df04852824a92c64929d9c74ad429b533` : assertion de non-régression pour le nom actuel dans le pied de page.
 
 **État de vérification :** ces modifications ont été enregistrées sur GitHub ; les tests Windows et Python ne sont pas déclarés réussis car ils n’ont pas été exécutés dans le cadre de cette étape. La vérification Android reste volontairement suspendue. Étape suivante : poursuivre l’audit fonctionnel et la préparation du plan de synchronisation locale, sans lancer de contrôle Android.
+
+
+Complément opérationnel à la pause Android :
+- `915157322af55ee4556f0237466433597d762254` : les déclencheurs automatiques push/PR du workflow Android principal sont désactivés ; le workflow complet (y compris diagnostics et captures en cas d’échec) est conservé pour un lancement manuel en fin de programme.
+- `0ac9b1792d25faa12155f41ce0c4f8508a295066` : le workflow de compilation APK séparé est lui aussi manuel uniquement.
+- Les contrôles Python généraux peuvent encore se déclencher séparément via `ci.yml`; cela ne relance pas la compilation ni le smoke-test Android.
