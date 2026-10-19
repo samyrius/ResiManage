@@ -286,3 +286,28 @@ Complément opérationnel à la pause Android :
 - `06f1223f12eaeeff3cc7597fd081c73d076e2015` : la colonne d’état des objectifs est maintenant définie dès la création d’une base neuve ; la migration additive reste en place pour les bases existantes.
 
 - `91d3fe3a004b9c5215cab5758377f917a1b7f326` : le workflow Windows exécute maintenant la suite de régression Python sur Windows avant la création de l’exécutable et de l’installateur. Cette vérification Windows est distincte des workflows Android, toujours manuels uniquement.
+
+
+## 14. Tableau de clôture — à reprendre dans cet ordre
+
+### Corrections déjà intégrées au code
+- Langue conservée après connexion ; drapeaux 🇩🇿 🇫🇷 🇬🇧 sur les deux écrans.
+- Connexion possible avec identifiant ou e-mail vérifié ; boutons d’affichage du mot de passe sur les formulaires principaux.
+- Objectifs par service/année avec état terminé/à faire, couleurs demandées et audit.
+- Profil résident enrichi avec solde et historique des congés, stages à l’étranger, notes, affectations et objectifs.
+- Les affectations futures ne sont plus affichées comme des stages terminés dans le profil.
+- Ressources 3D copiées dans le paquet Android ; version du paquet portée à 2.0.0.
+- Lanceur Windows : données persistantes dans le profil utilisateur, migration non destructive des anciennes bases/photos et tests Python prévus avant packaging.
+- Icône navigateur, pied de page et documentation harmonisés avec le nom ResiManage.
+- Vérification Android désactivée automatiquement et conservée en mode manuel uniquement.
+
+### Travaux restant à finaliser avant la vérification Android
+1. Terminer la gestion des comptes (modification de rôle et réinitialisation du mot de passe d’un autre compte).
+2. Définir une configuration SMTP sécurisée et vérifier l’envoi réel des codes, notamment pour Android sans intégrer de secrets à l’APK.
+3. Structurer les tentatives d’examens (virtuel, réel, rattrapage, sessions DEMS) en conservant les notes historiques et sans modifier silencieusement les critères de promotion.
+4. Terminer la stabilisation Windows, examiner le résultat du workflow Windows et confirmer les tests Python.
+5. Implémenter la synchronisation réelle PC central ↔ PC secondaire ↔ Android, avec VPN, authentification par appareil, mode hors connexion et résolution des conflits. Le document de conception existe ; le service n’est pas implémenté.
+6. Lancer manuellement les workflows Android, vérifier l’APK, les logs et les captures de l’émulateur ; ensuite tester sur le téléphone réel.
+7. Faire la revue finale des exigences, des sauvegardes/restaurations et de la sécurité avant d’utiliser des données réelles.
+
+**État honnête :** des corrections importantes sont enregistrées sur `resimanage-2-work`, mais le programme n’est pas encore terminé. Aucun test Python/Windows n’est déclaré réussi sans résultat effectif ; aucun nouveau test Android n’a été lancé pendant la pause.
