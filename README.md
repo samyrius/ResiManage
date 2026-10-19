@@ -35,3 +35,9 @@ Keep the local secret key, database, backups, uploaded resident photos, and pers
 ## Windows data safety
 
 ResiManage 2 keeps its Windows database, resident photos, and session-signing secret in `%LOCALAPPDATA%\\ResiManage\\data`, separately from the installed executable. Updating or reinstalling the program should therefore not replace the data folder. Before testing with real records, use the in-app backup feature and keep a copy of that backup outside the computer. The Windows installer and portable build are test packages until their build and launch checks have been reviewed.
+
+## E-mail verification and synchronization status
+
+Email-code registration requires SMTP configuration; see [email verification setup](docs/EMAIL_VERIFICATION_SETUP.md). Do not add SMTP secrets to the repository or APK.
+
+PC ↔ Android offline synchronization is not yet implemented. The security design and acceptance criteria are recorded in [the synchronization architecture](docs/SYNC_ARCHITECTURE_RESIMANAGE2.md). Do not expose the local Flask service publicly or use real resident data in a test environment before the security and recovery checks are complete.
