@@ -712,13 +712,37 @@ def manage_users():
  c=db()
  if request.method=="POST":
   action=request.form.get("action","create")
-  if action in ("deactivate","activate"):
+  if action in ("deactivate","activate","change_role","reset_password"):
    uid=request.form.get("user_id",type=int)
    target=c.execute("SELECT * FROM users WHERE id=?",(uid,)).fetchone()
-   if not target: flash("User not found.")
-   elif action=="deactivate" and target["username"].lower() in ("benhocine","drdris"): flash("Official accounts cannot be deactivated.")
-   elif action=="deactivate" and target["username"]==session.get("user"): flash("You cannot deactivate your own account while signed in.")
-   elif action=="deactivate" and target["role"]=="super_admin" and target["active"] and c.execute("SELECT COUNT(*) FROM users WHERE role='super_admin' AND active=1").fetchone()[0]<=1: flash("At least one active Super Admin must remain.")
+   if not target:
+    flash("User not found.")
+   elif action=="deactivate" and target["username"].lower() in ("benhocine","drdris"):
+    flash("Official accounts cannot be deactivated.")
+   elif action=="deactivate" and target["username"]==session.get("user"):
+    flash("You cannot deactivate your own account while signed in.")
+   elif action=="deactivate" and target["role"]=="super_admin" and target["active"] and c.execute("SELECT COUNT(*) FROM users WHERE role='super_admin' AND active=1").fetchone()[0]<=1:
+    flash("At least one active Super Admin must remain.")
+   elif action=="change_role":
+    new_role=request.form.get("new_role","")
+    if new_role not in ("super_admin","user"):
+     flash("Invalid role.")
+    elif target["username"].lower() in ("benhocine","drdris") and new_role!="super_admin":
+     flash("Official accounts must be Super Admins.")
+    elif target["role"]=="super_admin" and target["active"] and new_role!="super_admin" and c.execute("SELECT COUNT(*) FROM users WHERE role='super_admin' AND active=1").fetchone()[0]<=1:
+     flash("At least one active Super Admin must remain.")
+    else:
+     c.execute("UPDATE users SET role=? WHERE id=?",(new_role,uid))
+     audit_event(c,"user.role_changed",f"username={target['username']}; from={target['role']}; to={new_role}")
+     c.commit(); flash(tr("done"))
+   elif action=="reset_password":
+    new_password=request.form.get("new_password","")
+    if len(new_password)<12:
+     flash("New password must be at least 12 characters.")
+    else:
+     c.execute("UPDATE users SET password_hash=? WHERE id=?",(hash_password(new_password),uid))
+     audit_event(c,"user.password_reset",f"username={target['username']}; reset_by={session.get('user','')}")
+     c.commit(); flash("Password reset. Share the new password securely with the account owner.")
    else:
     active=0 if action=="deactivate" else 1
     c.execute("UPDATE users SET active=? WHERE id=?",(active,uid))
@@ -740,7 +764,7 @@ def manage_users():
     except sqlite3.IntegrityError:
      flash("Username already exists.")
  rows=c.execute("SELECT id,username,role,active,created_at FROM users ORDER BY role DESC,username").fetchall(); c.close()
- return page("""<section><h3>{{t('users')}}</h3><p>{{t('users_help')}}</p><form method="post"><input type="hidden" name="action" value="create"><label>{{t('username')}}</label><input name="username" minlength="3" required><label>{{t('password')}} (12+)</label><div class="password-wrap"><input id="new-user-password" name="password" type="password" minlength="12" required><button class="password-toggle" type="button" aria-label="Show password" onclick="const p=document.getElementById('new-user-password');p.type=p.type==='password'?'text':'password';this.setAttribute('aria-label',p.type==='password'?'Show password':'Hide password')">◉</button></div><label>{{t('role')}}</label><select name="role"><option value="user">{{t('standard_user')}}</option><option value="super_admin">{{t('super_admin')}}</option></select><button>{{t('add')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('username')}}</th><th>{{t('role')}}</th><th>{{t('active_col')}}</th><th>{{t('created')}}</th><th>Admin action</th></tr>{% for u in rows %}<tr><td>{{u.username}}</td><td>{{u.role}}</td><td>{{u.active}}</td><td>{{u.created_at}}</td><td>{% if u.username!=session.get('user') or u.active==0 %}<form method="post"><input type="hidden" name="user_id" value="{{u.id}}"><button name="action" value="{{'deactivate' if u.active else 'activate'}}">{{'Deactivate' if u.active else 'Activate'}}</button></form>{% else %}Current account{% endif %}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
+ return page("""<section><h3>{{t('users')}}</h3><p>{{t('users_help')}}</p><form method="post"><input type="hidden" name="action" value="create"><label>{{t('username')}}</label><input name="username" minlength="3" required><label>{{t('password')}} (12+)</label><div class="password-wrap"><input id="new-user-password" name="password" type="password" minlength="12" required><button class="password-toggle" type="button" aria-label="Show password" onclick="const p=document.getElementById('new-user-password');p.type=p.type==='password'?'text':'password';this.setAttribute('aria-label',p.type==='password'?'Show password':'Hide password')">◉</button></div><label>{{t('role')}}</label><select name="role"><option value="user">{{t('standard_user')}}</option><option value="super_admin">{{t('super_admin')}}</option></select><button>{{t('add')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('username')}}</th><th>{{t('role')}}</th><th>{{t('active_col')}}</th><th>{{t('created')}}</th><th>Account controls</th></tr>{% for u in rows %}<tr><td>{{u.username}}</td><td>{{u.role}}</td><td>{{u.active}}</td><td>{{u.created_at}}</td><td><form method="post"><input type="hidden" name="user_id" value="{{u.id}}"><label>Role</label><select name="new_role"><option value="user" {% if u.role=='user' %}selected{% endif %}>Standard user</option><option value="super_admin" {% if u.role=='super_admin' %}selected{% endif %}>Super Admin</option></select><button name="action" value="change_role">Save role</button></form><form method="post"><input type="hidden" name="user_id" value="{{u.id}}"><label>New password (12+)</label><input name="new_password" type="password" minlength="12" required><button name="action" value="reset_password">Reset password</button></form>{% if u.username!=session.get('user') or u.active==0 %}<form method="post"><input type="hidden" name="user_id" value="{{u.id}}"><button name="action" value="{{'deactivate' if u.active else 'activate'}}">{{'Deactivate' if u.active else 'Activate'}}</button></form>{% else %}Current account{% endif %}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
 @app.get("/audit")
 def audit_log():
  if super_guard(): return super_guard()
