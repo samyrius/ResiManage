@@ -22,7 +22,7 @@ Branche de travail visée : `resimanage-2-work`
 
 - La version active de travail est **ResiManage 2**, associée à la branche `resimanage-2-work`.
 - **ResiManage 1** est une sauvegarde à préserver. Ne pas la modifier ni la supprimer pendant le travail sur la version 2.
-- Ne pas lancer de compilation APK ou EXE sans demande explicite de l’utilisateur. Une demande de compilation doit viser une version dont les corrections ont été intégrées et vérifiées.
+- À chaque correction poussée sur `resimanage-2-work`, la CI compile automatiquement un APK debug et tente des tests de démarrage dans un émulateur Android ; l’APK et les preuves (journaux/capture) sont conservés comme artefacts temporaires. Une compilation EXE ou un APK de diffusion/release reste soumise à une demande explicite. Les tests sur téléphone réel restent complémentaires.
 - Après validation d’une modification par l’utilisateur, l’intégrer directement au projet actif dès que possible, puis documenter le changement et les tests réellement effectués.
 - Ne jamais annoncer qu’une fonction est terminée, compilée, synchronisée ou testée sans preuve vérifiable.
 - Préserver la base de données réelle et ses sauvegardes. Ne jamais ajouter de données personnelles fictives dans les données réelles ; utiliser une base de test séparée et des données fictives pour les tests.
@@ -37,7 +37,7 @@ Branche de travail visée : `resimanage-2-work`
 4. Stabiliser la version Windows locale, sans console noire visible ni adresse à saisir par l’utilisateur, avec base locale persistante et sauvegarde/restauration.
 5. Implémenter et tester la synchronisation locale PC ↔ Android, avec gestion explicite des conflits et des pertes de connexion.
 6. Finaliser les fonctions métier, les rôles et l’audit.
-7. Effectuer des tests complets avec des données fictives ; préparer une compilation de test uniquement après demande explicite.
+7. Effectuer des tests complets avec des données fictives ; les APK debug et smoke-tests Android sont automatisés à chaque mise à jour de la branche de travail. Demander l’accord avant une compilation de diffusion/release.
 8. Après finalisation, étudier l’évolution vers le serveur web central hybride.
 
 ## 4. Exigences métier à préserver
@@ -107,3 +107,11 @@ Branche de travail visée : `resimanage-2-work`
 - **Vérification :** les quatre remplacements ont chacun correspondu exactement à un emplacement dans le code. Les tests automatisés et l’affichage sur téléphone restent à vérifier après ce commit.
 - **Aucune compilation APK/EXE n’a été lancée.** ResiManage 1 reste inchangée.
 - Prochaine priorité : exécuter les tests automatiques déclenchés par le commit, puis auditer les fonctions et l’interface avant de traiter la synchronisation réseau. Le service Android actuel écoute sur `127.0.0.1` ; il ne constitue donc pas encore une synchronisation PC ↔ téléphone sur le réseau local.
+
+
+## 9. Mise à jour du 19 octobre 2026 — compilation Android et smoke-test automatisés
+
+- L’utilisateur a explicitement autorisé la compilation automatique des APK de test à chaque correction, afin d’accélérer le cycle de développement ; il peut compléter les essais sur son téléphone.
+- Workflow modifié sur `resimanage-2-work` dans le commit `e66a9c7cf110a79f5b8107d47821181f1e77a14c` : tests Python, assemblage APK debug, lancement dans un émulateur Android API 35, vérification de l’activité au premier plan et détection d’exceptions fatales ; artefacts APK et preuves de test conservés 14 jours.
+- À la rédaction de cette note, le commit workflow n’affichait pas encore de statut CI ; ne pas prétendre que le premier passage Android a réussi tant que le run et ses artefacts ne sont pas inspectés.
+- Étape suivante de la feuille de route : audit des fonctions et de l’interface en corrigeant les anomalies confirmées, puis stabilisation Windows locale avant de concevoir la synchronisation LAN PC ↔ Android.
