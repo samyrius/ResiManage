@@ -21,7 +21,7 @@ The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 4. Open the app and create the first administrator password when prompted.
 5. Open **Administrator accounts** and create usernames `benhocine` and `drdris`, both with the **Super administrator** role and separate strong passwords.
 
-This is a debug-signed test build, not a Play Store release. The APK build succeeds in CI, but emulator startup has not yet been reliably confirmed and it has not been installed and tested on a physical phone. Back up the data from inside the app before uninstalling it: Android removes private app data on uninstall.
+This will be a debug-signed test build, not a Play Store release. The latest source changes have not yet been rebuilt or checked on an emulator, and the APK has not been confirmed on a physical phone. Back up the data from inside the app before uninstalling it: Android removes private app data on uninstall.
 
 ## Import and backup notes
 
