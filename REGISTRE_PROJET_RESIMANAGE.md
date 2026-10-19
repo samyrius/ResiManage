@@ -360,3 +360,7 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 
 - `c4e0dda3cdd98ed7bc0d609e60a89b42d5811fbc` : correction d’une assertion UTF-8 du pied de page ; l’échec venait de la chaîne de test, pas du rendu de l’application.
 - `2d020cf192eb8ee268f348d67126440f02311e52` : document de synchronisation actualisé pour inclure les nouveaux champs d’examens et les contrôles de comptes comme prérequis de versionnement. La synchronisation reste non implémentée et aucune API réseau n’est activée.
+
+
+- `9c79393c026840471418c5a6ea54198b159b564c` : le profil résident utilise maintenant une photo de 240 px sur téléphone et place les informations sous la photo au lieu de les comprimer à côté.
+- `7ab0a8ddbd1dbdf1b7a342c2332432806f7b7931` : test de non-régression mis à jour pour cette disposition mobile plus lisible. La validation est en attente du workflow Python/Windows ; Android reste suspendu.
