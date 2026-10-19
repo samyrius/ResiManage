@@ -1561,6 +1561,8 @@ def leave_management():
         if super_guard(): c.close(); return ("Forbidden — Super Admin only",403)
         try:
             rid=int(request.form["resident_id"])
+            if not c.execute("SELECT 1 FROM residents WHERE id=?",(rid,)).fetchone():
+                raise ValueError("Resident does not exist.")
             start=date.fromisoformat(request.form["start_date"]); end=date.fromisoformat(request.form["end_date"])
             if end<start: raise ValueError("End date must not precede start date.")
             days=(end-start).days+1
