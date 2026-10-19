@@ -179,3 +179,10 @@ Complément opérationnel à la pause Android :
 - `955390a15729639db2e1bf142178b6bca740d8d5` : ajout des commandes d’affichage/masquage sur les formulaires de première configuration, paramètres et création de compte administrateur.
 - `1c7d327c76d2baa3c17d7754dcd97987ea2540e4` : tests de présence de ces commandes sur les formulaires administrateur.
 - Ces changements restent non vérifiés par exécution à cette étape.
+
+
+### Connexion par adresse e-mail
+- `8ebe025e8de05edea9036d4248f1046bc7458184` : la recherche du compte à la connexion accepte désormais le nom d’utilisateur ou l’adresse e-mail enregistrée, sans tenir compte de la casse de l’e-mail.
+- `22795868fb8f09ae5089d706528159384356dbab` : libellé de connexion clarifié en français, anglais et arabe.
+- `cb6459ff2f0d0ec450f602260bdc1cd6e5e16162` : test de régression pour la connexion avec l’adresse e-mail.
+- Le test n’a pas été exécuté à cette étape. L’envoi SMTP réel et la configuration sécurisée sur Android restent des points ouverts.
