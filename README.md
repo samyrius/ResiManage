@@ -54,3 +54,8 @@ Public registration requires a working SMTP account. Configure these variables i
 - `RESIMANAGE_SMTP_PASSWORD`
 
 Older `RESITRACK_SMTP_*` variable names remain accepted temporarily for existing deployments. Current `RESIMANAGE_SMTP_*` values take precedence. No real email delivery is claimed until these values are configured and a delivery test is performed.
+
+
+## Exam sessions and DEMS marks
+
+Exam records preserve the session type and attempt separately: virtual, actual, remedial, and (for year 4) DEMS virtual, DEMS actual, DEMS remedial, or DEMS insertion. Each record retains two components (theory/practical, or part 1/part 2 for DEMS insertion). Existing records migrate as `actual`, attempt 1, without deleting or rewriting their scores. First-year progression continues to require an average of at least 10/20 and both components at least 10/20 for each module; virtual marks are excluded from that decision, and a remedial result is used for its module when present.
