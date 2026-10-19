@@ -2433,3 +2433,33 @@ def test_login_rejects_unverified_email_as_identifier(tmp_path, monkeypatch):
     )
     assert response.status_code == 200
     assert "Accueil".encode() not in response.data
+
+
+def test_resident_profile_shows_annual_leave_dates_and_balance(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)",
+            ("LeaveProfile", "Resident", 2),
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='LeaveProfile'"
+        ).fetchone()[0]
+        year = __import__("datetime").date.today().year
+        conn.execute(
+            "INSERT INTO leave_years(resident_id,year,earned_days) VALUES(?,?,30)",
+            (rid, year),
+        )
+        conn.execute(
+            "INSERT INTO leave_entries(resident_id,start_date,end_date,days,notes) VALUES(?,?,?,?,?)",
+            (rid, f"{year}-06-01", f"{year}-06-03", 3, "Annual leave"),
+        )
+    response = client.get(f"/profile/{rid}")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Annual leave / Congés / الإجازات" in html
+    assert "Accrued: 30 days" in html
+    assert "Used: 3 days" in html
+    assert "Remaining: 27 days" in html
+    assert "Annual leave" in html
