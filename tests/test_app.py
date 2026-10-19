@@ -2171,3 +2171,14 @@ def test_internal_favicon_declares_the_jpeg_mime_type(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert b'type="image/jpeg" href="/static/resimanage-3d-icon.jpg"' in response.data
     assert b'type="image/svg+xml" href="/static/resimanage-3d-icon.jpg"' not in response.data
+
+
+def test_registration_password_fields_have_visibility_toggles(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    response = client.get("/register")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'id="register-password"' in html
+    assert 'id="register-confirm-password"' in html
+    assert html.count('class="password-toggle"') >= 2
+    assert "Hide password" in html
