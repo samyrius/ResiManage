@@ -304,7 +304,7 @@ Complément opérationnel à la pause Android :
 ### Travaux restant à finaliser avant la vérification Android
 1. Terminer la gestion des comptes (modification de rôle et réinitialisation du mot de passe d’un autre compte).
 2. Définir une configuration SMTP sécurisée et vérifier l’envoi réel des codes, notamment pour Android sans intégrer de secrets à l’APK.
-3. Structurer les tentatives d’examens (virtuel, réel, rattrapage, sessions DEMS) en conservant les notes historiques et sans modifier silencieusement les critères de promotion.
+3. Revoir et valider les règles métier des sessions d’examens (virtuel, réel, rattrapage, sessions DEMS) et les critères de progression. Le modèle de données et les champs de saisie sont intégrés, mais la suite de tests doit être exécutée avant validation.
 4. Terminer la stabilisation Windows, examiner le résultat du workflow Windows et confirmer les tests Python.
 5. Implémenter la synchronisation réelle PC central ↔ PC secondaire ↔ Android, avec VPN, authentification par appareil, mode hors connexion et résolution des conflits. Le document de conception existe ; le service n’est pas implémenté.
 6. Lancer manuellement les workflows Android, vérifier l’APK, les logs et les captures de l’émulateur ; ensuite tester sur le téléphone réel.
