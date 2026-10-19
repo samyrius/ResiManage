@@ -2773,3 +2773,14 @@ def test_leave_rejects_unknown_resident_without_creating_leave_years(tmp_path, m
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM leave_entries").fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM leave_years WHERE resident_id=987654321").fetchone()[0] == 0
+
+
+def test_exam_form_guides_dems_sessions_to_year_four(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.get("/exams")
+    assert response.status_code == 200
+    assert b'id="exam-study-year"' in response.data
+    assert b'id="exam-session-type"' in response.data
+    assert b'if(!isYearFour&&t.value.indexOf("dems_")===0)t.value="actual"' in response.data
+    assert b'if(o.value.indexOf("dems_")===0)o.disabled=!isYearFour' in response.data
