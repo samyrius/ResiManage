@@ -2821,7 +2821,7 @@ def test_resident_summary_includes_external_rotation_dates_and_country(tmp_path,
 
     response = client.get("/summary")
     assert response.status_code == 200
-    assert b"HÃ´pital Test" in response.data
+    assert "Hôpital Test".encode("utf-8") in response.data
     assert b"France" in response.data
     assert b"2026-11-01" in response.data
     assert b"2026-12-01" in response.data
