@@ -2758,3 +2758,18 @@ def test_first_year_evaluation_blocks_modules_with_only_virtual_marks(tmp_path, 
     with rotation_app.db() as conn:
         assert conn.execute("SELECT year FROM residents WHERE id=?", (rid,)).fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM decisions WHERE details LIKE '%Incomplete Sessions%'").fetchone()[0] == 0
+
+
+def test_leave_rejects_unknown_resident_without_creating_leave_years(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.post("/leave", data={
+        "resident_id": "987654321",
+        "start_date": "2026-11-01",
+        "end_date": "2026-11-05",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"Resident does not exist." in response.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM leave_entries").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM leave_years WHERE resident_id=987654321").fetchone()[0] == 0
