@@ -395,3 +395,12 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 - `19d78dfcb03250715177654689a70532f99725f4` : création de `SYNC_ARCHITECTURE_RESIMANAGE2.md`. Le document décrit une cible hors ligne d’abord, synchronisation bidirectionnelle via API HTTPS, VPN privé, journal idempotent, résolution explicite des conflits, transfert sécurisé des photos, sauvegardes et étapes de tests.
 - **Important :** cette étape est une spécification technique, pas une synchronisation fonctionnelle. Il reste à implémenter le journal local, l’API centrale, l’authentification des appareils, les conflits et les sauvegardes serveur avant d’annoncer une synchronisation entre appareils.
 - Les workflows de vérification Android restent manuels uniquement jusqu’à l’intégration de toutes les directives.
+
+
+## 19. Correction d’un verrouillage SQLite sous Windows — 19 octobre 2026
+
+- L’inspection du workflow Windows a révélé un échec réel : 108 tests passaient, mais le test de restauration de sauvegarde échouait, car le résident ajouté après la sauvegarde restait présent après la tentative de restauration.
+- Cause identifiée dans `page()` : deux appels à `db()` lisaient l’année d’affichage sans fermer leurs connexions SQLite. Sous Windows, une connexion oubliée peut empêcher le remplacement du fichier de base lors d’une restauration.
+- Commit `91aaac3dd263d0eb26334242a55ff9a2c0ec742b` : la fonction de rendu ouvre désormais une seule connexion pour lire l’année et la ferme systématiquement avant le rendu final.
+- Commit `8c57f31b5f4b8f6d3d7626f4770a7e5c34147e8d` : le test de restauration vérifie explicitement que le message de réussite apparaît, en plus de vérifier le contenu restauré. Cela empêche qu’une réponse HTTP 200 masque un échec métier.
+- **État : correction poussée, mais workflow Windows à relancer/consulter pour confirmer.** Ne pas annoncer le problème résolu avant le résultat du workflow. Aucun workflow Android ni APK n’a été lancé.
