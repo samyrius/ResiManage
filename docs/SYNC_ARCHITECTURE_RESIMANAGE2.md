@@ -55,3 +55,10 @@ Statut : **conception préparatoire, pas encore implémentée**. Ce document fix
 - Le serveur Android actuel écoute sur `127.0.0.1:5000` et n’est pas un serveur de synchronisation réseau.
 - Le lanceur Windows local est prévu pour ouvrir une interface sur boucle locale ; l’exposition à une interface VPN doit être conçue séparément et rester désactivée par défaut.
 - Il n’existe pas encore d’API de synchronisation, de file d’attente distribuée, de gestion de conflits ni d’enrôlement d’appareils. Aucun de ces éléments ne doit être présenté comme opérationnel.
+
+
+## État actualisé avant implémentation de la synchronisation
+
+La base locale évolue encore : les notes d’examen distinguent maintenant `exam_type` et `attempt` (virtuel, réel, rattrapage et sessions DEMS), et les contrôles de compte permettent des changements de rôle/mot de passe audités. Ces champs et ces règles doivent être inclus dans le modèle de versions avant de créer l’API ; il ne faut pas démarrer une réplication qui ne comprendrait que les anciens champs.
+
+**État d’exécution :** la synchronisation réseau reste non implémentée. Le travail doit commencer après la stabilisation Windows et la validation de la base locale. La vérification Android via GitHub Actions est suspendue à la demande de l’utilisateur jusqu’à la fin de toutes les directives ; aucun endpoint de synchronisation ne doit être exposé en attendant la conception complète de l’enrôlement, de TLS/VPN, des opérations idempotentes et des conflits.
