@@ -2195,3 +2195,24 @@ def test_admin_password_fields_have_visibility_toggles(tmp_path, monkeypatch):
     assert 'id="new-user-password"' in users_response.get_data(as_text=True)
     assert 'class="password-toggle"' in settings_response.get_data(as_text=True)
     assert 'class="password-toggle"' in users_response.get_data(as_text=True)
+
+
+def test_login_accepts_registered_email_as_identifier(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "UPDATE users SET email=? WHERE username='admin'",
+            ("admin.login@example.com",),
+        )
+    client.get("/logout")
+    response = client.post(
+        "/login",
+        data={
+            "username": "ADMIN.LOGIN@example.com",
+            "password": "test-strong-password-2026",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Resident" in response.data or "المقيمون".encode() in response.data
