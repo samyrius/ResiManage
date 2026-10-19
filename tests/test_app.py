@@ -2315,3 +2315,27 @@ def test_future_confirmed_rotation_is_not_shown_as_completed_in_profile(tmp_path
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert 'class="good">Remaining / À faire /' in html
+
+
+def test_windows_launcher_migrates_existing_database_and_photos_without_deleting_source(tmp_path):
+    import windows_launcher as desktop_launcher
+
+    legacy_root = tmp_path / "legacy-install"
+    data_dir = tmp_path / "user-data"
+    legacy_root.mkdir()
+    data_dir.mkdir()
+    legacy_db = legacy_root / "rotation.db"
+    with sqlite3.connect(legacy_db) as conn:
+        conn.execute("CREATE TABLE preserved_records(value TEXT)")
+        conn.execute("INSERT INTO preserved_records(value) VALUES('keep-me')")
+    legacy_photos = legacy_root / "resident_photos"
+    legacy_photos.mkdir()
+    (legacy_photos / "resident_1.jpg").write_bytes(b"test-photo-bytes")
+
+    desktop_launcher._migrate_legacy_data(data_dir, legacy_root)
+
+    with sqlite3.connect(data_dir / "rotation.db") as conn:
+        assert conn.execute("SELECT value FROM preserved_records").fetchone()[0] == "keep-me"
+    assert (data_dir / "resident_photos" / "resident_1.jpg").read_bytes() == b"test-photo-bytes"
+    assert legacy_db.is_file()
+    assert (legacy_photos / "resident_1.jpg").is_file()
