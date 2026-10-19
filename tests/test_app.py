@@ -2387,3 +2387,12 @@ def test_language_selectors_show_algerian_french_and_english_flags(tmp_path, mon
     assert "🇩🇿".encode() in home_page.data
     assert "🇫🇷".encode() in home_page.data
     assert "🇬🇧".encode() in home_page.data
+
+
+def test_android_python_bundle_includes_static_brand_assets():
+    project_root = Path(__file__).resolve().parents[1]
+    gradle = (project_root / "android/app/build.gradle").read_text(encoding="utf-8")
+    brand_image = project_root / "static/resimanage-3d-icon.jpg"
+    assert "copyRotationStaticAssets" in gradle
+    assert 'into(layout.projectDirectory.dir("src/main/python/static"))' in gradle
+    assert brand_image.is_file()
