@@ -273,3 +273,10 @@ Complément opérationnel à la pause Android :
 - `93140be81fbac2df1ffe757c90e2302f8ac2ca80` : test de régression du détail des stages externes dans le profil.
 
 - `1076e08c3521cf99641495e002bf8886d84c35a1` : clarification du statut de chiffrement : la base SQLite Android est dans le stockage privé de l’application, mais le fichier DB n’est pas encore chiffré au repos ; ce point doit être évalué avant l’usage avec des données réelles.
+
+
+### Mise à jour de la documentation Android et e-mail
+- `b803e356c41d78f7e98335c4f66a03363e5202c5` : le guide Android indique que les workflows sont manuels jusqu’à la revue finale.
+- `69abd473bcd06bacfec8012298b8ae85829c1dd0` : correction du nom d’artefact dans les instructions d’installation.
+- `900b370cf4222e31803e4223d949e0cfdcf75e9a` : suppression de l’affirmation non vérifiée selon laquelle le dernier APK serait déjà construit ; le guide indique honnêtement que les dernières modifications attendent une compilation et un test finaux.
+- `50fb078514b5be850b5c33add9affa5ecb66f016` : documentation SMTP mise à jour pour mentionner la connexion par e-mail vérifiée.
