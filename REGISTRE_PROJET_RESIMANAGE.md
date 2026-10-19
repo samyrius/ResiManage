@@ -257,3 +257,6 @@ Complément opérationnel à la pause Android :
 
 - `61596ccbac909e1b6f780d0d6c3a9babf81eabd8` : connexion par e-mail limitée aux adresses marquées comme vérifiées ; le nom d’utilisateur reste utilisable.
 - `8acf0873c8e9ebaeffb1632f6add8a9acc8de6c0` et `6f0e6148650a1507f15d9245c189abf05b3fb42d` : tests pour accepter un e-mail vérifié et rejeter un e-mail non vérifié.
+
+
+- `50fb078514b5be850b5c33add9affa5ecb66f016` : documentation e-mail mise à jour pour préciser que la connexion par e-mail est prise en charge uniquement après vérification ; l’envoi SMTP réel reste à configurer.
