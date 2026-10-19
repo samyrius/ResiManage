@@ -25,7 +25,7 @@ Ne jamais mettre ces valeurs dans Git, dans une capture d’écran, dans le code
 ## Limite pour les paquets Android/Windows
 
 - Le lanceur Windows hérite des variables d’environnement du processus qui le démarre ; une configuration doit donc être faite sur le poste avant lancement.
-- Le paquet Android actuel ne présente pas d’écran sécurisé de configuration SMTP et ne doit pas être supposé capable d’envoyer des codes de vérification dans une installation vierge. Il faut définir une méthode d’envoi adaptée avant de déclarer cette fonction prête sur téléphone.
+- La connexion accepte le nom d’utilisateur ou l’adresse e-mail vérifiée. Le paquet Android actuel ne présente pas d’écran sécurisé de configuration SMTP et ne doit pas être supposé capable d’envoyer des codes de vérification dans une installation vierge. Il faut définir une méthode d’envoi adaptée avant de déclarer cette fonction prête sur téléphone.
 - Les identifiants SMTP ne doivent pas être intégrés à l’APK ni à un dépôt public. Pour un déploiement multi-appareils, préférer un service de vérification côté serveur, accessible uniquement par le VPN privé et protégé par TLS et authentification.
 
 ## État
