@@ -260,3 +260,9 @@ Complément opérationnel à la pause Android :
 
 
 - `50fb078514b5be850b5c33add9affa5ecb66f016` : documentation e-mail mise à jour pour préciser que la connexion par e-mail est prise en charge uniquement après vérification ; l’envoi SMTP réel reste à configurer.
+
+
+### Dossier résident — congés annuels
+- `711f63e4e80f7fbac88832161702671ee1b0569a` : ajout dans le profil résident du tableau des congés (dates de début/fin, jours, notes) et du bilan acquis/utilisé/restant, en complément de la page globale de gestion des congés.
+- `0e0175964c722abc39079595f5ad33eee02021fd` : test de régression du détail et du solde des congés dans le profil.
+- Test non exécuté ici ; vérification Android toujours en pause.
