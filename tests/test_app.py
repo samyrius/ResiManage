@@ -2112,3 +2112,23 @@ def test_profile_photo_picker_accepts_supported_extensions_without_rejecting_gen
     assert "!['png','jpg','jpeg','webp'].includes(ext)" in html
     assert "file.type&&!allowed.includes(file.type)" not in html
     assert "reader.onerror=function()" in html
+
+
+def test_resident_profile_photo_frame_is_large_and_responsive(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        rid = conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,2) RETURNING id",
+            ("Avatar", "Sizing"),
+        ).fetchone()[0]
+        conn.commit()
+
+    response = client.get(f"/profile/{rid}")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    # Desktop/tablet: scale fluidly up to 240 px; narrow phone layout: 180 px square.
+    assert ".rt-avatar-wrap{flex:0 0 auto;width:clamp(190px,28vw,240px)}" in html
+    assert ".rt-profile-avatar{display:block;width:100%;height:clamp(190px,28vw,240px);object-fit:cover" in html
+    assert ".rt-avatar-wrap{width:180px;flex-basis:180px}" in html
+    assert ".rt-profile-avatar{height:180px;border-radius:20px}" in html
