@@ -226,3 +226,8 @@ Complément opérationnel à la pause Android :
 - `43b5d218fc25db008ade2118da3b8d57aba57323` : la langue sélectionnée est conservée dans la session lors de la connexion réussie au lieu d’être effacée avec le reste de la session. Cela corrige la cause probable du retour à l’arabe après sélection du français ou de l’anglais.
 - `5e45f4dc123eafbf8a8f8b96b6348afcbeb7640b` : test de régression de la persistance de la langue après connexion.
 - Test non exécuté ici ; validation Android toujours en pause.
+
+
+### Sélecteurs de langue avec drapeaux
+- `7284ceb8a11fa29ec4c2508acaa68ddfb275d65f` : ajout du drapeau algérien pour l’arabe sur l’écran de connexion et dans la navigation après connexion ; les drapeaux français et britannique restent visibles.
+- `6cfe34441c0ce09d3ab864beb8bc945f675f649a` : test des trois drapeaux sur les deux écrans.
