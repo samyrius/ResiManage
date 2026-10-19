@@ -2412,3 +2412,24 @@ def test_android_gradle_project_uses_current_resimanage_name():
     ).read_text(encoding="utf-8")
     assert 'rootProject.name = "ResiManage"' in settings
     assert 'rootProject.name = "RotationApp"' not in settings
+
+
+def test_login_rejects_unverified_email_as_identifier(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "UPDATE users SET email=?,email_verified=0 WHERE username='admin'",
+            ("unverified@example.com",),
+        )
+    client.get("/logout")
+    response = client.post(
+        "/login",
+        data={
+            "username": "unverified@example.com",
+            "password": "test-strong-password-2026",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "Accueil".encode() not in response.data
