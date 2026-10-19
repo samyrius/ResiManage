@@ -5,7 +5,7 @@ Statut : **conception préparatoire, pas encore implémentée**. Ce document fix
 ## Décisions de départ
 
 - Le PC Windows désigné comme serveur central conserve la base de référence.
-- L’application Android conserve une copie locale chiffrée/protégée par le stockage privé de l’application et doit rester utilisable hors connexion.
+- L’application Android conserve une copie locale dans le stockage privé de l’application et doit rester utilisable hors connexion. La base SQLite n’est pas encore chiffrée au niveau du fichier ; le chiffrement au repos doit être évalué avant tout déploiement avec données réelles.
 - Les deux PC et le téléphone peuvent être sur des réseaux Internet différents. La connexion entre eux passe par un VPN privé (par exemple WireGuard ou Tailscale) ; aucun port de l’application ne doit être exposé publiquement directement à Internet.
 - L’API de synchronisation doit utiliser HTTPS même à travers le VPN, avec authentification distincte par appareil et contrôle de rôle côté serveur.
 - Ne jamais synchroniser le fichier SQLite brut en le copiant ou en fusionnant des fichiers DB : les modifications passent par une API transactionnelle.
