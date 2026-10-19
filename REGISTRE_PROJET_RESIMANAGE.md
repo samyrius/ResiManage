@@ -231,3 +231,9 @@ Complément opérationnel à la pause Android :
 ### Sélecteurs de langue avec drapeaux
 - `7284ceb8a11fa29ec4c2508acaa68ddfb275d65f` : ajout du drapeau algérien pour l’arabe sur l’écran de connexion et dans la navigation après connexion ; les drapeaux français et britannique restent visibles.
 - `6cfe34441c0ce09d3ab864beb8bc945f675f649a` : test des trois drapeaux sur les deux écrans.
+
+
+### Ressources visuelles manquantes dans le paquet Android
+- `66fca1d6e6c48cbe89cc19e2aa88205a7e5ce70d` : correction du script Gradle : les ressources du dossier `static/`, dont l’image 3D utilisée dans l’en-tête et le favicon, sont maintenant copiées vers le répertoire Python embarqué d’Android.
+- `873fc85a295fcf86f85c8c5ef192b300330bc2b1` : test de régression de la présence de la tâche de copie.
+- Le paquet Android n’a pas été reconstruit conformément à la pause demandée ; cette correction reste à confirmer lors de la vérification finale.
