@@ -31,7 +31,13 @@ def _migrate_legacy_data(data_dir, legacy_root):
     legacy_photos = legacy_root / "resident_photos"
     target_photos = data_dir / "resident_photos"
     if legacy_photos.is_dir():
-        shutil.copytree(legacy_photos, target_photos, dirs_exist_ok=True)
+        for source_photo in legacy_photos.rglob("*"):
+            if not source_photo.is_file():
+                continue
+            target_photo = target_photos / source_photo.relative_to(legacy_photos)
+            if not target_photo.exists():
+                target_photo.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source_photo, target_photo)
 
 
 def _prepare_user_data():
