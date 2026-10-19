@@ -388,3 +388,10 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 - `8fb31e0b38e105a1580ce71d27a14f978c028ac3` : test ajouté pour la présence du pays, de l’hôpital et des dates dans la synthèse.
 - `9da36a243a8653b1f337d78fc7f758a35f5d28ca` : assertion du test corrigée pour comparer correctement le texte UTF-8.
 - Tests non exécutés. La compilation et les contrôles Android restent en pause.
+
+
+## 18. Préparation de la synchronisation multi-appareils — 19 octobre 2026
+
+- `19d78dfcb03250715177654689a70532f99725f4` : création de `SYNC_ARCHITECTURE_RESIMANAGE2.md`. Le document décrit une cible hors ligne d’abord, synchronisation bidirectionnelle via API HTTPS, VPN privé, journal idempotent, résolution explicite des conflits, transfert sécurisé des photos, sauvegardes et étapes de tests.
+- **Important :** cette étape est une spécification technique, pas une synchronisation fonctionnelle. Il reste à implémenter le journal local, l’API centrale, l’authentification des appareils, les conflits et les sauvegardes serveur avant d’annoncer une synchronisation entre appareils.
+- Les workflows de vérification Android restent manuels uniquement jusqu’à l’intégration de toutes les directives.
