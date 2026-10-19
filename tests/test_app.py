@@ -2162,3 +2162,12 @@ def test_windows_packaging_bundles_static_assets_and_uses_separate_user_data():
     assert 'root / "ResiManage" / "data"' in launcher
     assert 'resimanage.DB = str(data_dir / "rotation.db")' in launcher
     assert 'host="127.0.0.1"' in launcher
+
+
+def test_internal_favicon_declares_the_jpeg_mime_type(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.get("/")
+    assert response.status_code == 200
+    assert b'type="image/jpeg" href="/static/resimanage-3d-icon.jpg"' in response.data
+    assert b'type="image/svg+xml" href="/static/resimanage-3d-icon.jpg"' not in response.data
