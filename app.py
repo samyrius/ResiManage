@@ -1232,22 +1232,26 @@ def exams():
     c.close(); return ("Forbidden — Super Admin only",403)
    try:
     module=request.form.get("module","").strip()
+    exam_type=request.form.get("exam_type","actual").strip()
+    attempt=int(request.form.get("attempt","1"))
     theory=float(request.form.get("theory",""))
     practical=float(request.form.get("practical",""))
    except (TypeError,ValueError):
-    c.close(); flash("Module and numeric marks from 0 to 20 are required."); return redirect("/exams")
+    c.close(); flash("Module, valid exam session, attempt number and marks from 0 to 20 are required."); return redirect("/exams")
+   allowed_exam_types=("virtual","actual","remedial","dems_virtual","dems_actual","dems_remedial","dems_insertion")
+   dems_types=("dems_virtual","dems_actual","dems_remedial","dems_insertion")
    if resident["status"]=="graduated" or sy>resident["year"]:
     flash("Cannot record marks for a future study year or modify a DEMS-graduated resident's archived record.")
-   elif sy not in (1,2,3,4) or not module or not (0<=theory<=20 and 0<=practical<=20):
-    flash("Module and marks from 0 to 20 are required")
+   elif sy not in (1,2,3,4) or not module or exam_type not in allowed_exam_types or (exam_type in dems_types and sy!=4) or attempt not in (1,2,3) or not (0<=theory<=20 and 0<=practical<=20):
+    flash("Choose a valid session/year, attempt 1–3 and marks from 0 to 20. DEMS sessions are for year 4.")
    else:
-    existing=c.execute("SELECT id FROM exam_records WHERE resident_id=? AND study_year=? AND lower(module)=lower(?)",(rid,sy,module)).fetchone()
+    existing=c.execute("SELECT id FROM exam_records WHERE resident_id=? AND study_year=? AND lower(module)=lower(?) AND exam_type=? AND attempt=?",(rid,sy,module,exam_type,attempt)).fetchone()
     if existing:
      c.execute("UPDATE exam_records SET theory=?,practical=?,created_at=CURRENT_TIMESTAMP WHERE id=?",(theory,practical,existing["id"]))
-     audit_event(c,"exam.updated",f"resident_id={rid}; year={sy}; module={module}")
+     audit_event(c,"exam.updated",f"resident_id={rid}; year={sy}; module={module}; session={exam_type}; attempt={attempt}")
     else:
-     c.execute("INSERT INTO exam_records(resident_id,study_year,module,theory,practical) VALUES(?,?,?,?,?)",(rid,sy,module,theory,practical))
-     audit_event(c,"exam.recorded",f"resident_id={rid}; year={sy}; module={module}")
+     c.execute("INSERT INTO exam_records(resident_id,study_year,module,theory,practical,exam_type,attempt) VALUES(?,?,?,?,?,?,?)",(rid,sy,module,theory,practical,exam_type,attempt))
+     audit_event(c,"exam.recorded",f"resident_id={rid}; year={sy}; module={module}; session={exam_type}; attempt={attempt}")
     c.commit(); flash(tr("done"))
   elif action=="evaluate_first_year" and request.form.get("all_modules_confirmed")!="yes":
    flash("Confirm that all first-year module results have been entered before evaluating progression.")
@@ -1258,7 +1262,17 @@ def exams():
    elif resident["status"]!="active":
     flash("The resident is inactive; progression is not available.")
    else:
-    records=c.execute("SELECT theory,practical FROM exam_records WHERE resident_id=? AND study_year=1",(rid,)).fetchall()
+    raw_records=c.execute("SELECT id,module,theory,practical,exam_type,attempt FROM exam_records WHERE resident_id=? AND study_year=1 AND exam_type IN ('actual','remedial') ORDER BY id",(rid,)).fetchall()
+    chosen={}
+    for record in raw_records:
+     key=record["module"].strip().casefold()
+     previous=chosen.get(key)
+     # A remedial result replaces the ordinary actual result for that module;
+     # otherwise the highest recorded attempt in the same session is used.
+     priority=(1 if record["exam_type"]=="remedial" else 0,record["attempt"],record["id"])
+     if previous is None or priority>(1 if previous["exam_type"]=="remedial" else 0,previous["attempt"],previous["id"]):
+      chosen[key]=record
+    records=list(chosen.values())
     if not records:
      flash("Enter first-year exam modules before evaluation")
     else:
