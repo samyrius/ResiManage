@@ -15,7 +15,7 @@ The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Install
 
-1. Download the `rotation-app-debug-apk` artifact from a successful GitHub Actions run.
+1. After the final review and manual workflow run, download the `resimanage2-debug-apk` artifact from that successful GitHub Actions run.
 2. Extract `app-debug.apk` from the ZIP.
 3. Install it on a 64-bit ARM Android device (the APK includes `arm64-v8a` and `x86_64` libraries; x86_64 is included for emulator testing).
 4. Open the app and create the first administrator password when prompted.
