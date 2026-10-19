@@ -549,6 +549,7 @@ def test_backup_and_restore_preserve_database_and_resident_photos(tmp_path, monk
         "backup_file": (io.BytesIO(backup_bytes), "resimanage_full_backup.zip")
     }, content_type="multipart/form-data", follow_redirects=True)
     assert restored.status_code == 200
+    assert b"Restore completed." in restored.data, restored.data.decode("utf-8", errors="replace")
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM residents WHERE surname='BeforeBackup'").fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM residents WHERE surname='AddedAfterBackup'").fetchone()[0] == 0
