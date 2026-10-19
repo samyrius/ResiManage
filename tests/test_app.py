@@ -2182,3 +2182,16 @@ def test_registration_password_fields_have_visibility_toggles(tmp_path, monkeypa
     assert 'id="register-confirm-password"' in html
     assert html.count('class="password-toggle"') >= 2
     assert "Hide password" in html
+
+
+def test_admin_password_fields_have_visibility_toggles(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    settings_response = client.get("/settings")
+    users_response = client.get("/users")
+    assert settings_response.status_code == 200
+    assert users_response.status_code == 200
+    assert 'id="settings-new-password"' in settings_response.get_data(as_text=True)
+    assert 'id="new-user-password"' in users_response.get_data(as_text=True)
+    assert 'class="password-toggle"' in settings_response.get_data(as_text=True)
+    assert 'class="password-toggle"' in users_response.get_data(as_text=True)
