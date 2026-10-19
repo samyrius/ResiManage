@@ -1138,9 +1138,9 @@ def resident_profile(rid):
    continue
  leave_rows=c.execute("SELECT start_date,end_date,days,notes FROM leave_entries WHERE resident_id=? ORDER BY start_date DESC",(rid,)).fetchall()
  external_rows=c.execute("SELECT supervisor,destination,hospital,country,rotation_type,start_date,end_date,notes,status FROM external_rotations WHERE resident_id=? ORDER BY start_date DESC",(rid,)).fetchall()
- leave_year_count=c.execute("SELECT COUNT(*) FROM leave_years WHERE resident_id=?",(rid,)).fetchone()[0]
  leave_earned=c.execute("SELECT COALESCE(SUM(earned_days),0) FROM leave_years WHERE resident_id=? AND year<=?",(rid,today.year)).fetchone()[0]
- if not leave_year_count: leave_earned=30
+ current_leave_year=c.execute("SELECT 1 FROM leave_years WHERE resident_id=? AND year=?",(rid,today.year)).fetchone()
+ if not current_leave_year: leave_earned+=30
  leave_used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND end_date<=?",(rid,date(today.year,12,31).isoformat())).fetchone()[0]
  leave_remaining=leave_earned-leave_used
  terrains=c.execute("SELECT * FROM terrains ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END,name").fetchall(); c.close()
@@ -1530,7 +1530,7 @@ def leave_management():
     now=date.today(); balances=[]
     for r in residents:
         first=c.execute("SELECT MIN(year) FROM leave_years WHERE resident_id=?",(r["id"],)).fetchone()[0]
-        first=first if first is not None else now.year
+        first=min(first,now.year) if first is not None else now.year
         for yr in range(first,now.year+1):
             c.execute("INSERT OR IGNORE INTO leave_years(resident_id,year,earned_days,created_by) VALUES(?,?,30,?)",(r["id"],yr,session.get("user","")))
         earned=c.execute("SELECT COALESCE(SUM(earned_days),0) FROM leave_years WHERE resident_id=? AND year<=?",(r["id"],now.year)).fetchone()[0]
