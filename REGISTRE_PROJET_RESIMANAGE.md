@@ -173,3 +173,9 @@ Complément opérationnel à la pause Android :
 - `7e1701f0e80abfc070893dc20effd10eb2a443f0` : ajout de boutons d’affichage/masquage sur le mot de passe et sa confirmation dans le formulaire d’inscription, en cohérence avec l’écran de connexion.
 - `2f18c013fed8515f95b9031530051dc7daacd953` : test de régression du formulaire d’inscription.
 - Tests non exécutés ici ; validation Android toujours en pause.
+
+
+### Cohérence de l’affichage des mots de passe
+- `955390a15729639db2e1bf142178b6bca740d8d5` : ajout des commandes d’affichage/masquage sur les formulaires de première configuration, paramètres et création de compte administrateur.
+- `1c7d327c76d2baa3c17d7754dcd97987ea2540e4` : tests de présence de ces commandes sur les formulaires administrateur.
+- Ces changements restent non vérifiés par exécution à cette étape.
