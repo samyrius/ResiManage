@@ -271,3 +271,5 @@ Complément opérationnel à la pause Android :
 ### Dossier résident — stages à l’étranger
 - `b30c2ca283efead33ad49c70f5218493b9de40eb` : le profil résident affiche désormais les stages à l’étranger avec destination, hôpital, pays, type, dates, responsable, notes et statut.
 - `93140be81fbac2df1ffe757c90e2302f8ac2ca80` : test de régression du détail des stages externes dans le profil.
+
+- `1076e08c3521cf99641495e002bf8886d84c35a1` : clarification du statut de chiffrement : la base SQLite Android est dans le stockage privé de l’application, mais le fichier DB n’est pas encore chiffré au repos ; ce point doit être évalué avant l’usage avec des données réelles.
