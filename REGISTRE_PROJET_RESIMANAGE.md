@@ -143,3 +143,17 @@ Complément opérationnel à la pause Android :
 - `60035d69d877dc050126d89c87e12f740c4f8564` : test de régression pour empêcher le retour de ce mauvais type MIME.
 - `b0961f2ae52643f242c5c9b2cc01d81c8949517c` : README mis à jour pour désigner l’image actuelle du médecin/stéthoscope 3D plutôt que l’ancien fichier SVG.
 - Ces changements ont été enregistrés ; les tests ne sont pas déclarés exécutés/réussis. La vérification Android reste en pause.
+
+
+## 11. Conception de la synchronisation hors ligne
+
+- Document ajouté : `docs/SYNC_ARCHITECTURE_RESIMANAGE2.md` (commit `58797156c28bc5e793365a1635c10aba505d3e74`).
+- Il fixe le PC Windows central, le mode hors connexion Android/PC secondaire, le VPN privé entre réseaux distincts, HTTPS, l’enrôlement/révocation des appareils, la synchronisation incrémentale idempotente, la résolution explicite des conflits, les tombstones, l’audit et les critères d’acceptation.
+- **Ce document est une conception, pas une implémentation.** Aucun endpoint de synchronisation n’a été ajouté et le serveur reste local. L’exposition réseau reste désactivée par défaut.
+- Ordre de travail : terminer la stabilisation Windows, puis implémenter l’API et le modèle de versions par étapes, avec données fictives et tests de coupure/conflit avant toute donnée réelle.
+
+## 12. Éléments encore à fermer pendant l’audit fonctionnel
+
+- Vérifier et compléter la gestion des comptes : l’interface actuelle permet la création/activation/désactivation et les paramètres permettent de changer le mot de passe courant ; l’édition du rôle et la réinitialisation du mot de passe d’un autre compte ne sont pas encore confirmées comme disponibles.
+- Poursuivre la revue fonctionnelle des profils résidents, examens, congés, stages externes, règles d’affectation, archives DEMS, export/sauvegarde et traductions.
+- Les tests Python et Windows restent à exécuter ; la validation Android demeure suspendue jusqu’à la fin des directives.
