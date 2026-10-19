@@ -2404,3 +2404,11 @@ def test_android_package_version_identifies_resimanage_2():
     ).read_text(encoding="utf-8")
     assert "versionCode 2" in gradle
     assert 'versionName "2.0.0"' in gradle
+
+
+def test_android_gradle_project_uses_current_resimanage_name():
+    settings = (
+        Path(__file__).resolve().parents[1] / "android/settings.gradle"
+    ).read_text(encoding="utf-8")
+    assert 'rootProject.name = "ResiManage"' in settings
+    assert 'rootProject.name = "RotationApp"' not in settings
