@@ -2877,7 +2877,8 @@ def test_external_internship_request_requires_admin_approval_before_blocking_ass
             (rid,),
         ).fetchone()
         assert tuple(row[1:]) == ("pending", "requested")
-        allowed, message, _ = rotation_app.check(conn, rid, tid, period["id"], period["year_label"])
+        with rotation_app.app.test_request_context("/"):
+            allowed, message, _ = rotation_app.check(conn, rid, tid, period["id"], period["year_label"])
         assert "External rotation blocks" not in message
 
     # The Super Admin cannot approve a request that conflicts with an existing local assignment.
@@ -2907,7 +2908,8 @@ def test_external_internship_request_requires_admin_approval_before_blocking_ass
             "SELECT request_status,status FROM external_rotations WHERE id=?", (row["id"],)
         ).fetchone()
         assert tuple(saved) == ("approved", "returned")
-        allowed, message, _ = rotation_app.check(conn, rid, tid, period["id"], period["year_label"])
+        with rotation_app.app.test_request_context("/"):
+            allowed, message, _ = rotation_app.check(conn, rid, tid, period["id"], period["year_label"])
         assert allowed is False
         assert "External rotation blocks local assignment" in message
         assert conn.execute(
