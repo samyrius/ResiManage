@@ -19,6 +19,13 @@ import sync_client
 
 class CsrfAwareTestClient(FlaskClient):
     def post(self, *args, **kwargs):
+        path = args[0] if args else kwargs.get("path", "")
+        headers = kwargs.get("headers") or {}
+        if str(path).startswith("/api/sync/") and any(
+            str(k).lower() == "authorization" and str(v).startswith("Bearer ")
+            for k, v in headers.items()
+        ):
+            return super().post(*args, **kwargs)
         data = dict(kwargs.get("data") or {})
         if "_csrf_token" not in data:
             with self.session_transaction() as sess:
