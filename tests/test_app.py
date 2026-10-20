@@ -11,8 +11,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "android" / "app" / "src" / "main" / "python"))
 
 import app as rotation_app
+import sync_client
 
 
 class CsrfAwareTestClient(FlaskClient):
@@ -3112,3 +3114,43 @@ def test_sync_write_device_push_is_idempotent_conflict_aware_and_downgrades_assi
     assert assignment_push.json["results"][0]["status"] == "applied"
     with rotation_app.db() as conn:
         assert conn.execute("SELECT status FROM assignments WHERE id=?", (assignment_payload["id"],)).fetchone()[0] == "pending"
+
+
+def test_android_sync_client_requires_https_and_remote_apply_does_not_echo(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    valid_url, token = sync_client._validate_config("https://10.55.0.8:5000", "T" * 43)
+    assert valid_url == "https://10.55.0.8:5000"
+    assert len(token) == 43
+    with pytest.raises(sync_client.SyncError, match="HTTPS"):
+        sync_client._validate_config("http://10.55.0.8:5000", "T" * 43)
+
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
+            ("SyncClient", "Resident", 1, "active"),
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='SyncClient'").fetchone()[0]
+        fields = rotation_app._SYNC_ENTITY_FIELDS["residents"]
+        row = conn.execute("SELECT * FROM residents WHERE id=?", (rid,)).fetchone()
+        payload = {field: row[field] for field in fields}
+        local_seq_before = conn.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log").fetchone()[0]
+        conn.commit()
+
+    payload["surname"] = "ServerPulled"
+    conn = rotation_app.db()
+    sync_client._apply_remote_batch(conn, [{
+        "seq": 500, "entity": "residents", "entity_id": str(rid),
+        "operation": "upsert", "payload": payload,
+    }])
+    assert conn.execute("SELECT surname FROM residents WHERE id=?", (rid,)).fetchone()[0] == "ServerPulled"
+    assert conn.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log").fetchone()[0] == local_seq_before
+    assert conn.execute("SELECT server_seq FROM sync_row_versions WHERE entity='residents' AND entity_id=?", (str(rid),)).fetchone()[0] == 500
+    conn.execute("UPDATE residents SET surname='LocalEditedAfterPull' WHERE id=?", (rid,))
+    conn.commit()
+    latest = conn.execute(
+        "SELECT base_seq FROM sync_change_log WHERE entity='residents' AND entity_id=? ORDER BY seq DESC LIMIT 1",
+        (str(rid),),
+    ).fetchone()[0]
+    assert latest == 500
+    conn.close()
