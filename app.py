@@ -1051,14 +1051,15 @@ def sync_api_photo_upload(rid):
  photo_digest=hashlib.sha256(normalized).hexdigest()
  current=c.execute("SELECT photo_path FROM residents WHERE id=?",(rid,)).fetchone()
  prior=c.execute("SELECT photo_path,server_seq FROM sync_photo_uploads WHERE device_id=? AND resident_id=? AND sha256=?",(device["device_id"],rid,photo_digest)).fetchone()
+ latest=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log WHERE entity='residents' AND entity_id=?",(str(rid),)).fetchone()[0]
  if prior and current and current["photo_path"]:
   current_file=os.path.join(os.path.dirname(os.path.abspath(DB)),"resident_photos",secure_filename(os.path.basename(current["photo_path"])))
   if os.path.isfile(current_file):
    with open(current_file,"rb") as handle: current_digest=hashlib.sha256(handle.read(4*1024*1024+1)).hexdigest()
-   if current_digest==photo_digest:
-    latest=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log WHERE entity='residents' AND entity_id=?",(str(rid),)).fetchone()[0]
+   # Treat a byte-identical retry as idempotent only while the resident row
+   # has not advanced since that upload. A later edit must still conflict.
+   if current_digest==photo_digest and latest<=prior["server_seq"]:
     c.close(); return jsonify(ok=True,resident_id=rid,photo_path=current["photo_path"],server_seq=latest,replayed=True)
- latest=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log WHERE entity='residents' AND entity_id=?",(str(rid),)).fetchone()[0]
  if latest>base_seq:
   current_change=c.execute("SELECT payload_json FROM sync_change_log WHERE entity='residents' AND entity_id=? ORDER BY seq DESC LIMIT 1",(str(rid),)).fetchone()
   c.close(); return jsonify(error="conflict",server_seq=latest,server_payload=json.loads(current_change["payload_json"]) if current_change and current_change["payload_json"] else None),409
