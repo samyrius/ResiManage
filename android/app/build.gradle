@@ -36,8 +36,13 @@ def copyRotationStaticAssets = tasks.register("copyRotationStaticAssets", Copy) 
     from(rootProject.file("../static"))
     into(layout.projectDirectory.dir("src/main/python/static"))
 }
+def copyRotationLauncherIcon = tasks.register("copyRotationLauncherIcon", Copy) {
+    from(rootProject.file("../static/resimanage-3d-icon.jpg"))
+    into(layout.projectDirectory.dir("src/main/res/drawable"))
+    rename { "resimanage_3d_launcher.jpg" }
+}
 tasks.named("preBuild").configure {
-    dependsOn(copyRotationPythonApp, copyRotationStaticAssets)
+    dependsOn(copyRotationPythonApp, copyRotationStaticAssets, copyRotationLauncherIcon)
 }
 tasks.configureEach {
     if (name.toLowerCase().contains("python") && name != "copyRotationPythonApp" && name != "copyRotationStaticAssets") {
