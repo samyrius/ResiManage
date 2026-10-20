@@ -210,13 +210,26 @@ def _push_local_changes(conn, base_url, token, device_id, remote_cursor):
             continue
         latest[key] = row
     operations = []
+    photo_uploads = {}
+    skipped_photos = []
     for row in latest.values():
         local_seq = int(row["seq"])
         op_id = hashlib.sha256((device_id + ":" + str(local_seq)).encode("utf-8")).hexdigest()[:40]
+        payload = json.loads(row["payload_json"]) if row["operation"] == "upsert" else None
+        if row["entity"] == "residents" and isinstance(payload, dict) and payload.get("photo_path"):
+            filename = os.path.basename(str(payload["photo_path"]))
+            ext = os.path.splitext(filename)[1].lower()
+            local_photo = os.path.join(data_directory, "resident_photos", filename)
+            if filename.startswith("resident_") and ext in (".png", ".jpg", ".jpeg", ".webp") and os.path.isfile(local_photo):
+                photo_uploads[op_id] = (local_photo, ext)
+                payload["photo_path"] = ""
+            elif int(row["base_seq"] or 0) == 0:
+                payload["photo_path"] = ""
+                skipped_photos.append(str(row["entity_id"]))
         operations.append({
             "op_id": op_id, "entity": row["entity"], "entity_id": str(row["entity_id"]),
             "operation": row["operation"], "base_seq": int(row["base_seq"] or 0),
-            "payload": json.loads(row["payload_json"]) if row["operation"] == "upsert" else None,
+            "payload": payload,
         })
     pushed = 0
     for offset in range(0, len(operations), 80):
@@ -235,14 +248,35 @@ def _push_local_changes(conn, base_url, token, device_id, remote_cursor):
             pushed += 1
             original = next((op for op in operations if op["op_id"] == item.get("op_id")), None)
             if original:
+                entity_seq = int(item.get("server_seq", remote_cursor))
                 conn.execute(
                     "INSERT INTO sync_row_versions(entity,entity_id,server_seq) VALUES(?,?,?) "
                     "ON CONFLICT(entity,entity_id) DO UPDATE SET server_seq=excluded.server_seq",
-                    (original["entity"], original["entity_id"], int(item.get("server_seq", remote_cursor))),
+                    (original["entity"], original["entity_id"], entity_seq),
                 )
+                if item.get("status") == "applied" and item["op_id"] in photo_uploads:
+                    local_photo, ext = photo_uploads[item["op_id"]]
+                    mime = {".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webp":"image/webp"}[ext]
+                    with open(local_photo, "rb") as photo_handle:
+                        photo_result = _api_put_bytes(
+                            base_url, token,
+                            "/api/sync/v1/photo/" + original["entity_id"] + "?base_seq=" + str(entity_seq),
+                            photo_handle.read(4 * 1024 * 1024 + 1), mime,
+                        )
+                    if not photo_result.get("ok"):
+                        raise SyncError("Central server did not accept resident photo " + original["entity_id"])
+                    conn.execute("BEGIN IMMEDIATE")
+                    conn.execute("UPDATE sync_control SET suppress_log=1 WHERE id=1")
+                    conn.execute("UPDATE residents SET photo_path=? WHERE id=?",
+                                 ("/photos/" + os.path.basename(local_photo), int(original["entity_id"])))
+                    conn.execute("INSERT INTO sync_row_versions(entity,entity_id,server_seq) VALUES('residents',?,?) "
+                                 "ON CONFLICT(entity,entity_id) DO UPDATE SET server_seq=excluded.server_seq",
+                                 (original["entity_id"], int(photo_result["server_seq"])))
+                    conn.execute("UPDATE sync_control SET suppress_log=0 WHERE id=1")
+                    conn.commit()
     _set_setting(conn, "resimanage_sync_outbox_cursor", int(rows[-1]["seq"]))
     conn.commit()
-    return {"pushed": pushed, "skipped_entities": sorted(skipped)}
+    return {"pushed": pushed, "skipped_entities": sorted(skipped), "skipped_photos": sorted(set(skipped_photos))}
 
 
 def sync_once(data_directory, base_url, token):
@@ -267,13 +301,13 @@ def sync_once(data_directory, base_url, token):
             cursor, pulled = _pull_all(conn, base_url, token, cursor)
         else:
             cursor, pulled = _pull_all(conn, base_url, token, int(saved_cursor))
-        push_result = {"pushed": 0, "skipped_entities": []}
+        push_result = {"pushed": 0, "skipped_entities": [], "skipped_photos": []}
         if status.get("push_enabled"):
             push_result = _push_local_changes(conn, base_url, token, device_id, cursor)
         return json.dumps({
             "ok": True, "device_id": device_id, "pulled": pulled,
             "pushed": push_result["pushed"], "skipped_entities": push_result["skipped_entities"],
-            "remote_cursor": cursor,
+            "skipped_photos": push_result.get("skipped_photos", []), "remote_cursor": cursor,
             "message": "Sync finished." if not push_result["skipped_entities"] else
                 "Sync finished; some entity types are not yet push-enabled: " + ", ".join(push_result["skipped_entities"]),
         }, ensure_ascii=False)
