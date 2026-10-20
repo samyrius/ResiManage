@@ -76,3 +76,5 @@ $env:RESIMANAGE_TLS_KEY = "C:\\ResiManage\\certs\\server-key.pem"
 ```
 
 Use your organization/VPN certificate authority; allow TCP 5000 only through the VPN firewall. Remote HTTP is rejected. This is an unfinished server-side sync milestone, not a claim that the phone and PCs are already synchronized.
+
+Resident profile photos have a limited sync path in source: authenticated API upload/download (4 MB cap, WEBP normalization, row-version check) and Android private-folder copy. This is not yet physically tested, and photo conflict cleanup remains unfinished.
