@@ -3197,6 +3197,15 @@ def test_sync_api_transfers_resident_photo_with_write_token_and_version_guard(tm
     assert photo.mimetype == "image/webp"
     assert len(photo.data) > 0
 
+    # A network retry of the same photo is idempotent before any newer row edit.
+    replay = client.put(
+        f"/api/sync/v1/photo/{rid}?base_seq={base_seq}",
+        data=source.getvalue(), headers=headers, content_type="image/png",
+    )
+    assert replay.status_code == 200, replay.data
+    assert replay.json["replayed"] is True
+    assert replay.json["photo_path"] == uploaded.json["photo_path"]
+
     with rotation_app.db() as conn:
         saved = conn.execute("SELECT photo_path FROM residents WHERE id=?", (rid,)).fetchone()[0]
         assert saved == uploaded.json["photo_path"]
