@@ -65,7 +65,53 @@ def _setting(conn, key, default=None):
     return row["value"] if row else default
 
 
-def _apply_remote_batch(conn, changes):
+
+def _api_bytes(base_url, token, path):
+    req = urllib.request.Request(base_url.rstrip("/") + path,
+        headers={"Accept": "image/*", "Authorization": "Bearer " + token}, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=30, context=ssl.create_default_context(cafile=certifi.where())) as response:
+            raw = response.read(4 * 1024 * 1024 + 1)
+            if not raw or len(raw) > 4 * 1024 * 1024:
+                raise SyncError("Synced photo is empty or exceeds 4 MB.")
+            return raw, response.headers.get_content_type()
+    except urllib.error.HTTPError as exc:
+        raise SyncError("Photo download failed (HTTP %s): %s" % (exc.code, exc.read(2048).decode("utf-8", "replace"))) from exc
+    except urllib.error.URLError as exc:
+        raise SyncError("Cannot download resident photo: %s" % exc.reason) from exc
+
+
+def _api_put_bytes(base_url, token, path, raw, content_type):
+    req = urllib.request.Request(base_url.rstrip("/") + path, data=raw,
+        headers={"Authorization": "Bearer " + token, "Content-Type": content_type, "Accept": "application/json"},
+        method="PUT")
+    try:
+        with urllib.request.urlopen(req, timeout=30, context=ssl.create_default_context(cafile=certifi.where())) as response:
+            return json.loads(response.read(65536).decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raise SyncError("Photo upload failed (HTTP %s): %s" % (exc.code, exc.read(4096).decode("utf-8", "replace"))) from exc
+    except urllib.error.URLError as exc:
+        raise SyncError("Cannot upload resident photo: %s" % exc.reason) from exc
+
+def _apply_remote_batch(conn, changes, base_url, token, data_directory):
+    # Download photos before taking the SQLite write lock, then map the path to local storage.
+    photo_dir = os.path.join(data_directory, "resident_photos")
+    for change in changes:
+        if change.get("entity") == "residents" and change.get("operation") == "upsert":
+            payload = change.get("payload") or {}
+            if payload.get("photo_path"):
+                raw, mime = _api_bytes(base_url, token, "/api/sync/v1/photo/" + str(change["entity_id"]))
+                ext = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}.get(mime)
+                if not ext:
+                    raise SyncError("Unsupported central photo MIME type: " + str(mime))
+                os.makedirs(photo_dir, exist_ok=True)
+                filename = "resident_" + str(change["entity_id"]) + "_sync_" + str(change["seq"]) + ext
+                with open(os.path.join(photo_dir, filename), "wb") as handle:
+                    handle.write(raw)
+                payload = dict(payload)
+                payload["photo_path"] = "/photos/" + filename
+                change["payload"] = payload
+
     # Lock writes while suppressing journal triggers so pulled rows do not echo back as local edits.
     conn.execute("BEGIN IMMEDIATE")
     try:
@@ -118,7 +164,7 @@ def _bootstrap_empty_device(conn, base_url, token, server_cursor):
                     "seq": int(server_cursor), "entity": entity, "entity_id": str(row["id"]),
                     "operation": "upsert", "payload": row,
                 } for row in rows]
-                _apply_remote_batch(conn, changes)
+                _apply_remote_batch(conn, changes, base_url, token, data_directory)
                 after_id = int(page.get("next_id", after_id))
             if not page.get("has_more"):
                 break
@@ -136,7 +182,7 @@ def _pull_all(conn, base_url, token, cursor):
         changes = page.get("changes", [])
         if not changes:
             break
-        _apply_remote_batch(conn, changes)
+        _apply_remote_batch(conn, changes, base_url, token, data_directory)
         cursor = int(page.get("next_seq", cursor))
         _set_setting(conn, "resimanage_sync_remote_cursor", cursor)
         conn.commit()
