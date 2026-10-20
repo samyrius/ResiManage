@@ -3284,6 +3284,51 @@ def test_sync_api_transfers_resident_photo_with_write_token_and_version_guard(tm
     assert stale_upload.status_code == 409
 
 
+
+def test_android_sync_retries_photo_upload_when_resident_upsert_was_replayed(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    photo_dir = tmp_path / "resident_photos"
+    photo_dir.mkdir()
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
+            ("PhotoRetry", "Resident", 1, "active"),
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='PhotoRetry'").fetchone()[0]
+        filename = "resident_%s_retry.png" % rid
+        (photo_dir / filename).write_bytes(b"local-photo-bytes")
+        conn.execute("UPDATE residents SET photo_path=? WHERE id=?", ("/photos/" + filename, rid))
+        conn.commit()
+
+    upload_calls = []
+    def fake_api(base_url, token, path, body=None):
+        assert path == "/api/sync/v1/push"
+        assert body and len(body["operations"]) == 1
+        op = body["operations"][0]
+        assert op["entity"] == "residents"
+        return {"results": [{
+            "op_id": op["op_id"], "status": "applied", "server_seq": 42, "replayed": True,
+        }]}
+    def fake_put(base_url, token, path, raw, mime):
+        upload_calls.append((path, raw, mime))
+        return {"ok": True, "server_seq": 43}
+    monkeypatch.setattr(sync_client, "_api", fake_api)
+    monkeypatch.setattr(sync_client, "_api_put_bytes", fake_put)
+
+    conn = rotation_app.db()
+    result = sync_client._push_local_changes(
+        conn, "https://sync.example.test", "T" * 43, "device-retry", 0, str(tmp_path)
+    )
+    assert result["pushed"] == 1
+    assert len(upload_calls) == 1
+    assert upload_calls[0][0].startswith("/api/sync/v1/photo/%s?base_seq=42" % rid)
+    assert upload_calls[0][1] == b"local-photo-bytes"
+    assert upload_calls[0][2] == "image/png"
+    assert conn.execute("SELECT server_seq FROM sync_row_versions WHERE entity='residents' AND entity_id=?", (str(rid),)).fetchone()[0] == 43
+    conn.close()
+
+
 def test_android_sync_client_downloads_remote_photo_to_local_profile_path(tmp_path, monkeypatch):
     from PIL import Image
 
