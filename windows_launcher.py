@@ -84,6 +84,9 @@ def _server_settings():
         raise RuntimeError("RESIMANAGE_BIND must be an explicit IP address (use the VPN interface IP).") from exc
     if address.is_unspecified:
         raise RuntimeError("Wildcard binds (0.0.0.0/::) are disabled; bind only to the exact VPN IP.")
+    shared_vpn_range = ipaddress.ip_network("100.64.0.0/10")
+    if not address.is_loopback and not (address.is_private or address.is_link_local or address in shared_vpn_range):
+        raise RuntimeError("Remote ResiManage listeners must bind to a private/VPN IP, never a public address.")
 
     cert = os.environ.get("RESIMANAGE_TLS_CERT", "").strip()
     key = os.environ.get("RESIMANAGE_TLS_KEY", "").strip()
