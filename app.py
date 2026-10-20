@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from flask import Flask, request, redirect, session, render_template_string, flash, send_file, send_from_directory
+from flask import Flask, request, redirect, session, render_template_string, flash, send_file, send_from_directory, jsonify
 import sqlite3, os, sys, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess, secrets, smtplib, time, zipfile
 import warnings
 from PIL import Image, ImageOps
@@ -86,6 +86,14 @@ def install_sync_change_triggers(c):
   changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
  )""")
  c.execute("CREATE INDEX IF NOT EXISTS idx_sync_change_log_entity_seq ON sync_change_log(entity,seq)")
+ c.execute("""CREATE TABLE IF NOT EXISTS sync_devices(
+  device_id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen TEXT DEFAULT ''
+ )""")
  for table,fields in _SYNC_ENTITY_FIELDS.items():
   pairs=", ".join("'"+field+"', NEW."+field for field in fields)
   for suffix,operation in (("insert","upsert"),("update","upsert")):
@@ -265,7 +273,7 @@ th{background:#0b3552!important;color:#70eaf2!important}td{background:#061d32;bo
 <details class="nav-group" {% if request.path in ['/residents','/objectives','/import','/exams','/dems'] %}open{% endif %}><summary><span class="nav-icon">♙</span><span>{{t('residents')}}</span></summary><div class="nav-menu"><a href="/residents" class="{% if request.path=='/residents' %}is-active{% endif %}">{{t('manage_residents')}}</a><a href="/objectives" class="{% if request.path=='/objectives' %}is-active{% endif %}">{{t('objectives')}}</a><a href="/import" class="{% if request.path=='/import' %}is-active{% endif %}">{{t('import_residents')}}</a><a href="/exams" class="{% if request.path=='/exams' %}is-active{% endif %}">{{t('promotion')}}</a><a href="/dems" class="{% if request.path=='/dems' %}is-active{% endif %}">{{t('dems_success')}}</a></div></details>
 <details class="nav-group" {% if request.path in ['/terrains','/capacities','/assign','/history','/leave','/external-rotations'] %}open{% endif %}><summary><span class="nav-icon">⇄</span><span>{% if lang=='ar' %}التربصات والتخطيط{% elif lang=='fr' %}Stages et planification{% else %}Rotations & planning{% endif %}</span></summary><div class="nav-menu"><a href="/terrains" class="{% if request.path=='/terrains' %}is-active{% endif %}">{{t('terrains')}}</a><a href="/capacities" class="{% if request.path=='/capacities' %}is-active{% endif %}">{{t('capacities')}}</a><a href="/assign" class="{% if request.path=='/assign' %}is-active{% endif %}">{{t('assign')}}</a><a href="/history" class="{% if request.path=='/history' %}is-active{% endif %}">{{t('history')}}</a><a href="/leave" class="{% if request.path=='/leave' %}is-active{% endif %}">{% if lang=='ar' %}الإجازات{% elif lang=='fr' %}Congés{% else %}Annual leave{% endif %}</a><a href="/external-rotations" class="{% if request.path.startswith('/external-rotations') %}is-active{% endif %}">{% if lang=='ar' %}التربصات الخارجية{% elif lang=='fr' %}Stages externes{% else %}External rotations{% endif %}</a></div></details>
 <details class="nav-group" {% if request.path in ['/decisions','/summary'] %}open{% endif %}><summary><span class="nav-icon">▤</span><span>{% if lang=='ar' %}المتابعة والتقارير{% elif lang=='fr' %}Suivi et rapports{% else %}Monitoring & reports{% endif %}</span></summary><div class="nav-menu"><a href="/decisions" class="{% if request.path=='/decisions' %}is-active{% endif %}">{{t('decisions')}}</a><a href="/summary" class="{% if request.path=='/summary' %}is-active{% endif %}">{{t('summary')}}</a></div></details>
-<details class="nav-group" {% if request.path in ['/settings','/users','/audit','/backup','/export','/restore'] %}open{% endif %}><summary><span class="nav-icon">⚙</span><span>{{t('settings')}}</span></summary><div class="nav-menu"><a href="/settings" class="{% if request.path=='/settings' %}is-active{% endif %}">{{t('settings_page')}}</a><a href="/users" class="{% if request.path=='/users' %}is-active{% endif %}">{{t('users')}}</a><a href="/audit" class="{% if request.path=='/audit' %}is-active{% endif %}">{{t('audit')}}</a><a href="/backup" class="{% if request.path=='/backup' %}is-active{% endif %}">{{t('backup')}}</a><a href="/export" class="{% if request.path=='/export' %}is-active{% endif %}">{{t('export')}}</a><a href="/restore" class="{% if request.path=='/restore' %}is-active{% endif %}">{{t('restore')}}</a><a href="/logout">{{t('logout')}}</a></div></details>
+<details class="nav-group" {% if request.path in ['/settings','/users','/sync-devices','/audit','/backup','/export','/restore'] %}open{% endif %}><summary><span class="nav-icon">⚙</span><span>{{t('settings')}}</span></summary><div class="nav-menu"><a href="/settings" class="{% if request.path=='/settings' %}is-active{% endif %}">{{t('settings_page')}}</a><a href="/users" class="{% if request.path=='/users' %}is-active{% endif %}">{{t('users')}}</a><a href="/sync-devices" class="{% if request.path=='/sync-devices' %}is-active{% endif %}">Sync devices / Appareils / أجهزة</a><a href="/audit" class="{% if request.path=='/audit' %}is-active{% endif %}">{{t('audit')}}</a><a href="/backup" class="{% if request.path=='/backup' %}is-active{% endif %}">{{t('backup')}}</a><a href="/export" class="{% if request.path=='/export' %}is-active{% endif %}">{{t('export')}}</a><a href="/restore" class="{% if request.path=='/restore' %}is-active{% endif %}">{{t('restore')}}</a><a href="/logout">{{t('logout')}}</a></div></details>
 <div class="rt-language" aria-label="Language"><a href="/lang/ar" {% if lang=='ar' %}aria-current="page"{% endif %} title="العربية">🇩🇿</a><a href="/lang/fr" {% if lang=='fr' %}aria-current="page"{% endif %} title="Français">🇫🇷</a><a href="/lang/en" {% if lang=='en' %}aria-current="page"{% endif %} title="English">🇬🇧</a></div></nav>{% endif %}<main>{% for m in get_flashed_messages() %}<p class="msg">{{m}}</p>{% endfor %}{{body|safe}}</main></div><footer class="rt-footer">© <strong>Tous droits réservés · ResiManage · Dr Dris</strong><span class="rt-sep"> | </span><strong>All rights reserved · ResiManage · Dr Dris</strong><span class="rt-sep"> | </span><strong>جميع الحقوق محفوظة · ResiManage · Dr Dris</strong></footer></html>"""
  c=db()
  try:
@@ -762,7 +770,7 @@ def settings():
   audit_event(c,"settings.updated",f"year={y}; director_updated={bool(d)}")
   c.commit(); flash(tr("done"))
  vals={r["key"]:r["value"] for r in c.execute("SELECT key,value FROM settings")}; c.close()
- return page("""<section><h3>{{t('settings')}}</h3><form method="post"><label>{{t('language')}}</label><select name="lang"><option value="ar" {% if lang=='ar' %}selected{% endif %}>العربية</option><option value="fr" {% if lang=='fr' %}selected{% endif %}>Français</option><option value="en" {% if lang=='en' %}selected{% endif %}>English</option></select><label>{{t('year')}}</label><input name="year" value="{{vals.get('year','')}}" required><label>{{t('director')}}</label><input name="director" value="{{vals.get('director','')}}"><label>{{t('new_password')}}</label><div class="password-wrap"><input id="settings-new-password" type="password" name="new_password" minlength="12" autocomplete="new-password"><button class="password-toggle" type="button" aria-label="Show password" onclick="const p=document.getElementById('settings-new-password');p.type=p.type==='password'?'text':'password';this.setAttribute('aria-label',p.type==='password'?'Show password':'Hide password')">◉</button></div><button>{{t('change')}}</button></form><p class="muted">{{t('note')}}</p></section>""",vals=vals,lang=session.get("lang","ar"))
+ return page("""<section><h3>{{t('settings')}}</h3><form method="post"><label>{{t('language')}}</label><select name="lang"><option value="ar" {% if lang=='ar' %}selected{% endif %}>العربية</option><option value="fr" {% if lang=='fr' %}selected{% endif %}>Français</option><option value="en" {% if lang=='en' %}selected{% endif %}>English</option></select><label>{{t('year')}}</label><input name="year" value="{{vals.get('year','')}}" required><label>{{t('director')}}</label><input name="director" value="{{vals.get('director','')}}"><label>{{t('new_password')}}</label><div class="password-wrap"><input id="settings-new-password" type="password" name="new_password" minlength="12" autocomplete="new-password"><button class="password-toggle" type="button" aria-label="Show password" onclick="const p=document.getElementById('settings-new-password');p.type=p.type==='password'?'text':'password';this.setAttribute('aria-label',p.type==='password'?'Show password':'Hide password')">◉</button></div><button>{{t('change')}}</button></form><p class="muted">{{t('note')}}</p><p><a href="/sync-devices">Manage trusted sync devices / Gérer les appareils de synchronisation / إدارة أجهزة المزامنة</a></p></section>""",vals=vals,lang=session.get("lang","ar"))
 @app.route("/users",methods=["GET","POST"])
 def manage_users():
  if super_guard(): return super_guard()
@@ -827,6 +835,120 @@ def audit_log():
  if super_guard(): return super_guard()
  c=db(); rows=c.execute("SELECT * FROM audit ORDER BY id DESC LIMIT 300").fetchall(); c.close()
  return page("""<section><h3>{{t('audit')}}</h3><div class="wrap"><table><tr><th>{{t('date')}}</th><th>{{t('actor')}}</th><th>{{t('action')}}</th><th>{{t('details')}}</th></tr>{% for r in rows %}<tr><td>{{r.created_at}}</td><td>{{r.actor}}</td><td>{{r.action}}</td><td>{{r.details}}</td></tr>{% else %}<tr><td colspan="4">{{t('none')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
+
+
+@app.route("/sync-devices",methods=["GET","POST"])
+def manage_sync_devices():
+ if super_guard(): return super_guard()
+ c=db()
+ if request.method=="POST":
+  action=request.form.get("action","")
+  if action=="enroll":
+   label=request.form.get("label","").strip()
+   if not label or len(label)>100:
+    flash("Device label is required (maximum 100 characters).")
+   else:
+    device_id=secrets.token_hex(12)
+    token=secrets.token_urlsafe(32)
+    token_hash=hashlib.sha256(token.encode("utf-8")).hexdigest()
+    c.execute("INSERT INTO sync_devices(device_id,label,token_hash) VALUES(?,?,?)",(device_id,label,token_hash))
+    audit_event(c,"sync_device.enrolled",f"device_id={device_id}; label={label}")
+    c.commit()
+    session["issued_sync_device"]={"device_id":device_id,"label":label,"token":token}
+    flash("Device enrolled. Copy its bearer token now; it will only be shown once.")
+  elif action=="revoke":
+   device_id=request.form.get("device_id","").strip()
+   row=c.execute("SELECT label,active FROM sync_devices WHERE device_id=?",(device_id,)).fetchone()
+   if not row:
+    flash("Sync device not found.")
+   elif not row["active"]:
+    flash("Device already revoked.")
+   else:
+    c.execute("UPDATE sync_devices SET active=0 WHERE device_id=?",(device_id,))
+    audit_event(c,"sync_device.revoked",f"device_id={device_id}; label={row['label']}")
+    c.commit(); flash("Device token revoked.")
+  else:
+   c.close(); return ("Invalid sync-device action",400)
+  c.close(); return redirect("/sync-devices")
+ rows=c.execute("SELECT device_id,label,active,created_at,last_seen FROM sync_devices ORDER BY created_at DESC").fetchall()
+ c.close()
+ issued=session.pop("issued_sync_device",None)
+ return page("""<section><h3>Sync devices / Appareils de synchronisation / أجهزة المزامنة</h3><p>Enroll only trusted devices. The token grants access to resident data over the sync API; copy it once and store it securely. Remote API access requires HTTPS.</p>{% if issued %}<div style="padding:12px;border:1px solid #16a085;border-radius:12px"><strong>Copy this token now — it will not be shown again:</strong><p><code>{{issued.token}}</code></p><small>Device ID: {{issued.device_id}}</small></div>{% endif %}<form method="post"><input type="hidden" name="_csrf_token" value="{{csrf_token}}"><input type="hidden" name="action" value="enroll"><label>Device label</label><input name="label" maxlength="100" required placeholder="e.g. Resident phone 01"><button>Generate enrollment token</button></form></section><section><h3>Enrolled devices</h3><div class="wrap"><table><tr><th>Label</th><th>Device ID</th><th>Active</th><th>Created</th><th>Last seen</th><th>Action</th></tr>{% for d in rows %}<tr><td>{{d.label}}</td><td><code>{{d.device_id}}</code></td><td>{{'Yes' if d.active else 'Revoked'}}</td><td>{{d.created_at}}</td><td>{{d.last_seen or 'Never'}}</td><td>{% if d.active %}<form method="post"><input type="hidden" name="_csrf_token" value="{{csrf_token}}"><input type="hidden" name="action" value="revoke"><input type="hidden" name="device_id" value="{{d.device_id}}"><button>Revoke</button></form>{% else %}—{% endif %}</td></tr>{% else %}<tr><td colspan="6">No enrolled devices.</td></tr>{% endfor %}</table></div></section>""",rows=rows,issued=issued)
+def _authenticate_sync_device():
+ authorization=request.headers.get("Authorization","")
+ if not authorization.startswith("Bearer "):
+  return None,None,(jsonify(error="bearer_token_required"),401)
+ token=authorization[7:].strip()
+ if not token or len(token)>256:
+  return None,None,(jsonify(error="invalid_token"),401)
+ # Plain HTTP is allowed only for loopback development. Remote sync must use TLS.
+ if not request.is_secure and request.remote_addr not in ("127.0.0.1","::1","localhost"):
+  return None,None,(jsonify(error="https_required"),426)
+ token_hash=hashlib.sha256(token.encode("utf-8")).hexdigest()
+ c=db()
+ device=c.execute("SELECT device_id,label,active FROM sync_devices WHERE token_hash=?",(token_hash,)).fetchone()
+ if not device or not device["active"]:
+  c.close(); return None,None,(jsonify(error="device_revoked_or_unknown"),401)
+ c.execute("UPDATE sync_devices SET last_seen=CURRENT_TIMESTAMP WHERE device_id=?",(device["device_id"],))
+ c.commit()
+ return device,c,None
+
+@app.get("/api/sync/v1/status")
+def sync_api_status():
+ device,c,error=_authenticate_sync_device()
+ if error:return error
+ latest=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log").fetchone()[0]
+ c.close()
+ return jsonify(api_version=1,device_id=device["device_id"],server_cursor=latest,
+                entities=sorted(_SYNC_ENTITY_FIELDS.keys()),push_enabled=False,
+                note="Authenticated incremental pull only; write sync is not implemented.")
+
+@app.get("/api/sync/v1/bootstrap")
+def sync_api_bootstrap():
+ device,c,error=_authenticate_sync_device()
+ if error:return error
+ entity=request.args.get("entity","")
+ if entity not in _SYNC_ENTITY_FIELDS:
+  c.close(); return jsonify(error="unknown_entity",allowed=sorted(_SYNC_ENTITY_FIELDS.keys())),400
+ try:
+  after_id=int(request.args.get("after_id","0"))
+  limit=int(request.args.get("limit","200"))
+  if after_id<0 or limit<1 or limit>500: raise ValueError
+ except (TypeError,ValueError):
+  c.close(); return jsonify(error="invalid_pagination"),400
+ fields=_SYNC_ENTITY_FIELDS[entity]
+ columns=", ".join('"'+field+'"' for field in fields)
+ rows=c.execute(f"SELECT {columns} FROM {entity} WHERE id>? ORDER BY id LIMIT ?",(after_id,limit+1)).fetchall()
+ latest=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log").fetchone()[0]
+ has_more=len(rows)>limit
+ rows=rows[:limit]
+ payload=[{field:row[field] for field in fields} for row in rows]
+ cursor=rows[-1]["id"] if rows else after_id
+ c.close()
+ return jsonify(entity=entity,rows=payload,next_id=cursor,has_more=has_more,snapshot_cursor=latest)
+
+@app.get("/api/sync/v1/pull")
+def sync_api_pull():
+ device,c,error=_authenticate_sync_device()
+ if error:return error
+ try:
+  after_seq=int(request.args.get("after_seq","0"))
+  limit=int(request.args.get("limit","200"))
+  if after_seq<0 or limit<1 or limit>500: raise ValueError
+ except (TypeError,ValueError):
+  c.close(); return jsonify(error="invalid_pagination"),400
+ rows=c.execute("SELECT seq,entity,entity_id,operation,payload_json,changed_at FROM sync_change_log WHERE seq>? ORDER BY seq LIMIT ?",(after_seq,limit+1)).fetchall()
+ has_more=len(rows)>limit
+ rows=rows[:limit]
+ changes=[]
+ for row in rows:
+  changes.append({"seq":row["seq"],"entity":row["entity"],"entity_id":row["entity_id"],
+                  "operation":row["operation"],"payload":json.loads(row["payload_json"]) if row["payload_json"] else None,
+                  "changed_at":row["changed_at"]})
+ cursor=rows[-1]["seq"] if rows else after_seq
+ c.close()
+ return jsonify(device_id=device["device_id"],changes=changes,next_seq=cursor,has_more=has_more)
+
 def normalize_header(value):
  value=str(value or "").strip().lower()
  value=re.sub(r"[\s_\-]+"," ",value)
