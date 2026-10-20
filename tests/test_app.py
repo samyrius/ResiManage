@@ -542,19 +542,21 @@ def test_backup_and_restore_preserve_database_and_resident_photos(tmp_path, monk
         assert "rotation.db" in bundle.namelist()
         assert "resident_photos/test-resident.webp" in bundle.namelist()
         assert bundle.read("resident_photos/test-resident.webp") == b"original-photo-bytes"
-    with rotation_app.db() as conn:
-        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)", ("AddedAfterBackup", "Resident", 1))
-    conn.close()  # Windows cannot atomically replace a SQLite file while this handle remains open.
+    open_conn = rotation_app.db()
+    open_conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)", ("AddedAfterBackup", "Resident", 1))
+    open_conn.commit()  # Keep an idle SQLite handle open across restore to cover Windows.
     photo_path.write_bytes(b"changed-photo-bytes")
     restored = client.post("/restore", data={
         "backup_file": (io.BytesIO(backup_bytes), "resimanage_full_backup.zip")
     }, content_type="multipart/form-data", follow_redirects=True)
     assert restored.status_code == 200
     assert b"Restore completed." in restored.data, restored.data.decode("utf-8", errors="replace")
-    with rotation_app.db() as conn:
-        assert conn.execute("SELECT COUNT(*) FROM residents WHERE surname='BeforeBackup'").fetchone()[0] == 1
-        assert conn.execute("SELECT COUNT(*) FROM residents WHERE surname='AddedAfterBackup'").fetchone()[0] == 0
-        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='database.restored'").fetchone()[0] == 1
+    with rotation_app.db() as restored_conn:
+        assert restored_conn.execute("SELECT COUNT(*) FROM residents WHERE surname='BeforeBackup'").fetchone()[0] == 1
+        assert restored_conn.execute("SELECT COUNT(*) FROM residents WHERE surname='AddedAfterBackup'").fetchone()[0] == 0
+        assert restored_conn.execute("SELECT COUNT(*) FROM audit WHERE action='database.restored'").fetchone()[0] == 1
+    assert open_conn.execute("SELECT COUNT(*) FROM residents WHERE surname='AddedAfterBackup'").fetchone()[0] == 0
+    open_conn.close()
     assert (tmp_path / "resident_photos" / "test-resident.webp").read_bytes() == b"original-photo-bytes"
     assert list(tmp_path.glob("rotation_backup_before_restore_*.db"))
     assert list(tmp_path.glob("rotation_backup_before_restore_*.zip"))
