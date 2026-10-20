@@ -3306,6 +3306,33 @@ def test_android_sync_bootstrap_uses_explicit_data_directory(tmp_path, monkeypat
     conn.close()
 
 
+
+def test_android_sync_bootstrap_refuses_to_overwrite_local_objectives(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        terrain_id = conn.execute("SELECT id FROM terrains ORDER BY id LIMIT 1").fetchone()[0]
+        conn.execute(
+            "INSERT INTO objectives(terrain_id,study_year,objective,completed) VALUES(?,1,?,0)",
+            (terrain_id, "Locally configured objective"),
+        )
+        conn.commit()
+    monkeypatch.setattr(
+        sync_client, "_api",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("network must not start")),
+    )
+    conn = rotation_app.db()
+    with pytest.raises(sync_client.SyncError, match="empty device data database"):
+        sync_client._bootstrap_empty_device(
+            conn, "https://sync.example.test", "T" * 43, 750, str(tmp_path)
+        )
+    assert conn.execute(
+        "SELECT objective FROM objectives WHERE terrain_id=?",
+        (terrain_id,),
+    ).fetchone()[0] == "Locally configured objective"
+    conn.close()
+
+
 def test_sync_api_transfers_resident_photo_with_write_token_and_version_guard(tmp_path, monkeypatch):
     from PIL import Image
 
