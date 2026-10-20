@@ -63,7 +63,7 @@ Exam records preserve the session type and attempt separately: virtual, actual, 
 
 ## Optional private-VPN sync API (early, read-only phase)
 
-The Super Admin can enroll/revoke sync devices at `/sync-devices`. The API currently supports authenticated status, bootstrap snapshots, and incremental pull only; it does **not** yet sync writes or provide an Android client/offline conflict handling. Keep it on a private VPN and never expose it publicly.
+The Super Admin can enroll/revoke sync devices at `/sync-devices`. The API supports authenticated status/bootstrap/pull and a limited validated push for selected entities with idempotency and conflict responses. It still does **not** provide an Android client, full workflow coverage, offline queue, or conflict-resolution UI. Keep it on a private VPN and never expose it publicly.
 
 The Windows launcher remains loopback-only by default. To deliberately bind it to a specific private VPN interface, configure a certificate trusted by the connecting devices, then launch ResiManage with these environment variables (PowerShell example):
 
