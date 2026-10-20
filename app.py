@@ -83,7 +83,7 @@ def init():
  CREATE TABLE IF NOT EXISTS import_previews(id INTEGER PRIMARY KEY,owner TEXT NOT NULL,rows_json TEXT NOT NULL,errors_json TEXT NOT NULL,filename TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE IF NOT EXISTS leave_years(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL,year INTEGER NOT NULL,earned_days INTEGER NOT NULL DEFAULT 30,created_by TEXT DEFAULT '',UNIQUE(resident_id,year));
  CREATE TABLE IF NOT EXISTS leave_entries(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL,start_date TEXT NOT NULL,end_date TEXT NOT NULL,days INTEGER NOT NULL,notes TEXT DEFAULT '',created_by TEXT DEFAULT '',created_at TEXT DEFAULT CURRENT_TIMESTAMP);
- CREATE TABLE IF NOT EXISTS external_rotations(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL,supervisor TEXT NOT NULL,destination TEXT NOT NULL,hospital TEXT NOT NULL,country TEXT NOT NULL,rotation_type TEXT NOT NULL,start_date TEXT NOT NULL,end_date TEXT NOT NULL,notes TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'active',created_by TEXT DEFAULT '',created_at TEXT DEFAULT CURRENT_TIMESTAMP,updated_at TEXT DEFAULT CURRENT_TIMESTAMP);
+ CREATE TABLE IF NOT EXISTS external_rotations(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL,supervisor TEXT NOT NULL,destination TEXT NOT NULL,hospital TEXT NOT NULL,country TEXT NOT NULL,rotation_type TEXT NOT NULL,start_date TEXT NOT NULL,end_date TEXT NOT NULL,notes TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'active',request_status TEXT NOT NULL DEFAULT 'approved',created_by TEXT DEFAULT '',created_at TEXT DEFAULT CURRENT_TIMESTAMP,updated_at TEXT DEFAULT CURRENT_TIMESTAMP);
  """)
  ensure_column(c,"exam_records","exam_type","TEXT NOT NULL DEFAULT 'actual'")
  ensure_column(c,"exam_records","attempt","INTEGER NOT NULL DEFAULT 1")
@@ -92,6 +92,7 @@ def init():
  ensure_column(c,"users","email_verified","INTEGER NOT NULL DEFAULT 0")
  ensure_column(c,"import_previews","import_type","TEXT NOT NULL DEFAULT 'residents'")
  ensure_column(c,"objectives","completed","INTEGER NOT NULL DEFAULT 0")
+ ensure_column(c,"external_rotations","request_status","TEXT NOT NULL DEFAULT 'approved'")
  y=str(datetime.now().year)+"-"+str(datetime.now().year+1)
  c.execute("INSERT OR IGNORE INTO settings VALUES('year',?)",(y,))
  initial_password=os.environ.get("ROTATION_INITIAL_PASSWORD")
