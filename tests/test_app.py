@@ -3125,6 +3125,36 @@ def test_sync_write_device_push_is_idempotent_conflict_aware_and_downgrades_assi
 
 
 
+def test_sync_external_rotation_request_rejects_overlap_with_local_assignment(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
+            ("SyncExternal", "Resident", 2, "active"),
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='SyncExternal'").fetchone()[0]
+        terrain_id = conn.execute("SELECT id FROM terrains WHERE name='Réanimation chirurgicale'").fetchone()[0]
+        period = conn.execute(
+            "SELECT id FROM periods WHERE year_label LIKE '2026-%' AND name LIKE '%Fév%' LIMIT 1"
+        ).fetchone()
+        assert period is not None
+        conn.execute(
+            "INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",
+            (rid, terrain_id, period["id"]),
+        )
+        payload = {
+            "id": 8101, "resident_id": rid, "supervisor": "Supervisor",
+            "destination": "Foreign internship", "hospital": "Teaching Hospital",
+            "country": "France", "rotation_type": "anesthesia",
+            "start_date": "2026-03-01", "end_date": "2026-03-31",
+            "notes": "overlap must be blocked", "status": "requested",
+            "request_status": "pending", "created_by": "test",
+            "created_at": "2026-10-20 00:00:00", "updated_at": "2026-10-20 00:00:00",
+        }
+        with pytest.raises(ValueError, match="overlaps an existing local assignment"):
+            rotation_app._validate_sync_push_row(conn, "external_rotations", payload)
+
 def test_sync_push_leave_validation_supports_cross_year_leave_and_rejects_overlap(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
