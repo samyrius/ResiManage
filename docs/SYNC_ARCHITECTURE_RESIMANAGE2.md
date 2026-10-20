@@ -62,3 +62,10 @@ Statut : **conception préparatoire, pas encore implémentée**. Ce document fix
 La base locale évolue encore : les notes d’examen distinguent maintenant `exam_type` et `attempt` (virtuel, réel, rattrapage et sessions DEMS), et les contrôles de compte permettent des changements de rôle/mot de passe audités. Ces champs et ces règles doivent être inclus dans le modèle de versions avant de créer l’API ; il ne faut pas démarrer une réplication qui ne comprendrait que les anciens champs.
 
 **État d’exécution :** la synchronisation réseau reste non implémentée. Le travail doit commencer après la stabilisation Windows et la validation de la base locale. La vérification Android via GitHub Actions est suspendue à la demande de l’utilisateur jusqu’à la fin de toutes les directives ; aucun endpoint de synchronisation ne doit être exposé en attendant la conception complète de l’enrôlement, de TLS/VPN, des opérations idempotentes et des conflits.
+
+
+## Journal local de changements — première brique ajoutée (20 octobre 2026)
+
+Le code local crée maintenant une table `sync_change_log` et des déclencheurs SQLite pour les entités métier (résidents, terrains, périodes, capacités, affectations, historique, décisions, examens, objectifs, votes/archives DEMS, congés, stages externes et audit). Les insertions/modifications journalisent un instantané JSON de la ligne; les suppressions créent un tombstone avec l’identifiant. Les tables `users`, mots de passe et sessions ne sont pas incluses.
+
+Cette brique fournit une séquence locale pour préparer le pull incrémental, mais **ne réalise pas la synchronisation** : aucun endpoint API authentifié, enrôlement d’appareils, transfert photo, file d’opérations Android, résolution de conflits, TLS/VPN ou bootstrap initial n’est encore disponible. Les tests de régression du journal doivent réussir avant de poursuivre l’API.
