@@ -4,10 +4,14 @@ import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
+import android.util.Base64;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
 import android.webkit.ValueCallback;
@@ -16,18 +20,32 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.URLUtil;
+import android.webkit.JavascriptInterface;
 import android.widget.TextView;
 
 import com.chaquo.python.Python;
 import com.chaquo.python.android.AndroidPlatform;
 
+import org.json.JSONObject;
+
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+import java.io.ByteArrayOutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URI;
+import java.security.KeyStore;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
     private static final String HOME_URL = "http://127.0.0.1:5000/login";
     private static final int FILE_CHOOSER_REQUEST = 1201;
     private WebView webView;
+    private String dataDirectory;
+    private SyncBridge syncBridge;
     private ValueCallback<Uri[]> fileChooserCallback;
 
     @Override
@@ -43,6 +61,9 @@ public class MainActivity extends Activity {
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(true);
         webView.setWebViewClient(new WebViewClient());
+        dataDirectory = getFilesDir().getAbsolutePath();
+        syncBridge = new SyncBridge(dataDirectory);
+        webView.addJavascriptInterface(syncBridge, "ResiManageSync");
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback,
@@ -108,7 +129,6 @@ public class MainActivity extends Activity {
             Python.start(new AndroidPlatform(this));
         }
         Python python = Python.getInstance();
-        String dataDirectory = getFilesDir().getAbsolutePath();
         new Thread(() -> {
             try {
                 python.getModule("rotation_server").callAttr("start_server", dataDirectory);
@@ -145,6 +165,132 @@ public class MainActivity extends Activity {
             }
         }
         showStartupError("The local server did not respond. Close and reopen the app.");
+    }
+
+
+    /** Android Keystore-backed config for the manual remote sync client. */
+    private final class SyncBridge {
+        private static final String KEY_ALIAS = "ResiManageSyncConfigKey";
+        private static final String PREFS = "resimanage_sync_secure";
+        private final String appDataDirectory;
+        private final SharedPreferences preferences;
+        private final ExecutorService executor = Executors.newSingleThreadExecutor();
+        private volatile boolean running = false;
+
+        SyncBridge(String dataDirectory) {
+            appDataDirectory = dataDirectory;
+            preferences = getSharedPreferences(PREFS, MODE_PRIVATE);
+        }
+
+        private SecretKey getOrCreateKey() throws Exception {
+            KeyStore store = KeyStore.getInstance("AndroidKeyStore");
+            store.load(null);
+            if (store.containsAlias(KEY_ALIAS)) {
+                return (SecretKey) store.getKey(KEY_ALIAS, null);
+            }
+            KeyGenerator generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+            generator.init(new KeyGenParameterSpec.Builder(
+                    KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setRandomizedEncryptionRequired(true)
+                    .build());
+            return generator.generateKey();
+        }
+
+        private String encrypt(String plainText) throws Exception {
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey());
+            byte[] encrypted = cipher.doFinal(plainText.getBytes("UTF-8"));
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            output.write(cipher.getIV());
+            output.write(encrypted);
+            return Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP);
+        }
+
+        private String decrypt(String encoded) throws Exception {
+            byte[] packed = Base64.decode(encoded, Base64.NO_WRAP);
+            if (packed.length < 13) throw new IllegalArgumentException("Encrypted sync settings are corrupt.");
+            byte[] iv = new byte[12];
+            System.arraycopy(packed, 0, iv, 0, iv.length);
+            byte[] ciphertext = new byte[packed.length - iv.length];
+            System.arraycopy(packed, iv.length, ciphertext, 0, ciphertext.length);
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), new GCMParameterSpec(128, iv));
+            return new String(cipher.doFinal(ciphertext), "UTF-8");
+        }
+
+        @JavascriptInterface
+        public String saveConfig(String serverUrl, String bearerToken) {
+            try {
+                URI uri = new URI(serverUrl == null ? "" : serverUrl.trim());
+                if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null
+                        || uri.getUserInfo() != null || uri.getQuery() != null || uri.getFragment() != null
+                        || (uri.getPath() != null && !uri.getPath().isEmpty() && !"/".equals(uri.getPath()))) {
+                    return new JSONObject().put("ok", false).put("message",
+                            "Enter the HTTPS server origin only (for example https://vpn-ip:5000).").toString();
+                }
+                String token = bearerToken == null ? "" : bearerToken.trim();
+                if (token.length() < 32 || token.length() > 256) {
+                    return new JSONObject().put("ok", false).put("message", "The bearer token is missing or invalid.").toString();
+                }
+                JSONObject config = new JSONObject();
+                config.put("serverUrl", uri.toString().replaceAll("/+$", ""));
+                config.put("token", token);
+                preferences.edit().putString("encrypted_config", encrypt(config.toString())).apply();
+                return new JSONObject().put("ok", true).put("message", "Sync settings saved encrypted in Android Keystore-backed storage.").toString();
+            } catch (Exception ex) {
+                try { return new JSONObject().put("ok", false).put("message", ex.getMessage()).toString(); }
+                catch (Exception ignored) { return "{\"ok\":false,\"message\":\"Could not save sync settings.\"}"; }
+            }
+        }
+
+        @JavascriptInterface
+        public boolean isConfigured() {
+            return preferences.contains("encrypted_config");
+        }
+
+        @JavascriptInterface
+        public boolean clearConfig() {
+            preferences.edit().remove("encrypted_config").apply();
+            return true;
+        }
+
+        @JavascriptInterface
+        public boolean runSync() {
+            if (running) return false;
+            String encrypted = preferences.getString("encrypted_config", null);
+            if (encrypted == null) {
+                notifyPage("{\"ok\":false,\"message\":\"Configure the central HTTPS server and device token first.\"}");
+                return false;
+            }
+            running = true;
+            executor.execute(() -> {
+                String result;
+                try {
+                    JSONObject config = new JSONObject(decrypt(encrypted));
+                    Python python = Python.getInstance();
+                    result = python.getModule("sync_client").callAttr(
+                            "sync_once", appDataDirectory,
+                            config.getString("serverUrl"), config.getString("token")).toString();
+                } catch (Throwable ex) {
+                    try { result = new JSONObject().put("ok", false).put("message", ex.getMessage()).toString(); }
+                    catch (Exception ignored) { result = "{\"ok\":false,\"message\":\"Sync failed.\"}"; }
+                } finally {
+                    running = false;
+                }
+                notifyPage(result);
+            });
+            return true;
+        }
+
+        private void notifyPage(String result) {
+            final String quoted = JSONObject.quote(result);
+            runOnUiThread(() -> {
+                if (webView != null) webView.evaluateJavascript(
+                        "window.resimanageSyncFinished && window.resimanageSyncFinished(" + quoted + ");", null);
+            });
+        }
     }
 
     private void showStartupError(String message) {
