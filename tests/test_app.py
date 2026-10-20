@@ -3014,6 +3014,8 @@ def test_sync_device_enrollment_api_pull_tls_guard_and_revocation(tmp_path, monk
     assert status.status_code == 200
     assert status.json["device_id"] == device["device_id"]
     assert status.json["push_enabled"] is False
+    readonly_push = client.post("/api/sync/v1/push", headers=headers, json={"operations":[{}]})
+    assert readonly_push.status_code == 403
 
     bootstrap = client.get("/api/sync/v1/bootstrap?entity=residents&limit=50", headers=headers)
     assert bootstrap.status_code == 200
@@ -3035,3 +3037,78 @@ def test_sync_device_enrollment_api_pull_tls_guard_and_revocation(tmp_path, monk
     }, follow_redirects=True)
     assert revoked.status_code == 200
     assert client.get("/api/sync/v1/status", headers=headers).status_code == 401
+
+
+def test_sync_write_device_push_is_idempotent_conflict_aware_and_downgrades_assignments(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    enrolled = client.post("/sync-devices", data={
+        "action": "enroll", "label": "Trusted sync writer", "mode": "read_write"
+    }, follow_redirects=True)
+    match = re.search(rb"<p><code>([A-Za-z0-9_-]{40,})</code></p>", enrolled.data)
+    assert match
+    token = match.group(1).decode("ascii")
+    headers = {"Authorization": "Bearer " + token}
+    status = client.get("/api/sync/v1/status", headers=headers)
+    assert status.status_code == 200 and status.json["push_enabled"] is True
+    base_seq = status.json["server_cursor"]
+
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
+            ("Push", "Resident", 2, "active"),
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Push'").fetchone()[0]
+        resident_fields = rotation_app._SYNC_ENTITY_FIELDS["residents"]
+        resident_row = conn.execute("SELECT * FROM residents WHERE id=?", (rid,)).fetchone()
+        resident_payload = {field: resident_row[field] for field in resident_fields}
+        terrain_id = conn.execute(
+            "SELECT id FROM terrains WHERE name='Réanimation chirurgicale'"
+        ).fetchone()[0]
+        period = conn.execute("SELECT id,year_label,name FROM periods ORDER BY id LIMIT 1").fetchone()
+        conn.commit()
+
+    resident_payload["surname"] = "PushedUpdate"
+    operation = {
+        "op_id": "resident-push-op-0001", "entity": "residents",
+        "entity_id": str(rid), "operation": "upsert",
+        "base_seq": base_seq, "payload": resident_payload,
+    }
+    pushed = client.post("/api/sync/v1/push", headers=headers, json={"operations":[operation]})
+    assert pushed.status_code == 200, pushed.data
+    assert pushed.json["results"][0]["status"] == "applied"
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT surname FROM residents WHERE id=?", (rid,)).fetchone()[0] == "PushedUpdate"
+
+    replay = client.post("/api/sync/v1/push", headers=headers, json={"operations":[operation]})
+    assert replay.status_code == 200
+    assert replay.json["results"][0]["replayed"] is True
+
+    with rotation_app.db() as conn:
+        conn.execute("UPDATE residents SET surname='ServerUpdate' WHERE id=?", (rid,))
+        conn.commit()
+        terrain_id = conn.execute("SELECT id FROM terrains WHERE name='Réanimation chirurgicale'").fetchone()[0]
+        period = conn.execute("SELECT id,year_label,name FROM periods ORDER BY id LIMIT 1").fetchone()
+        assignment_payload = {
+            "id": 987654, "resident_id": rid, "terrain_id": terrain_id,
+            "period_id": period["id"], "status": "confirmed",
+        }
+    conflict_op = dict(operation, op_id="resident-push-op-0002", base_seq=base_seq,
+                       payload=dict(resident_payload, surname="StaleClient"))
+    conflict = client.post("/api/sync/v1/push", headers=headers, json={"operations":[conflict_op]})
+    assert conflict.status_code == 200
+    assert conflict.json["results"][0]["status"] == "conflict"
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT surname FROM residents WHERE id=?", (rid,)).fetchone()[0] == "ServerUpdate"
+
+    assignment_op = {
+        "op_id": "assignment-push-op-0001", "entity": "assignments",
+        "entity_id": str(assignment_payload["id"]), "operation": "upsert",
+        "base_seq": conflict.json["results"][0]["server_seq"],
+        "payload": assignment_payload,
+    }
+    assignment_push = client.post("/api/sync/v1/push", headers=headers, json={"operations":[assignment_op]})
+    assert assignment_push.status_code == 200
+    assert assignment_push.json["results"][0]["status"] == "applied"
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT status FROM assignments WHERE id=?", (assignment_payload["id"],)).fetchone()[0] == "pending"
