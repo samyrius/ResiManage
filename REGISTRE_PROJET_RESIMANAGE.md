@@ -462,3 +462,12 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 - Python CI push run `39406581599` et PR run `39406586914` : **succès, 111 tests passés** (45,53 s dans le log du run push).
 - Le run Windows EXE/installer `39406581573` était encore en cours lors de la consultation; son résultat reste à confirmer.
 - Cela valide les régressions Python de cette branche, pas l’APK, l’installation Android physique, ni la synchronisation réseau.
+
+
+## 25. API de synchronisation en lecture et résultat Python CI — 20 octobre 2026
+
+- Super Admin : écran `/sync-devices` pour enrôler/révoquer un appareil. Le jeton est généré aléatoirement, seul son hash est stocké; le secret apparaît dans la réponse d’enrôlement et n’est pas placé dans le cookie de session.
+- API bearer-token : status, bootstrap paginé et pull incrémental; le bootstrap lit les lignes et son curseur dans un même snapshot SQLite. HTTPS est exigé hors loopback; le lanceur Windows reste loopback par défaut et n’accepte une écoute distante que sur une IP privée/VPN exacte avec TLS, sans wildcard ni IP publique.
+- **API volontairement pull-only** : pas de push, pas de client Android configuré, pas de mode hors ligne ni de résolution de conflits. C’est une fondation serveur, pas une synchronisation complète.
+- Python CI sur commit `1b1d1083ff25cdecdb0b4eb8ff12fd71cc0a4d35`: succès, **113 tests passés** (run push `39407504659`, PR `39407510921`). Le run Windows EXE/installer `39407504449` était encore en cours; vérifier son résultat.
+- Windows restore : le remplacement par `os.replace` échouait sur runner Windows (WinError 5). Le code utilise maintenant l’API SQLite backup pour restaurer dans le fichier existant; une régression garde volontairement une connexion SQLite inactive ouverte. Le run Windows sur le commit incluant cette correction est à confirmer.
