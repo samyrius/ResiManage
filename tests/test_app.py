@@ -3124,6 +3124,41 @@ def test_sync_write_device_push_is_idempotent_conflict_aware_and_downgrades_assi
         assert conn.execute("SELECT status FROM assignments WHERE id=?", (assignment_payload["id"],)).fetchone()[0] == "pending"
 
 
+
+def test_sync_push_leave_validation_supports_cross_year_leave_and_rejects_overlap(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
+            ("CrossYearLeave", "Resident", 2, "active"),
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='CrossYearLeave'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO leave_years(resident_id,year,earned_days) VALUES(?,?,?)",
+            (rid, 2026, 30),
+        )
+        conn.execute(
+            "INSERT INTO leave_years(resident_id,year,earned_days) VALUES(?,?,?)",
+            (rid, 2027, 30),
+        )
+        fields = rotation_app._SYNC_ENTITY_FIELDS["leave_entries"]
+        payload = {
+            "id": 7001, "resident_id": rid, "start_date": "2026-12-28",
+            "end_date": "2027-01-03", "days": 7, "notes": "cross-year leave",
+            "created_by": "test", "created_at": "2026-10-20 00:00:00",
+        }
+        validated = rotation_app._validate_sync_push_row(conn, "leave_entries", payload)
+        assert validated["days"] == 7
+        conn.execute(
+            "INSERT INTO leave_entries(id,resident_id,start_date,end_date,days,notes,created_by) VALUES(?,?,?,?,?,?,?)",
+            (7002, rid, "2026-12-30", "2027-01-01", 3, "existing leave", "test"),
+        )
+        with pytest.raises(ValueError, match="overlaps an existing entry"):
+            rotation_app._validate_sync_push_row(conn, "leave_entries", payload)
+        conn.close()
+
+
 def test_android_sync_client_requires_https_and_remote_apply_does_not_echo(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
