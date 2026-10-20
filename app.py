@@ -1605,7 +1605,7 @@ def external_rotations():
     if guard(): return redirect("/login")
     c=db()
     if request.method=="POST":
-        if super_guard(): c.close(); return ("Forbidden — Super Admin only",403)
+        is_admin=session.get("role")=="super_admin"
         try:
             rid=int(request.form["resident_id"])
             resident=c.execute("SELECT id FROM residents WHERE id=?",(rid,)).fetchone()
@@ -1615,13 +1615,14 @@ def external_rotations():
             start=date.fromisoformat(request.form["start_date"]); end=date.fromisoformat(request.form["end_date"])
             if not all([supervisor,destination,hospital,country,kind]): raise ValueError("All external rotation fields are required.")
             if end<start: raise ValueError("Return date must not precede start date.")
-            overlap=c.execute("SELECT id FROM external_rotations WHERE resident_id=? AND status<>'cancelled' AND start_date<=? AND end_date>=?",(rid,end.isoformat(),start.isoformat())).fetchone()
-            if overlap: raise ValueError("External rotations for this resident cannot overlap.")
-            reject_external_overlap_with_local_assignment(c,rid,start,end)
-            status="returned" if end<date.today() else "active"
-            c.execute("INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,notes,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?)",(rid,supervisor,destination,hospital,country,kind,start.isoformat(),end.isoformat(),request.form.get("notes","").strip(),status,session.get("user","")))
-            audit_event(c,"external_rotation.created",f"resident_id={rid}; hospital={hospital}; country={country}; start={start}; end={end}")
-            c.commit(); flash("External rotation saved; overlapping local assignments are blocked.")
+            overlap=c.execute("SELECT id FROM external_rotations WHERE resident_id=? AND request_status NOT IN ('rejected','cancelled') AND start_date<=? AND end_date>=?",(rid,end.isoformat(),start.isoformat())).fetchone()
+            if overlap: raise ValueError("External rotation requests for this resident cannot overlap.")
+            if is_admin: reject_external_overlap_with_local_assignment(c,rid,start,end)
+            request_status="approved" if is_admin else "pending"
+            status=("returned" if end<date.today() else "active") if is_admin else "requested"
+            c.execute("INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,notes,status,request_status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",(rid,supervisor,destination,hospital,country,kind,start.isoformat(),end.isoformat(),request.form.get("notes","").strip(),status,request_status,session.get("user","")))
+            audit_event(c,"external_rotation.created" if is_admin else "external_rotation.requested",f"resident_id={rid}; hospital={hospital}; country={country}; start={start}; end={end}; request_status={request_status}")
+            c.commit(); flash("External rotation saved and active." if is_admin else "External internship request submitted; it will not block assignments until approved.")
         except Exception as exc: c.rollback(); flash("External rotation not saved: "+str(exc)[:220])
         c.close(); return redirect("/external-rotations")
     residents=c.execute("SELECT id,surname,firstname,year FROM residents ORDER BY year DESC,surname").fetchall()
