@@ -995,6 +995,74 @@ def sync_api_pull():
  return jsonify(device_id=device["device_id"],changes=changes,next_seq=cursor,has_more=has_more)
 
 
+
+@app.get("/api/sync/v1/photo/<int:rid>")
+def sync_api_photo_download(rid):
+ device,c,error=_authenticate_sync_device()
+ if error:return error
+ row=c.execute("SELECT photo_path FROM residents WHERE id=?",(rid,)).fetchone()
+ c.close()
+ if not row:return jsonify(error="resident_not_found"),404
+ photo_path=(row["photo_path"] or "").strip()
+ filename=secure_filename(os.path.basename(photo_path))
+ if not photo_path.startswith("/photos/") or not filename.startswith("resident_") or os.path.splitext(filename)[1].lower() not in (".png",".jpg",".jpeg",".webp"):
+  return jsonify(error="resident_has_no_syncable_photo"),404
+ directory=os.path.join(os.path.dirname(os.path.abspath(DB)),"resident_photos")
+ full_path=os.path.join(directory,filename)
+ if not os.path.isfile(full_path):return jsonify(error="photo_file_missing"),404
+ mimetype={".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webp":"image/webp"}[os.path.splitext(filename)[1].lower()]
+ return send_file(full_path,mimetype=mimetype,as_attachment=False,download_name=filename,conditional=True)
+
+@app.put("/api/sync/v1/photo/<int:rid>")
+def sync_api_photo_upload(rid):
+ device,c,error=_authenticate_sync_device()
+ if error:return error
+ if device["mode"]!="read_write":
+  c.close(); return jsonify(error="device_read_only"),403
+ resident=c.execute("SELECT id FROM residents WHERE id=?",(rid,)).fetchone()
+ if not resident:
+  c.close(); return jsonify(error="resident_not_found"),404
+ try:
+  base_seq=int(request.args.get("base_seq","0"))
+  if base_seq<0:raise ValueError
+ except ValueError:
+  c.close(); return jsonify(error="invalid_base_seq"),400
+ latest=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log WHERE entity='residents' AND entity_id=?",(str(rid),)).fetchone()[0]
+ if latest>base_seq:
+  current=c.execute("SELECT payload_json FROM sync_change_log WHERE entity='residents' AND entity_id=? ORDER BY seq DESC LIMIT 1",(str(rid),)).fetchone()
+  c.close(); return jsonify(error="conflict",server_seq=latest,server_payload=json.loads(current["payload_json"]) if current and current["payload_json"] else None),409
+ raw=request.get_data(cache=False)
+ if not raw or len(raw)>4*1024*1024:
+  c.close(); return jsonify(error="photo_must_be_nonempty_and_at_most_4mb"),413
+ try:
+  with warnings.catch_warnings():
+   warnings.simplefilter("error",Image.DecompressionBombWarning)
+   with Image.open(io.BytesIO(raw)) as probe:
+    if probe.format not in ("PNG","JPEG","WEBP"):raise ValueError("unsupported image format")
+    probe.verify()
+   with Image.open(io.BytesIO(raw)) as source:
+    image=ImageOps.exif_transpose(source); image.load(); image.thumbnail((1200,1200))
+    output=io.BytesIO()
+    image.convert("RGBA" if "A" in image.getbands() else "RGB").save(output,format="WEBP",quality=90,method=6)
+    normalized=output.getvalue()
+ except Exception:
+  c.close(); return jsonify(error="invalid_png_jpeg_or_webp_image"),400
+ directory=os.path.join(os.path.dirname(os.path.abspath(DB)),"resident_photos")
+ os.makedirs(directory,exist_ok=True)
+ filename="resident_"+str(rid)+"_sync_"+secrets.token_hex(8)+".webp"
+ target=os.path.join(directory,filename); temporary=target+".tmp"
+ try:
+  with open(temporary,"wb") as handle:handle.write(normalized)
+  os.replace(temporary,target)
+ finally:
+  if os.path.exists(temporary):os.remove(temporary)
+ c.execute("UPDATE residents SET photo_path=? WHERE id=?",("/photos/"+filename,rid))
+ audit_event(c,"sync.photo_uploaded",f"device_id={device['device_id']}; resident_id={rid}; photo={filename}")
+ c.commit()
+ server_seq=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log WHERE entity='residents' AND entity_id=?",(str(rid),)).fetchone()[0]
+ c.close()
+ return jsonify(ok=True,resident_id=rid,photo_path="/photos/"+filename,server_seq=server_seq)
+
 _SYNC_PUSH_ENTITIES={"residents","terrains","periods","capacities","assignments","history","exam_records","objectives","leave_years","leave_entries","external_rotations"}
 _SYNC_PUSH_DELETE_ENTITIES={"objectives","leave_entries","history"}
 
