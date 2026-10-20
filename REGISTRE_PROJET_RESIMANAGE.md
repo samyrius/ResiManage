@@ -413,3 +413,11 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 - **L'APK n'est pas encore compilé ni téléchargeable** : le connecteur GitHub disponible ici permet de lire et modifier les fichiers, mais pas de lancer un workflow Actions. L'utilisateur doit déclencher manuellement le workflow depuis GitHub Actions et sélectionner la branche de référence; ensuite, vérifier que le run réussit et télécharger l'artefact.
 - Ce repère conserve le code source, pas les données SQLite privées du téléphone/PC. Avant installation ou désinstallation, faire aussi une sauvegarde depuis l'application.
 - Les workflows Android restent manuels. Ne lancer aucune compilation de la branche active après le début des agents sans accord; le repère doit être construit depuis la branche de référence ci-dessus.
+
+
+## 21. Demande et approbation d’un stage à l’étranger — 20 octobre 2026
+
+- Les comptes standards peuvent désormais soumettre une demande de stage externe avec responsable, destination, hôpital, pays, type et dates. La demande est enregistrée comme `pending/requested` et **ne bloque pas** les affectations locales avant approbation.
+- Un Super Admin peut approuver ou refuser la demande. L’approbation revérifie les chevauchements avec les affectations locales et les autres stages externes approuvés; en cas de conflit, la demande reste en attente. L’approbation/refus est inscrit au journal d’audit.
+- Les stages historiques déjà présents sont migrés avec `request_status='approved'` pour préserver leur effet sur les affectations.
+- Ajout d’un test de régression couvrant demande, approbation refusée en cas de conflit, puis approbation après retrait du conflit et blocage local attendu. Le workflow Python CI est déclenché par le commit; résultat à consulter avant de déclarer les tests verts.
