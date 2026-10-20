@@ -254,7 +254,7 @@ def _push_local_changes(conn, base_url, token, device_id, remote_cursor, data_di
                     "ON CONFLICT(entity,entity_id) DO UPDATE SET server_seq=excluded.server_seq",
                     (original["entity"], original["entity_id"], entity_seq),
                 )
-                if item.get("status") == "applied" and item["op_id"] in photo_uploads:
+                if item.get("status") in ("applied", "replayed") and item["op_id"] in photo_uploads:
                     local_photo, ext = photo_uploads[item["op_id"]]
                     mime = {".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webp":"image/webp"}[ext]
                     with open(local_photo, "rb") as photo_handle:
