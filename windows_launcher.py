@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """ResiManage desktop launcher: persistent per-user data + local WebView window."""
 import os
+import ipaddress
 import secrets
 import shutil
 import socket
@@ -74,6 +75,37 @@ def _available_local_port():
         return probe.getsockname()[1]
 
 
+def _server_settings():
+    """Resolve a safe bind target; remote/VPN listeners require explicit TLS."""
+    host = os.environ.get("RESIMANAGE_BIND", "127.0.0.1").strip()
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError as exc:
+        raise RuntimeError("RESIMANAGE_BIND must be an explicit IP address (use the VPN interface IP).") from exc
+    if address.is_unspecified:
+        raise RuntimeError("Wildcard binds (0.0.0.0/::) are disabled; bind only to the exact VPN IP.")
+
+    cert = os.environ.get("RESIMANAGE_TLS_CERT", "").strip()
+    key = os.environ.get("RESIMANAGE_TLS_KEY", "").strip()
+    if bool(cert) != bool(key):
+        raise RuntimeError("Configure both RESIMANAGE_TLS_CERT and RESIMANAGE_TLS_KEY.")
+    ssl_context = (cert, key) if cert and key else None
+    if not address.is_loopback and ssl_context is None:
+        raise RuntimeError("A non-loopback ResiManage listener requires TLS certificate/key and a private VPN IP.")
+
+    port_text = os.environ.get("RESIMANAGE_PORT", "").strip()
+    if port_text:
+        try:
+            port = int(port_text)
+        except ValueError as exc:
+            raise RuntimeError("RESIMANAGE_PORT must be an integer.") from exc
+        if not 1 <= port <= 65535:
+            raise RuntimeError("RESIMANAGE_PORT must be between 1 and 65535.")
+    else:
+        port = 0 if address.is_loopback else 5000
+    return host, port, ssl_context
+
+
 def main():
     data_dir = _prepare_user_data()
     import app as resimanage
@@ -85,11 +117,14 @@ def main():
         SESSION_COOKIE_SAMESITE="Lax",
     )
     resimanage.init()
-    port = _available_local_port()
-    server = make_server("127.0.0.1", port, resimanage.app, threaded=True)
+    host, port, ssl_context = _server_settings()
+    if port == 0:
+        port = _available_local_port()
+    server = make_server(host, port, resimanage.app, threaded=True, ssl_context=ssl_context)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    url = f"http://127.0.0.1:{port}"
+    scheme = "https" if ssl_context else "http"
+    url = f"{scheme}://{host}:{server.server_port}"
 
     try:
         import webview
