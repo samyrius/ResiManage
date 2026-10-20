@@ -91,8 +91,18 @@ def install_sync_change_triggers(c):
   label TEXT NOT NULL,
   token_hash TEXT NOT NULL UNIQUE,
   active INTEGER NOT NULL DEFAULT 1,
+  mode TEXT NOT NULL DEFAULT 'read_only',
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   last_seen TEXT DEFAULT ''
+ )""")
+ ensure_column(c,"sync_devices","mode","TEXT NOT NULL DEFAULT 'read_only'")
+ c.execute("""CREATE TABLE IF NOT EXISTS sync_applied_ops(
+  op_id TEXT PRIMARY KEY,
+  device_id TEXT NOT NULL,
+  entity TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  result_json TEXT NOT NULL,
+  applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
  )""")
  for table,fields in _SYNC_ENTITY_FIELDS.items():
   pairs=", ".join("'"+field+"', NEW."+field for field in fields)
@@ -838,7 +848,7 @@ def audit_log():
 
 
 def render_sync_devices_page(rows,issued):
- return page("""<section><h3>Sync devices / Appareils de synchronisation / أجهزة المزامنة</h3><p>Enroll only trusted devices. The token grants access to resident data over the sync API; copy it once and store it securely. Remote API access requires HTTPS.</p>{% if issued %}<div style="padding:12px;border:1px solid #16a085;border-radius:12px"><strong>Copy this token now — it will not be shown again:</strong><p><code>{{issued.token}}</code></p><small>Device ID: {{issued.device_id}}</small></div>{% endif %}<form method="post"><input type="hidden" name="_csrf_token" value="{{csrf_token}}"><input type="hidden" name="action" value="enroll"><label>Device label</label><input name="label" maxlength="100" required placeholder="e.g. Resident phone 01"><button>Generate enrollment token</button></form></section><section><h3>Enrolled devices</h3><div class="wrap"><table><tr><th>Label</th><th>Device ID</th><th>Active</th><th>Created</th><th>Last seen</th><th>Action</th></tr>{% for d in rows %}<tr><td>{{d.label}}</td><td><code>{{d.device_id}}</code></td><td>{{'Yes' if d.active else 'Revoked'}}</td><td>{{d.created_at}}</td><td>{{d.last_seen or 'Never'}}</td><td>{% if d.active %}<form method="post"><input type="hidden" name="_csrf_token" value="{{csrf_token}}"><input type="hidden" name="action" value="revoke"><input type="hidden" name="device_id" value="{{d.device_id}}"><button>Revoke</button></form>{% else %}—{% endif %}</td></tr>{% else %}<tr><td colspan="6">No enrolled devices.</td></tr>{% endfor %}</table></div></section>""",rows=rows,issued=issued)
+ return page("""<section><h3>Sync devices / Appareils de synchronisation / أجهزة المزامنة</h3><p>Enroll only trusted devices. The token grants access to resident data over the sync API; copy it once and store it securely. Remote API access requires HTTPS.</p>{% if issued %}<div style="padding:12px;border:1px solid #16a085;border-radius:12px"><strong>Copy this token now — it will not be shown again:</strong><p><code>{{issued.token}}</code></p><small>Device ID: {{issued.device_id}}</small></div>{% endif %}<form method="post"><input type="hidden" name="_csrf_token" value="{{csrf_token}}"><input type="hidden" name="action" value="enroll"><label>Device label</label><input name="label" maxlength="100" required placeholder="e.g. Resident phone 01"><label>Access</label><select name="mode"><option value="read_only">Read-only pull</option><option value="read_write">Read and submit approved sync changes</option></select><button>Generate enrollment token</button></form></section><section><h3>Enrolled devices</h3><div class="wrap"><table><tr><th>Label</th><th>Device ID</th><th>Active</th><th>Mode</th><th>Created</th><th>Last seen</th><th>Action</th></tr>{% for d in rows %}<tr><td>{{d.label}}</td><td><code>{{d.device_id}}</code></td><td>{{'Yes' if d.active else 'Revoked'}}</td><td>{{d.mode}}</td><td>{{d.created_at}}</td><td>{{d.last_seen or 'Never'}}</td><td>{% if d.active %}<form method="post"><input type="hidden" name="_csrf_token" value="{{csrf_token}}"><input type="hidden" name="action" value="revoke"><input type="hidden" name="device_id" value="{{d.device_id}}"><button>Revoke</button></form>{% else %}—{% endif %}</td></tr>{% else %}<tr><td colspan="7">No enrolled devices.</td></tr>{% endfor %}</table></div></section>""",rows=rows,issued=issued)
 
 @app.route("/sync-devices",methods=["GET","POST"])
 def manage_sync_devices():
@@ -854,7 +864,9 @@ def manage_sync_devices():
     device_id=secrets.token_hex(12)
     token=secrets.token_urlsafe(32)
     token_hash=hashlib.sha256(token.encode("utf-8")).hexdigest()
-    c.execute("INSERT INTO sync_devices(device_id,label,token_hash) VALUES(?,?,?)",(device_id,label,token_hash))
+    mode=request.form.get("mode","read_only")
+    if mode not in ("read_only","read_write"): raise ValueError("Invalid device access mode.")
+    c.execute("INSERT INTO sync_devices(device_id,label,token_hash,mode) VALUES(?,?,?,?)",(device_id,label,token_hash,mode))
     audit_event(c,"sync_device.enrolled",f"device_id={device_id}; label={label}")
     c.commit()
     issued={"device_id":device_id,"label":label,"token":token}
@@ -872,7 +884,7 @@ def manage_sync_devices():
     c.commit(); flash("Device token revoked.")
   else:
    c.close(); return ("Invalid sync-device action",400)
- rows=c.execute("SELECT device_id,label,active,created_at,last_seen FROM sync_devices ORDER BY created_at DESC").fetchall()
+ rows=c.execute("SELECT device_id,label,active,mode,created_at,last_seen FROM sync_devices ORDER BY created_at DESC").fetchall()
  c.close()
  return render_sync_devices_page(rows,issued)
 
@@ -888,7 +900,7 @@ def _authenticate_sync_device():
   return None,None,(jsonify(error="https_required"),426)
  token_hash=hashlib.sha256(token.encode("utf-8")).hexdigest()
  c=db()
- device=c.execute("SELECT device_id,label,active FROM sync_devices WHERE token_hash=?",(token_hash,)).fetchone()
+ device=c.execute("SELECT device_id,label,active,mode FROM sync_devices WHERE token_hash=?",(token_hash,)).fetchone()
  if not device or not device["active"]:
   c.close(); return None,None,(jsonify(error="device_revoked_or_unknown"),401)
  c.execute("UPDATE sync_devices SET last_seen=CURRENT_TIMESTAMP WHERE device_id=?",(device["device_id"],))
@@ -902,8 +914,8 @@ def sync_api_status():
  latest=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log").fetchone()[0]
  c.close()
  return jsonify(api_version=1,device_id=device["device_id"],server_cursor=latest,
-                entities=sorted(_SYNC_ENTITY_FIELDS.keys()),push_enabled=False,
-                note="Authenticated incremental pull only; write sync is not implemented.")
+                entities=sorted(_SYNC_ENTITY_FIELDS.keys()),push_enabled=(device["mode"]=="read_write"),
+                note="Authenticated bootstrap/pull; push is limited to validated entity types.")
 
 @app.get("/api/sync/v1/bootstrap")
 def sync_api_bootstrap():
