@@ -59,3 +59,19 @@ Older `RESITRACK_SMTP_*` variable names remain accepted temporarily for existing
 ## Exam sessions and DEMS marks
 
 Exam records preserve the session type and attempt separately: virtual, actual, remedial, and (for year 4) DEMS virtual, DEMS actual, DEMS remedial, or DEMS insertion. Each record retains two components (theory/practical, or part 1/part 2 for DEMS insertion). Existing records migrate as `actual`, attempt 1, without deleting or rewriting their scores. First-year progression continues to require an average of at least 10/20 and both components at least 10/20 for each module; virtual marks are excluded from that decision, and a remedial result is used for its module when present.
+
+
+## Optional private-VPN sync API (early, read-only phase)
+
+The Super Admin can enroll/revoke sync devices at `/sync-devices`. The API currently supports authenticated status, bootstrap snapshots, and incremental pull only; it does **not** yet sync writes or provide an Android client/offline conflict handling. Keep it on a private VPN and never expose it publicly.
+
+The Windows launcher remains loopback-only by default. To deliberately bind it to a specific private VPN interface, configure a certificate trusted by the connecting devices, then launch ResiManage with these environment variables (PowerShell example):
+
+```powershell
+$env:RESIMANAGE_BIND = "10.55.0.8" # exact private VPN address of this Windows PC
+$env:RESIMANAGE_PORT = "5000"
+$env:RESIMANAGE_TLS_CERT = "C:\\ResiManage\\certs\\server.pem"
+$env:RESIMANAGE_TLS_KEY = "C:\\ResiManage\\certs\\server-key.pem"
+```
+
+Use your organization/VPN certificate authority; allow TCP 5000 only through the VPN firewall. Remote HTTP is rejected. This is an unfinished server-side sync milestone, not a claim that the phone and PCs are already synchronized.
