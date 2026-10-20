@@ -111,13 +111,14 @@ def main():
     import app as resimanage
 
     resimanage.DB = str(data_dir / "rotation.db")
+    host, port, ssl_context = _server_settings()
     resimanage.app.config.update(
         SECRET_KEY=os.environ["ROTATION_SECRET"],
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=bool(ssl_context),
     )
     resimanage.init()
-    host, port, ssl_context = _server_settings()
     if port == 0:
         port = _available_local_port()
     server = make_server(host, port, resimanage.app, threaded=True, ssl_context=ssl_context)
