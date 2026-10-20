@@ -304,12 +304,16 @@ def sync_once(data_directory, base_url, token):
         push_result = {"pushed": 0, "skipped_entities": [], "skipped_photos": []}
         if status.get("push_enabled"):
             push_result = _push_local_changes(conn, base_url, token, device_id, cursor)
+        warnings = []
+        if push_result["skipped_entities"]:
+            warnings.append("Not yet push-enabled: " + ", ".join(push_result["skipped_entities"]))
+        if push_result.get("skipped_photos"):
+            warnings.append("Local photo files missing for resident IDs: " + ", ".join(push_result["skipped_photos"]))
         return json.dumps({
             "ok": True, "device_id": device_id, "pulled": pulled,
             "pushed": push_result["pushed"], "skipped_entities": push_result["skipped_entities"],
             "skipped_photos": push_result.get("skipped_photos", []), "remote_cursor": cursor,
-            "message": "Sync finished." if not push_result["skipped_entities"] else
-                "Sync finished; some entity types are not yet push-enabled: " + ", ".join(push_result["skipped_entities"]),
+            "message": "Sync finished." if not warnings else "Sync finished with warnings: " + "; ".join(warnings),
         }, ensure_ascii=False)
     except Exception as exc:
         return json.dumps({"ok": False, "message": str(exc)}, ensure_ascii=False)
