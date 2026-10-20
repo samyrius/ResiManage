@@ -465,7 +465,7 @@ def verify_email():
     c.execute("DELETE FROM pending_registrations WHERE email=?",(email,)); c.commit()
     flash("Account already exists / الحساب موجود مسبقًا.")
  c.close()
- return page("""<section class="login-hero"><div class="login-brand"><div class="login-emblem">✉</div><h1>Resi<span>Manage</span></h1><h2>Email verification / تأكيد البريد</h2><p class="login-subtitle">Code sent to {{email}}</p></div><div class="login-panel"><form method="post"><label>6-digit code / رمز التأكيد</label><input name="code" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" required><button class="login-submit">Verify email / تأكيد البريد</button></form><p class="login-security">Code expires after 10 minutes / تنتهي صلاحية الرمز بعد 10 دقائق.</p></div></section>""",email=email)
+ return page("""<section class="login-hero"><div class="login-brand"><img class="login-emblem" src="/static/resimanage-3d-icon.jpg" alt="ResiManage — médecin et stéthoscope"><h1>Resi<span>Manage</span></h1><h2>Email verification / تأكيد البريد</h2><p class="login-subtitle">Code sent to {{email}}</p></div><div class="login-panel"><form method="post"><label>6-digit code / رمز التأكيد</label><input name="code" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" required><button class="login-submit">Verify email / تأكيد البريد</button></form><p class="login-security">Code expires after 10 minutes / تنتهي صلاحية الرمز بعد 10 دقائق.</p></div></section>""",email=email)
 
 @app.get("/logout")
 def logout(): session.clear(); return redirect("/login")
