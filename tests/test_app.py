@@ -2826,3 +2826,89 @@ def test_resident_summary_includes_external_rotation_dates_and_country(tmp_path,
     assert b"France" in response.data
     assert b"2026-11-01" in response.data
     assert b"2026-12-01" in response.data
+
+
+def test_external_internship_request_requires_admin_approval_before_blocking_assignments(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
+            ("Request", "Resident", 2, "active"),
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Request'").fetchone()[0]
+        period = conn.execute(
+            "SELECT id,year_label,name FROM periods WHERE name LIKE '%Août%' OR name LIKE '%Aout%'"
+        ).fetchone()
+        assert period is not None
+        tid = conn.execute(
+            "SELECT id FROM terrains WHERE name='Réanimation chirurgicale'"
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",
+            (rid, tid, period["id"]),
+        )
+        conn.execute(
+            "INSERT INTO users(username,password_hash,role,active) VALUES(?,?,?,1)",
+            ("internrequester", rotation_app.hash_password("requester-test-password"), "user"),
+        )
+        conn.commit()
+
+    # A standard account submits the request, but it must not become an approved blocking stage.
+    with client.session_transaction() as sess:
+        sess["user"] = "internrequester"
+        sess["role"] = "user"
+    request_response = client.post("/external-rotations", data={
+        "resident_id": str(rid),
+        "supervisor": "Dr Request",
+        "destination": "Alger",
+        "hospital": "CHU Request",
+        "country": "Algeria",
+        "rotation_type": "Clinical",
+        "start_date": "2026-08-10",
+        "end_date": "2026-08-20",
+        "notes": "Request awaiting authorization",
+    }, follow_redirects=True)
+    assert request_response.status_code == 200
+    with rotation_app.db() as conn:
+        row = conn.execute(
+            "SELECT id,request_status,status FROM external_rotations WHERE resident_id=?",
+            (rid,),
+        ).fetchone()
+        assert tuple(row[1:]) == ("pending", "requested")
+        allowed, message, _ = rotation_app.check(conn, rid, tid, period["id"], period["year_label"])
+        assert "External rotation blocks" not in message
+
+    # The Super Admin cannot approve a request that conflicts with an existing local assignment.
+    login(client)
+    denied_approval = client.post(
+        f"/external-rotations/{row['id']}/decision",
+        data={"decision": "approve"},
+        follow_redirects=True,
+    )
+    assert denied_approval.status_code == 200
+    assert b"overlaps an existing local assignment" in denied_approval.data
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT request_status FROM external_rotations WHERE id=?", (row["id"],)
+        ).fetchone()[0] == "pending"
+        conn.execute("UPDATE assignments SET status='cancelled' WHERE resident_id=? AND period_id=?", (rid, period["id"]))
+        conn.commit()
+
+    approved = client.post(
+        f"/external-rotations/{row['id']}/decision",
+        data={"decision": "approve"},
+        follow_redirects=True,
+    )
+    assert approved.status_code == 200
+    with rotation_app.db() as conn:
+        saved = conn.execute(
+            "SELECT request_status,status FROM external_rotations WHERE id=?", (row["id"],)
+        ).fetchone()
+        assert tuple(saved) == ("approved", "returned")
+        allowed, message, _ = rotation_app.check(conn, rid, tid, period["id"], period["year_label"])
+        assert allowed is False
+        assert "External rotation blocks local assignment" in message
+        assert conn.execute(
+            "SELECT COUNT(*) FROM audit WHERE action='external_rotation.request_approved'"
+        ).fetchone()[0] == 1
