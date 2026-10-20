@@ -1,5 +1,6 @@
 import hashlib
 import json
+import pytest
 from flask.testing import FlaskClient
 import io
 import sqlite3
@@ -2168,7 +2169,8 @@ def test_windows_packaging_bundles_static_assets_and_uses_separate_user_data():
     assert '--add-data "static;static"' in workflow
     assert 'root / "ResiManage" / "data"' in launcher
     assert 'resimanage.DB = str(data_dir / "rotation.db")' in launcher
-    assert 'make_server("127.0.0.1", port, resimanage.app, threaded=True)' in launcher
+    assert 'make_server(host, port, resimanage.app, threaded=True, ssl_context=ssl_context)' in launcher
+    assert 'RESIMANAGE_BIND' in launcher and 'RESIMANAGE_TLS_CERT' in launcher
 
 
 def test_internal_favicon_declares_the_jpeg_mime_type(tmp_path, monkeypatch):
@@ -2946,3 +2948,30 @@ def test_sync_change_journal_records_business_row_versions_and_tombstones(tmp_pa
     assert json.loads(rows[1]["payload_json"])["surname"] == "JournalUpdated"
     assert json.loads(rows[2]["payload_json"]) == {"id": rid}
     assert "users" not in entities
+
+
+def test_windows_sync_listener_requires_exact_vpn_ip_and_tls(monkeypatch, tmp_path):
+    import windows_launcher as desktop_launcher
+
+    monkeypatch.delenv("RESIMANAGE_BIND", raising=False)
+    monkeypatch.delenv("RESIMANAGE_PORT", raising=False)
+    monkeypatch.delenv("RESIMANAGE_TLS_CERT", raising=False)
+    monkeypatch.delenv("RESIMANAGE_TLS_KEY", raising=False)
+    assert desktop_launcher._server_settings() == ("127.0.0.1", 0, None)
+
+    monkeypatch.setenv("RESIMANAGE_BIND", "10.55.0.8")
+    with pytest.raises(RuntimeError, match="requires TLS"):
+        desktop_launcher._server_settings()
+
+    cert = tmp_path / "vpn-cert.pem"
+    key = tmp_path / "vpn-key.pem"
+    cert.write_text("test-cert", encoding="ascii")
+    key.write_text("test-key", encoding="ascii")
+    monkeypatch.setenv("RESIMANAGE_TLS_CERT", str(cert))
+    monkeypatch.setenv("RESIMANAGE_TLS_KEY", str(key))
+    monkeypatch.setenv("RESIMANAGE_PORT", "5443")
+    assert desktop_launcher._server_settings() == ("10.55.0.8", 5443, (str(cert), str(key)))
+
+    monkeypatch.setenv("RESIMANAGE_BIND", "0.0.0.0")
+    with pytest.raises(RuntimeError, match="Wildcard binds"):
+        desktop_launcher._server_settings()
