@@ -965,6 +965,145 @@ def sync_api_pull():
  c.close()
  return jsonify(device_id=device["device_id"],changes=changes,next_seq=cursor,has_more=has_more)
 
+
+_SYNC_PUSH_ENTITIES={"residents","terrains","periods","capacities","assignments","history","exam_records","objectives","leave_years","leave_entries","external_rotations"}
+_SYNC_PUSH_DELETE_ENTITIES={"objectives","leave_entries","history"}
+
+def _validate_sync_push_row(c,entity,payload):
+ fields=_SYNC_ENTITY_FIELDS[entity]
+ if not isinstance(payload,dict) or set(payload.keys())!=set(fields):
+  raise ValueError("payload must contain the complete whitelisted row shape")
+ row=dict(payload)
+ try: row["id"]=int(row["id"])
+ except (TypeError,ValueError): raise ValueError("row id must be an integer")
+ if entity=="residents":
+  if not str(row.get("surname") or "").strip() or not str(row.get("firstname") or "").strip(): raise ValueError("resident surname and first name are required")
+  if int(row["year"]) not in (1,2,3,4): raise ValueError("resident study year must be 1-4")
+  if row["status"] not in ("active","graduated","archived"): raise ValueError("invalid resident status")
+ elif entity=="terrains":
+  if not str(row.get("name") or "").strip() or row["kind"] not in ("mandatory","basic","optional"): raise ValueError("invalid terrain name/type")
+  conflict=c.execute("SELECT id FROM terrains WHERE name=? AND id<>?",(row["name"],row["id"])).fetchone()
+  if conflict: raise ValueError("terrain name already exists under another ID")
+ elif entity=="periods":
+  label=str(row.get("year_label") or "")
+  if not re.fullmatch(r"\d{4}-\d{4}",label) or int(label.split("-")[1])!=int(label.split("-")[0])+1: raise ValueError("invalid academic year label")
+  if not str(row.get("name") or "").strip(): raise ValueError("period name is required")
+  conflict=c.execute("SELECT id FROM periods WHERE year_label=? AND name=? AND id<>?",(label,row["name"],row["id"])).fetchone()
+  if conflict: raise ValueError("period already exists under another ID")
+ elif entity=="capacities":
+  if int(row["places"])<0: raise ValueError("capacity cannot be negative")
+  if not c.execute("SELECT 1 FROM terrains WHERE id=?",(row["terrain_id"],)).fetchone() or not c.execute("SELECT 1 FROM periods WHERE id=?",(row["period_id"],)).fetchone(): raise ValueError("capacity references an unknown terrain/period")
+  conflict=c.execute("SELECT id FROM capacities WHERE year_label=? AND terrain_id=? AND period_id=? AND id<>?",(row["year_label"],row["terrain_id"],row["period_id"],row["id"])).fetchone()
+  if conflict: raise ValueError("capacity already exists for this terrain/period")
+ elif entity=="assignments":
+  if not c.execute("SELECT 1 FROM residents WHERE id=?",(row["resident_id"],)).fetchone() or not c.execute("SELECT 1 FROM terrains WHERE id=?",(row["terrain_id"],)).fetchone() or not c.execute("SELECT 1 FROM periods WHERE id=?",(row["period_id"],)).fetchone(): raise ValueError("assignment references an unknown resident/terrain/period")
+  if row["status"] not in ("pending","confirmed","rejected","cancelled"): raise ValueError("invalid assignment status")
+  conflict=c.execute("SELECT id FROM assignments WHERE resident_id=? AND period_id=? AND id<>? AND status IN ('pending','confirmed')",(row["resident_id"],row["period_id"],row["id"])).fetchone()
+  if conflict: raise ValueError("resident already has an active assignment for this period")
+  # Central approval is required before a remote assignment becomes confirmed.
+  row["status"]="pending"
+ elif entity=="history":
+  if not c.execute("SELECT 1 FROM residents WHERE id=?",(row["resident_id"],)).fetchone() or not c.execute("SELECT 1 FROM terrains WHERE id=?",(row["terrain_id"],)).fetchone(): raise ValueError("history references an unknown resident/terrain")
+  if not str(row.get("year_label") or "").strip() or not str(row.get("period") or "").strip(): raise ValueError("history year and period are required")
+  if row.get("date_done"):
+   date.fromisoformat(row["date_done"])
+ elif entity=="exam_records":
+  if not c.execute("SELECT 1 FROM residents WHERE id=?",(row["resident_id"],)).fetchone(): raise ValueError("exam references an unknown resident")
+  if int(row["study_year"]) not in (1,2,3,4) or int(row["attempt"])<1: raise ValueError("invalid exam year/attempt")
+  if row["exam_type"] not in ("virtual","actual","remedial","dems_virtual","dems_actual","dems_remedial","dems_insertion"): raise ValueError("invalid exam session")
+  for field in ("theory","practical"):
+   if row[field] is not None and not 0<=float(row[field])<=20: raise ValueError("exam scores must be between 0 and 20")
+  if str(row["exam_type"]).startswith("dems_") and int(row["study_year"])!=4: raise ValueError("DEMS sessions belong to year 4")
+ elif entity=="objectives":
+  if not c.execute("SELECT 1 FROM terrains WHERE id=?",(row["terrain_id"],)).fetchone(): raise ValueError("objective references an unknown terrain")
+  if int(row["study_year"]) not in (1,2,3,4) or int(row["completed"]) not in (0,1) or not str(row["objective"] or "").strip(): raise ValueError("invalid objective")
+ elif entity=="leave_years":
+  if not c.execute("SELECT 1 FROM residents WHERE id=?",(row["resident_id"],)).fetchone() or int(row["year"])<2000 or not 0<=int(row["earned_days"])<=30: raise ValueError("invalid annual leave entitlement")
+  conflict=c.execute("SELECT id FROM leave_years WHERE resident_id=? AND year=? AND id<>?",(row["resident_id"],row["year"],row["id"])).fetchone()
+  if conflict: raise ValueError("leave entitlement already exists for this resident/year")
+ elif entity=="leave_entries":
+  if not c.execute("SELECT 1 FROM residents WHERE id=?",(row["resident_id"],)).fetchone(): raise ValueError("leave references an unknown resident")
+  start=date.fromisoformat(row["start_date"]); end=date.fromisoformat(row["end_date"])
+  if end<start or start.year!=end.year or int(row["days"])!=(end-start).days+1: raise ValueError("leave dates/days are inconsistent or span multiple calendar years")
+  earned=c.execute("SELECT COALESCE(SUM(earned_days),0) FROM leave_years WHERE resident_id=? AND year=?",(row["resident_id"],start.year)).fetchone()[0]
+  used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND strftime('%Y',start_date)=? AND id<>?",(row["resident_id"],str(start.year),row["id"])).fetchone()[0]
+  if used+int(row["days"])>earned: raise ValueError("leave exceeds the recorded entitlement for this year")
+ elif entity=="external_rotations":
+  if not c.execute("SELECT 1 FROM residents WHERE id=?",(row["resident_id"],)).fetchone(): raise ValueError("external stage references an unknown resident")
+  start=date.fromisoformat(row["start_date"]); end=date.fromisoformat(row["end_date"])
+  if end<start: raise ValueError("external stage end date precedes start date")
+  if row["request_status"]!="pending" or row["status"]!="requested": raise ValueError("remote devices may submit requests only; approval must happen on the central administrator")
+  overlap=c.execute("SELECT id FROM external_rotations WHERE resident_id=? AND id<>? AND request_status NOT IN ('rejected','cancelled') AND start_date<=? AND end_date>=?",(row["resident_id"],row["id"],end.isoformat(),start.isoformat())).fetchone()
+  if overlap: raise ValueError("external request overlaps another non-rejected request/stage")
+ return row
+
+@app.post("/api/sync/v1/push")
+def sync_api_push():
+ device,c,error=_authenticate_sync_device()
+ if error:return error
+ if device["mode"]!="read_write":
+  c.close(); return jsonify(error="device_read_only"),403
+ raw=request.get_data()
+ if len(raw)>1_000_000:
+  c.close(); return jsonify(error="batch_too_large"),413
+ body=request.get_json(silent=True)
+ operations=body.get("operations") if isinstance(body,dict) else None
+ if not isinstance(operations,list) or not 1<=len(operations)<=100:
+  c.close(); return jsonify(error="operations_must_be_a_list_of_1_to_100"),400
+ for op in operations:
+  if not isinstance(op,dict) or not all(k in op for k in ("op_id","entity","entity_id","operation","base_seq")):
+   c.close(); return jsonify(error="invalid_operation_shape"),400
+  if not isinstance(op["op_id"],str) or not 8<=len(op["op_id"])<=128 or op["entity"] not in _SYNC_PUSH_ENTITIES or op["operation"] not in ("upsert","delete"):
+   c.close(); return jsonify(error="invalid_operation"),400
+  if op["operation"]=="upsert" and not isinstance(op.get("payload"),dict):
+   c.close(); return jsonify(error="upsert_requires_payload"),400
+ try:
+  c.execute("BEGIN IMMEDIATE")
+  results=[]
+  for op in operations:
+   op_id=op["op_id"]; entity=op["entity"]; entity_id=str(op["entity_id"]); operation=op["operation"]
+   try: numeric_id=int(entity_id); base_seq=int(op["base_seq"])
+   except (TypeError,ValueError): raise ValueError("entity_id/base_seq must be integers")
+   if base_seq<0: raise ValueError("base_seq cannot be negative")
+   prior=c.execute("SELECT device_id,result_json FROM sync_applied_ops WHERE op_id=?",(op_id,)).fetchone()
+   if prior:
+    if prior["device_id"]!=device["device_id"]:
+     results.append({"op_id":op_id,"status":"rejected","reason":"op_id belongs to another device"})
+    else:
+     results.append({**json.loads(prior["result_json"]),"replayed":True})
+    continue
+   latest=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log WHERE entity=? AND entity_id=?",(entity,entity_id)).fetchone()[0]
+   if latest>base_seq:
+    current=c.execute("SELECT payload_json FROM sync_change_log WHERE entity=? AND entity_id=? ORDER BY seq DESC LIMIT 1",(entity,entity_id)).fetchone()
+    results.append({"op_id":op_id,"status":"conflict","server_seq":latest,"server_payload":json.loads(current["payload_json"]) if current and current["payload_json"] else None})
+    continue
+   try:
+    if operation=="upsert":
+     row=_validate_sync_push_row(c,entity,op["payload"])
+     if str(row["id"])!=entity_id: raise ValueError("entity_id must match payload.id")
+     fields=_SYNC_ENTITY_FIELDS[entity]
+     cols=", ".join('"'+field+'"' for field in fields)
+     marks=", ".join("?" for _ in fields)
+     values=tuple(row[field] for field in fields)
+     c.execute(f"INSERT OR REPLACE INTO {entity} ({cols}) VALUES ({marks})",values)
+    else:
+     if entity not in _SYNC_PUSH_DELETE_ENTITIES: raise ValueError("delete is not allowed for this entity")
+     c.execute(f"DELETE FROM {entity} WHERE id=?",(numeric_id,))
+    audit_event(c,"sync.push_applied",f"device_id={device['device_id']}; entity={entity}; entity_id={entity_id}; op_id={op_id}")
+    server_seq=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log").fetchone()[0]
+    result={"op_id":op_id,"status":"applied","server_seq":server_seq}
+   except (ValueError,TypeError,sqlite3.IntegrityError) as exc:
+    result={"op_id":op_id,"status":"rejected","reason":str(exc)[:240]}
+   c.execute("INSERT INTO sync_applied_ops(op_id,device_id,entity,entity_id,result_json) VALUES(?,?,?,?,?)",(op_id,device["device_id"],entity,entity_id,json.dumps(result,ensure_ascii=False)))
+   results.append(result)
+  c.commit()
+ except Exception as exc:
+  c.rollback(); c.close(); return jsonify(error="push_batch_failed",details=str(exc)[:200]),400
+ c.close()
+ return jsonify(results=results,applied_count=sum(r["status"]=="applied" for r in results),
+                conflict_count=sum(r["status"]=="conflict" for r in results),
+                rejected_count=sum(r["status"]=="rejected" for r in results))
+
 def normalize_header(value):
  value=str(value or "").strip().lower()
  value=re.sub(r"[\s_\-]+"," ",value)
