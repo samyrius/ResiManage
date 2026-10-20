@@ -1051,7 +1051,7 @@ def sync_api_photo_upload(rid):
  photo_digest=hashlib.sha256(normalized).hexdigest()
  current=c.execute("SELECT photo_path FROM residents WHERE id=?",(rid,)).fetchone()
  prior=c.execute("SELECT photo_path,server_seq FROM sync_photo_uploads WHERE device_id=? AND resident_id=? AND sha256=?",(device["device_id"],rid,photo_digest)).fetchone()
- if prior and current and current["photo_path"]==prior["photo_path"]:
+ if prior and current and current["photo_path"]:
   current_file=os.path.join(os.path.dirname(os.path.abspath(DB)),"resident_photos",secure_filename(os.path.basename(current["photo_path"])))
   if os.path.isfile(current_file):
    with open(current_file,"rb") as handle: current_digest=hashlib.sha256(handle.read(4*1024*1024+1)).hexdigest()
