@@ -114,6 +114,11 @@ def install_sync_change_triggers(c):
   result_json TEXT NOT NULL,
   applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
  )""")
+ c.execute("""CREATE TABLE IF NOT EXISTS sync_photo_uploads(
+  device_id TEXT NOT NULL, resident_id INTEGER NOT NULL, sha256 TEXT NOT NULL,
+  photo_path TEXT NOT NULL, server_seq INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(device_id,resident_id,sha256)
+ )""")
  for table,fields in _SYNC_ENTITY_FIELDS.items():
   pairs=", ".join("'"+field+"', NEW."+field for field in fields)
   for suffix,operation in (("insert","upsert"),("update","upsert")):
@@ -1027,10 +1032,6 @@ def sync_api_photo_upload(rid):
   if base_seq<0:raise ValueError
  except ValueError:
   c.close(); return jsonify(error="invalid_base_seq"),400
- latest=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log WHERE entity='residents' AND entity_id=?",(str(rid),)).fetchone()[0]
- if latest>base_seq:
-  current=c.execute("SELECT payload_json FROM sync_change_log WHERE entity='residents' AND entity_id=? ORDER BY seq DESC LIMIT 1",(str(rid),)).fetchone()
-  c.close(); return jsonify(error="conflict",server_seq=latest,server_payload=json.loads(current["payload_json"]) if current and current["payload_json"] else None),409
  raw=request.get_data(cache=False)
  if not raw or len(raw)>4*1024*1024:
   c.close(); return jsonify(error="photo_must_be_nonempty_and_at_most_4mb"),413
@@ -1047,6 +1048,20 @@ def sync_api_photo_upload(rid):
     normalized=output.getvalue()
  except Exception:
   c.close(); return jsonify(error="invalid_png_jpeg_or_webp_image"),400
+ photo_digest=hashlib.sha256(normalized).hexdigest()
+ current=c.execute("SELECT photo_path FROM residents WHERE id=?",(rid,)).fetchone()
+ prior=c.execute("SELECT photo_path,server_seq FROM sync_photo_uploads WHERE device_id=? AND resident_id=? AND sha256=?",(device["device_id"],rid,photo_digest)).fetchone()
+ if prior and current and current["photo_path"]==prior["photo_path"]:
+  current_file=os.path.join(os.path.dirname(os.path.abspath(DB)),"resident_photos",secure_filename(os.path.basename(current["photo_path"])))
+  if os.path.isfile(current_file):
+   with open(current_file,"rb") as handle: current_digest=hashlib.sha256(handle.read(4*1024*1024+1)).hexdigest()
+   if current_digest==photo_digest:
+    latest=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log WHERE entity='residents' AND entity_id=?",(str(rid),)).fetchone()[0]
+    c.close(); return jsonify(ok=True,resident_id=rid,photo_path=current["photo_path"],server_seq=latest,replayed=True)
+ latest=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log WHERE entity='residents' AND entity_id=?",(str(rid),)).fetchone()[0]
+ if latest>base_seq:
+  current_change=c.execute("SELECT payload_json FROM sync_change_log WHERE entity='residents' AND entity_id=? ORDER BY seq DESC LIMIT 1",(str(rid),)).fetchone()
+  c.close(); return jsonify(error="conflict",server_seq=latest,server_payload=json.loads(current_change["payload_json"]) if current_change and current_change["payload_json"] else None),409
  directory=os.path.join(os.path.dirname(os.path.abspath(DB)),"resident_photos")
  os.makedirs(directory,exist_ok=True)
  filename="resident_"+str(rid)+"_sync_"+secrets.token_hex(8)+".webp"
@@ -1060,7 +1075,8 @@ def sync_api_photo_upload(rid):
  audit_event(c,"sync.photo_uploaded",f"device_id={device['device_id']}; resident_id={rid}; photo={filename}")
  c.commit()
  server_seq=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log WHERE entity='residents' AND entity_id=?",(str(rid),)).fetchone()[0]
- c.close()
+ c.execute("INSERT OR REPLACE INTO sync_photo_uploads(device_id,resident_id,sha256,photo_path,server_seq) VALUES(?,?,?,?,?)",(device["device_id"],rid,photo_digest,"/photos/"+filename,server_seq))
+ c.commit(); c.close()
  return jsonify(ok=True,resident_id=rid,photo_path="/photos/"+filename,server_seq=server_seq)
 
 _SYNC_PUSH_ENTITIES={"residents","terrains","periods","capacities","assignments","history","exam_records","objectives","leave_years","leave_entries","external_rotations"}
