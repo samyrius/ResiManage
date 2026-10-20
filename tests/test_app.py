@@ -2975,6 +2975,9 @@ def test_windows_sync_listener_requires_exact_vpn_ip_and_tls(monkeypatch, tmp_pa
     monkeypatch.setenv("RESIMANAGE_BIND", "0.0.0.0")
     with pytest.raises(RuntimeError, match="Wildcard binds"):
         desktop_launcher._server_settings()
+    monkeypatch.setenv("RESIMANAGE_BIND", "8.8.8.8")
+    with pytest.raises(RuntimeError, match="private/VPN IP"):
+        desktop_launcher._server_settings()
 
 
 def test_sync_device_enrollment_api_pull_tls_guard_and_revocation(tmp_path, monkeypatch):
