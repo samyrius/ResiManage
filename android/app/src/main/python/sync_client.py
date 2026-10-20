@@ -148,7 +148,7 @@ def _apply_remote_batch(conn, changes, base_url, token, data_directory):
         raise
 
 
-def _bootstrap_empty_device(conn, base_url, token, server_cursor):
+def _bootstrap_empty_device(conn, base_url, token, server_cursor, data_directory):
     # Independent integer-ID databases cannot be safely merged yet; first pairing requires no resident data.
     for table in ("residents", "assignments", "history", "exam_records", "leave_entries", "external_rotations"):
         if conn.execute('SELECT COUNT(*) FROM "' + table + '"').fetchone()[0]:
@@ -174,7 +174,7 @@ def _bootstrap_empty_device(conn, base_url, token, server_cursor):
     conn.commit()
 
 
-def _pull_all(conn, base_url, token, cursor):
+def _pull_all(conn, base_url, token, cursor, data_directory):
     total = 0
     while True:
         query = urllib.parse.urlencode({"after_seq": cursor, "limit": 300})
@@ -192,7 +192,7 @@ def _pull_all(conn, base_url, token, cursor):
     return cursor, total
 
 
-def _push_local_changes(conn, base_url, token, device_id, remote_cursor):
+def _push_local_changes(conn, base_url, token, device_id, remote_cursor, data_directory):
     outbox_cursor = int(_setting(conn, "resimanage_sync_outbox_cursor", "0") or 0)
     rows = conn.execute(
         "SELECT seq,entity,entity_id,operation,payload_json,base_seq FROM sync_change_log WHERE seq>? ORDER BY seq",
@@ -296,14 +296,14 @@ def sync_once(data_directory, base_url, token):
         saved_cursor = _setting(conn, "resimanage_sync_remote_cursor")
         if saved_cursor is None:
             cursor = int(status.get("server_cursor", 0))
-            _bootstrap_empty_device(conn, base_url, token, cursor)
+            _bootstrap_empty_device(conn, base_url, token, cursor, data_directory)
             # Catch server changes committed while the paged snapshot was being downloaded.
-            cursor, pulled = _pull_all(conn, base_url, token, cursor)
+            cursor, pulled = _pull_all(conn, base_url, token, cursor, data_directory)
         else:
-            cursor, pulled = _pull_all(conn, base_url, token, int(saved_cursor))
+            cursor, pulled = _pull_all(conn, base_url, token, int(saved_cursor), data_directory)
         push_result = {"pushed": 0, "skipped_entities": [], "skipped_photos": []}
         if status.get("push_enabled"):
-            push_result = _push_local_changes(conn, base_url, token, device_id, cursor)
+            push_result = _push_local_changes(conn, base_url, token, device_id, cursor, data_directory)
         warnings = []
         if push_result["skipped_entities"]:
             warnings.append("Not yet push-enabled: " + ", ".join(push_result["skipped_entities"]))
