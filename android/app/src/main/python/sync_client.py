@@ -8,6 +8,8 @@ import sqlite3
 import urllib.error
 import urllib.parse
 import urllib.request
+import ssl
+import certifi
 import app as resimanage
 
 
@@ -23,7 +25,7 @@ def _api(base_url, token, path, body=None):
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=data, headers=headers, method="GET" if data is None else "POST")
     try:
-        with urllib.request.urlopen(req, timeout=30) as response:
+        with urllib.request.urlopen(req, timeout=30, context=ssl.create_default_context(cafile=certifi.where())) as response:
             raw = response.read(2_000_001)
             if len(raw) > 2_000_000:
                 raise SyncError("Sync response exceeded the 2 MB safety limit.")
