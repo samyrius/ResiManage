@@ -40,7 +40,7 @@ ResiManage 2 keeps its Windows database, resident photos, and session-signing se
 
 Email-code registration requires SMTP configuration; see [email verification setup](docs/EMAIL_VERIFICATION_SETUP.md). Do not add SMTP secrets to the repository or APK.
 
-PC ↔ Android offline synchronization is not yet implemented. The security design and acceptance criteria are recorded in [the synchronization architecture](docs/SYNC_ARCHITECTURE_RESIMANAGE2.md). Do not expose the local Flask service publicly or use real resident data in a test environment before the security and recovery checks are complete.
+PC ↔ Android synchronization has partial server/API and manual Android-client code, but it is not complete or validated on physical devices. Review the implementation status and acceptance criteria in [the synchronization architecture](docs/SYNC_ARCHITECTURE_RESIMANAGE2.md). Do not expose the service publicly or use real resident data before end-to-end, security, conflict, backup and recovery checks pass.
 
 
 ## Email verification configuration
