@@ -150,9 +150,23 @@ def _apply_remote_batch(conn, changes, base_url, token, data_directory):
 
 def _bootstrap_empty_device(conn, base_url, token, server_cursor, data_directory):
     # Independent integer-ID databases cannot be safely merged yet; first pairing requires no resident data.
-    for table in ("residents", "assignments", "history", "exam_records", "leave_entries", "external_rotations"):
+    # These entities may contain local user-entered data even when no resident rows
+    # exist. Bootstrap uses central integer IDs and upserts rows, so silently applying
+    # it over any of these tables could overwrite local capacities, objectives, votes,
+    # decisions, archive records, leave entitlements or audit history.
+    protected_tables = (
+        "residents", "assignments", "history", "exam_records",
+        "leave_entries", "external_rotations", "capacities", "objectives",
+        "decisions", "dems_archive", "promotion_votes", "dems_votes",
+        "leave_years", "audit",
+    )
+    for table in protected_tables:
         if conn.execute('SELECT COUNT(*) FROM "' + table + '"').fetchone()[0]:
-            raise SyncError("Initial pairing requires an empty device database to avoid ID collisions. Back up/export this device first.")
+            raise SyncError(
+                "Initial pairing requires an empty device data database (except seeded "
+                "terrains/periods and account/settings tables) to avoid overwriting local "
+                "records. Back up/export this device first."
+            )
     for entity in sorted(resimanage._SYNC_ENTITY_FIELDS):
         after_id = 0
         while True:
