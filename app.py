@@ -184,6 +184,9 @@ def boot():
 
 @app.before_request
 def verify_csrf():
+ if request.method=="POST" and request.path.startswith("/api/sync/") and request.headers.get("Authorization","").startswith("Bearer "):
+  # API writes authenticate with a per-device bearer token; browser session CSRF is not used.
+  return None
  if request.method=="POST":
   expected=session.get("_csrf_token","")
   supplied=request.form.get("_csrf_token","")
