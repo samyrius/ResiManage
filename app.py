@@ -1118,8 +1118,10 @@ def sync_api_push():
     else:
      if entity not in _SYNC_PUSH_DELETE_ENTITIES: raise ValueError("delete is not allowed for this entity")
      c.execute(f"DELETE FROM {entity} WHERE id=?",(numeric_id,))
+    # Return the row's own version, not the later audit-log sequence, so
+    # unrelated changes cannot mask a concurrent edit to this entity.
+    server_seq=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log WHERE entity=? AND entity_id=?",(entity,entity_id)).fetchone()[0]
     audit_event(c,"sync.push_applied",f"device_id={device['device_id']}; entity={entity}; entity_id={entity_id}; op_id={op_id}")
-    server_seq=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log").fetchone()[0]
     result={"op_id":op_id,"status":"applied","server_seq":server_seq}
    except (ValueError,TypeError,sqlite3.IntegrityError) as exc:
     result={"op_id":op_id,"status":"rejected","reason":str(exc)[:240]}
