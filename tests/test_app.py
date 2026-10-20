@@ -3156,7 +3156,6 @@ def test_sync_push_leave_validation_supports_cross_year_leave_and_rejects_overla
         )
         with pytest.raises(ValueError, match="overlaps an existing entry"):
             rotation_app._validate_sync_push_row(conn, "leave_entries", payload)
-        conn.close()
 
 
 def test_android_sync_client_requires_https_and_remote_apply_does_not_echo(tmp_path, monkeypatch):
