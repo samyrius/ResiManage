@@ -423,3 +423,27 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 - Ajout d’un test de régression couvrant demande, approbation refusée en cas de conflit, puis approbation après retrait du conflit et blocage local attendu. Le workflow Python CI est déclenché par le commit; résultat à consulter avant de déclarer les tests verts.
 
 - **Précision pratique pour lancer le repère :** le workflow visible depuis la branche par défaut `main` s’appelle `Android APK build` et produit l’artefact `rotation-app-debug-apk`. Le workflow plus explicite `ResiManage Android reference/test APK` vient d’être ajusté sur la branche de travail, mais GitHub Actions peut ne pas l’afficher tant que son fichier n’est pas présent sur `main`. Pour ne pas modifier la sauvegarde `main`, lancer le workflow `Android APK build` existant et choisir `resimanage2-apk-baseline-20261020` comme branche à construire.
+
+
+## 22. État de reprise et contrôles en cours — 20 octobre 2026
+
+### Fonctions déjà présentes dans la branche active
+
+- Identité ResiManage, sélecteur de langues persistant, connexion/inscription avec code e-mail (l’envoi réel dépend de la configuration SMTP), rôles Super Admin/utilisateur et journal d’audit.
+- Dossiers résidents, import avec prévisualisation, photos, examens multi-sessions/tentatives, règles de promotion et archive DEMS, objectifs par terrain/année, congés avec solde et historique, stages externes.
+- La demande de stage à l’étranger est désormais distincte d’un stage approuvé : l’utilisateur standard demande; le Super Admin approuve/refuse; l’approbation revalide les chevauchements.
+- Stabilisation Windows et sauvegarde/restauration ont des tests de régression ajoutés, mais la vérification complète Windows reste à confirmer par les runs CI.
+
+### Points bloquants encore ouverts avant de déclarer « terminé »
+
+1. **Synchronisation LAN/offline PC ↔ Android et second PC : absente du code.** Il reste à construire le journal de changements, l’enrôlement/révocation des appareils, l’API sécurisée sur VPN/TLS, la file hors ligne, les conflits et les tests bout en bout. La spécification seule ne suffit pas.
+2. **Chiffrement de la base SQLite au repos :** la base Android est en stockage privé, mais n’est pas chiffrée au niveau fichier; à décider/implémenter avant données réelles.
+3. **APK repère :** branche immuable créée; build manuel depuis GitHub Actions encore à déclencher et vérifier.
+4. **Validation physique Android :** installation, démarrage, langue, photos, formulaires, sauvegarde/restauration et utilisation réelle sur le téléphone restent à faire par l’utilisateur lors de la revue.
+5. **Vérification globale :** Python CI et Windows CI en cours après les dernières modifications; ne pas annoncer les tests verts avant résultat.
+
+### Incident CI de cette reprise
+
+- Le premier commit de la demande de stage externe a déclenché un échec Python : le code interrogeait `request_status` sans que la colonne/migration ait été ajoutée. Le log indiquait 33 échecs et 76 réussites.
+- Correction poussée dans `69be842c366c028d0abac6529917a8f7a7e845f7` : colonne dans le schéma neuf et migration additive pour les bases existantes.
+- Le nouveau run Python correspondant et le run de la dernière mise à jour du registre sont en attente/en cours au moment de cette note; vérifier leurs conclusions avant toute clôture.
