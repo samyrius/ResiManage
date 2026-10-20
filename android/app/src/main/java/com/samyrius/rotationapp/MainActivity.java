@@ -19,6 +19,7 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebResourceRequest;
 import android.webkit.URLUtil;
 import android.webkit.JavascriptInterface;
 import android.widget.TextView;
@@ -60,7 +61,36 @@ public class MainActivity extends Activity {
         settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(true);
-        webView.setWebViewClient(new WebViewClient());
+        webView.setWebViewClient(new WebViewClient() {
+            private boolean isLocalAppUrl(Uri uri) {
+                return "http".equalsIgnoreCase(uri.getScheme())
+                        && ("127.0.0.1".equals(uri.getHost()) || "localhost".equals(uri.getHost()))
+                        && uri.getPort() == 5000;
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                if (isLocalAppUrl(uri)) return false;
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, uri));
+                } catch (ActivityNotFoundException ignored) {
+                    // No external browser available; do not load an untrusted origin into the bridge-enabled WebView.
+                }
+                return true;
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                Uri uri = Uri.parse(url);
+                if (isLocalAppUrl(uri)) return false;
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, uri));
+                } catch (ActivityNotFoundException ignored) {
+                }
+                return true;
+            }
+        });
         dataDirectory = getFilesDir().getAbsolutePath();
         syncBridge = new SyncBridge(dataDirectory);
         webView.addJavascriptInterface(syncBridge, "ResiManageSync");
