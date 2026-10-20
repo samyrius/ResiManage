@@ -3161,3 +3161,49 @@ def test_android_sync_client_requires_https_and_remote_apply_does_not_echo(tmp_p
     ).fetchone()[0]
     assert latest == 500
     conn.close()
+
+
+def test_sync_api_transfers_resident_photo_with_write_token_and_version_guard(tmp_path, monkeypatch):
+    from PIL import Image
+
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    enrolled = client.post("/sync-devices", data={
+        "action": "enroll", "label": "Photo sync device", "mode": "read_write"
+    }, follow_redirects=True)
+    match = re.search(rb"<p><code>([A-Za-z0-9_-]{40,})</code></p>", enrolled.data)
+    assert match
+    headers = {"Authorization": "Bearer " + match.group(1).decode("ascii")}
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status,photo_path) VALUES(?,?,?,?,?)",
+            ("PhotoSync", "Resident", 1, "active", ""),
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='PhotoSync'").fetchone()[0]
+        conn.commit()
+    base_seq = client.get("/api/sync/v1/status", headers=headers).json["server_cursor"]
+
+    source = io.BytesIO()
+    Image.new("RGB", (48, 32), "white").save(source, format="PNG")
+    uploaded = client.put(
+        f"/api/sync/v1/photo/{rid}?base_seq={base_seq}",
+        data=source.getvalue(), headers=headers, content_type="image/png",
+    )
+    assert uploaded.status_code == 200, uploaded.data
+    assert uploaded.json["photo_path"].startswith("/photos/resident_")
+    photo = client.get(f"/api/sync/v1/photo/{rid}", headers=headers)
+    assert photo.status_code == 200
+    assert photo.mimetype == "image/webp"
+    assert len(photo.data) > 0
+
+    with rotation_app.db() as conn:
+        saved = conn.execute("SELECT photo_path FROM residents WHERE id=?", (rid,)).fetchone()[0]
+        assert saved == uploaded.json["photo_path"]
+        assert (tmp_path / "resident_photos" / os.path.basename(saved)).is_file()
+        conn.execute("UPDATE residents SET surname='PhotoSyncServerEdit' WHERE id=?", (rid,))
+        conn.commit()
+    stale_upload = client.put(
+        f"/api/sync/v1/photo/{rid}?base_seq={base_seq}",
+        data=source.getvalue(), headers=headers, content_type="image/png",
+    )
+    assert stale_upload.status_code == 409
