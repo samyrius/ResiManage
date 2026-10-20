@@ -2975,3 +2975,60 @@ def test_windows_sync_listener_requires_exact_vpn_ip_and_tls(monkeypatch, tmp_pa
     monkeypatch.setenv("RESIMANAGE_BIND", "0.0.0.0")
     with pytest.raises(RuntimeError, match="Wildcard binds"):
         desktop_launcher._server_settings()
+
+
+def test_sync_device_enrollment_api_pull_tls_guard_and_revocation(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    enrolled = client.post("/sync-devices", data={
+        "action": "enroll", "label": "Test resident phone"
+    }, follow_redirects=True)
+    assert enrolled.status_code == 200
+    match = re.search(rb"<p><code>([A-Za-z0-9_-]{40,})</code></p>", enrolled.data)
+    assert match, enrolled.data.decode("utf-8", errors="replace")
+    token = match.group(1).decode("ascii")
+    assert b"Copy this token now" in enrolled.data
+    with client.session_transaction() as sess:
+        assert "issued_sync_device" not in sess
+
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
+            ("ApiPull", "Resident", 1, "active"),
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='ApiPull'").fetchone()[0]
+        device = conn.execute(
+            "SELECT device_id,token_hash,active FROM sync_devices WHERE label=?",
+            ("Test resident phone",),
+        ).fetchone()
+        assert device["token_hash"] == hashlib.sha256(token.encode("ascii")).hexdigest()
+        assert device["active"] == 1
+        conn.commit()
+
+    assert client.get("/api/sync/v1/status").status_code == 401
+    headers = {"Authorization": "Bearer " + token}
+    status = client.get("/api/sync/v1/status", headers=headers)
+    assert status.status_code == 200
+    assert status.json["device_id"] == device["device_id"]
+    assert status.json["push_enabled"] is False
+
+    bootstrap = client.get("/api/sync/v1/bootstrap?entity=residents&limit=50", headers=headers)
+    assert bootstrap.status_code == 200
+    assert any(row["id"] == rid for row in bootstrap.json["rows"])
+    pull = client.get("/api/sync/v1/pull?after_seq=0&limit=500", headers=headers)
+    assert pull.status_code == 200
+    assert any(change["entity"] == "residents" and change["entity_id"] == str(rid)
+               for change in pull.json["changes"])
+
+    remote_http = client.get(
+        "/api/sync/v1/status",
+        headers=headers,
+        environ_base={"REMOTE_ADDR": "10.55.0.9"},
+    )
+    assert remote_http.status_code == 426
+
+    revoked = client.post("/sync-devices", data={
+        "action": "revoke", "device_id": device["device_id"]
+    }, follow_redirects=True)
+    assert revoked.status_code == 200
+    assert client.get("/api/sync/v1/status", headers=headers).status_code == 401
