@@ -1,4 +1,5 @@
 import hashlib
+import json
 from flask.testing import FlaskClient
 import io
 import sqlite3
@@ -2912,3 +2913,32 @@ def test_external_internship_request_requires_admin_approval_before_blocking_ass
         assert conn.execute(
             "SELECT COUNT(*) FROM audit WHERE action='external_rotation.request_approved'"
         ).fetchone()[0] == 1
+
+
+def test_sync_change_journal_records_business_row_versions_and_tombstones(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)  # Initializes schema and journal triggers.
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
+            ("Journal", "Resident", 1, "active"),
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Journal'").fetchone()[0]
+        conn.execute("UPDATE residents SET surname=? WHERE id=?", ("JournalUpdated", rid))
+        conn.execute("DELETE FROM residents WHERE id=?", (rid,))
+        # Credentials are deliberately outside the syncable entity set.
+        conn.execute(
+            "INSERT INTO users(username,password_hash,role) VALUES(?,?,?)",
+            ("sync-secret-test", "not-a-real-secret-hash", "user"),
+        )
+        conn.commit()
+        rows = conn.execute(
+            "SELECT operation,payload_json FROM sync_change_log WHERE entity='residents' AND entity_id=? ORDER BY seq",
+            (str(rid),),
+        ).fetchall()
+        entities = {row[0] for row in conn.execute("SELECT DISTINCT entity FROM sync_change_log")}
+    assert [row["operation"] for row in rows] == ["upsert", "upsert", "delete"]
+    assert json.loads(rows[0]["payload_json"])["surname"] == "Journal"
+    assert json.loads(rows[1]["payload_json"])["surname"] == "JournalUpdated"
+    assert json.loads(rows[2]["payload_json"]) == {"id": rid}
+    assert "users" not in entities
