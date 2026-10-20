@@ -481,3 +481,11 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 - Les triggers locaux capturent désormais le `base_seq` par ligne et permettent de supprimer les échos des lignes reçues du serveur. Cela prépare le contrôle de conflit lorsque le client poussera ses edits.
 - **Limites restantes :** le client n’a pas été compilé ni testé sur appareil; pas de résolution de conflit UI, pas de synchronisation planifiée, pas de transfert de photos, pas de push des votes officiels/archives DEMS/décisions, pas de client Windows secondaire. L’APK reste volontairement non compilé jusqu’à la validation finale demandée.
 - Les runs Python/Windows déclenchés par ces commits sont à consulter; deux échecs CI étaient dus au client de test CSRF injectant `data` en plus de `json` pour l’API bearer, corrigé dans le test helper commit `479e0d43f8b812e1527113b55f87afaabfdd88f2`.
+
+
+## 27. Push contrôlé et client Android — contrôle intermédiaire — 20 octobre 2026
+
+- Le push serveur est maintenant limité à des entités métier autorisées, avec mode appareil `read_only/read_write`, idempotency keys, conflit par version de ligne, validation des champs, et downgrade des affectations reçues en `pending` pour décision centrale.
+- Le client Android source utilise la clé Android Keystore pour chiffrer sa configuration, applique les lignes distantes avec suppression des échos, conserve le curseur/version de ligne, puis pousse les changements locaux autorisés. Il refuse un bootstrap sur une base ayant déjà des résidents/stages; c’est volontaire pour éviter les collisions d’IDs avant une vraie migration/merge.
+- Python CI commit `1411a4451fe5751fa24983f1d6c8c0025d04f88c`: succès, **115 tests passés** (run `39408673873`). Des changements postérieurs (version de ligne serveur, navigation WebView, trust CA et documentation) ont de nouveaux runs en cours; attendre leurs résultats.
+- Toujours non livré : APK compilé, test physique, transfert photos, synchronisation votes/archives DEMS et décisions officielles, client Windows secondaire, résolution de conflit interactive et sync planifiée.
