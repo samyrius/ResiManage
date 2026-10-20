@@ -3196,6 +3196,39 @@ def test_android_sync_pull_uses_explicit_data_directory(tmp_path, monkeypatch):
     conn.close()
 
 
+
+def test_android_sync_bootstrap_uses_explicit_data_directory(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
+            ("Bootstrap", "Resident", 1, "active"),
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Bootstrap'").fetchone()[0]
+        fields = rotation_app._SYNC_ENTITY_FIELDS["residents"]
+        row = conn.execute("SELECT * FROM residents WHERE id=?", (rid,)).fetchone()
+        payload = {field: row[field] for field in fields}
+        conn.execute("DELETE FROM residents WHERE id=?", (rid,))
+        conn.commit()
+    def fake_api(base_url, token, path, body=None):
+        if "/bootstrap?" in path and "entity=residents" in path:
+            return {"rows": [payload], "next_id": rid, "has_more": False}
+        if "/bootstrap?" in path:
+            return {"rows": [], "next_id": 0, "has_more": False}
+        raise AssertionError("Unexpected sync request: " + path)
+    monkeypatch.setattr(sync_client, "_api", fake_api)
+    conn = rotation_app.db()
+    sync_client._bootstrap_empty_device(
+        conn, "https://sync.example.test", "T" * 43, 750, str(tmp_path)
+    )
+    assert conn.execute("SELECT surname FROM residents WHERE id=?", (rid,)).fetchone()[0] == "Bootstrap"
+    assert conn.execute(
+        "SELECT value FROM settings WHERE key='resimanage_sync_remote_cursor'"
+    ).fetchone()[0] == "750"
+    conn.close()
+
+
 def test_sync_api_transfers_resident_photo_with_write_token_and_version_guard(tmp_path, monkeypatch):
     from PIL import Image
 
