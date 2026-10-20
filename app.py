@@ -1138,10 +1138,14 @@ def _validate_sync_push_row(c,entity,payload):
  elif entity=="leave_entries":
   if not c.execute("SELECT 1 FROM residents WHERE id=?",(row["resident_id"],)).fetchone(): raise ValueError("leave references an unknown resident")
   start=date.fromisoformat(row["start_date"]); end=date.fromisoformat(row["end_date"])
-  if end<start or start.year!=end.year or int(row["days"])!=(end-start).days+1: raise ValueError("leave dates/days are inconsistent or span multiple calendar years")
-  earned=c.execute("SELECT COALESCE(SUM(earned_days),0) FROM leave_years WHERE resident_id=? AND year=?",(row["resident_id"],start.year)).fetchone()[0]
-  used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND strftime('%Y',start_date)=? AND id<>?",(row["resident_id"],str(start.year),row["id"])).fetchone()[0]
-  if used+int(row["days"])>earned: raise ValueError("leave exceeds the recorded entitlement for this year")
+  if end<start or int(row["days"])!=(end-start).days+1: raise ValueError("leave dates/days are inconsistent")
+  overlap=c.execute("SELECT id FROM leave_entries WHERE resident_id=? AND id<>? AND start_date<=? AND end_date>=?",(row["resident_id"],row["id"],end.isoformat(),start.isoformat())).fetchone()
+  if overlap: raise ValueError("leave overlaps an existing entry")
+  # Match the main leave form: unused entitlement carries forward, and a
+  # multi-year entry is counted against the cumulative entitlement by its end year.
+  earned=c.execute("SELECT COALESCE(SUM(earned_days),0) FROM leave_years WHERE resident_id=? AND year<=?",(row["resident_id"],end.year)).fetchone()[0]
+  used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND end_date<=? AND id<>?",(row["resident_id"],date(end.year,12,31).isoformat(),row["id"])).fetchone()[0]
+  if used+int(row["days"])>earned: raise ValueError("leave exceeds the recorded cumulative entitlement")
  elif entity=="external_rotations":
   if not c.execute("SELECT 1 FROM residents WHERE id=?",(row["resident_id"],)).fetchone(): raise ValueError("external stage references an unknown resident")
   start=date.fromisoformat(row["start_date"]); end=date.fromisoformat(row["end_date"])
