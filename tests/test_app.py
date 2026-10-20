@@ -3285,7 +3285,7 @@ def test_sync_api_transfers_resident_photo_with_write_token_and_version_guard(tm
 
 
 
-def test_android_sync_retries_photo_upload_when_resident_upsert_was_replayed(tmp_path, monkeypatch):
+def test_android_sync_uploads_photo_when_resident_upsert_result_is_replayed(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
     photo_dir = tmp_path / "resident_photos"
