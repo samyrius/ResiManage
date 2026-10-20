@@ -2417,6 +2417,17 @@ def test_android_python_bundle_includes_static_brand_assets():
     assert brand_image.is_file()
 
 
+def test_android_launcher_icon_is_bundled_from_current_brand_artwork():
+    project_root = Path(__file__).resolve().parents[1]
+    manifest = (project_root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
+    gradle = (project_root / "android/app/build.gradle").read_text(encoding="utf-8")
+    brand_image = project_root / "static/resimanage-3d-icon.jpg"
+    assert 'android:icon="@drawable/resimanage_3d_launcher"' in manifest
+    assert 'android:roundIcon="@drawable/resimanage_3d_launcher"' in manifest
+    assert 'copyRotationLauncherIcon' in gradle
+    assert 'rename { "resimanage_3d_launcher.jpg" }' in gradle
+    assert brand_image.is_file()
+
 def test_android_package_version_identifies_resimanage_2():
     gradle = (
         Path(__file__).resolve().parents[1] / "android/app/build.gradle"
