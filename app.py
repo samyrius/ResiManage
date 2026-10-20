@@ -54,6 +54,52 @@ def ensure_column(c, table, column, spec):
 def audit_event(c, action, details):
  c.execute("INSERT INTO audit(action,details,actor) VALUES(?,?,?)",
            (action,str(details)[:1000],str(session.get("user","system"))))
+
+
+# Transactional change journal groundwork for future authenticated device sync.
+# Authentication/transport endpoints and offline client queues are intentionally separate phases.
+_SYNC_ENTITY_FIELDS={
+ "residents":("id","surname","firstname","year","phone","repeat_year","status","birth_place","birth_date","photo_path","dems_status"),
+ "terrains":("id","name","kind","mandatory_year","active"),
+ "periods":("id","year_label","name"),
+ "capacities":("id","year_label","terrain_id","period_id","places"),
+ "assignments":("id","resident_id","terrain_id","period_id","status"),
+ "history":("id","resident_id","terrain_id","year_label","period","date_done"),
+ "decisions":("id","details","decision","reason","actor","created_at"),
+ "exam_records":("id","resident_id","study_year","module","theory","practical","exam_type","attempt","created_at"),
+ "objectives":("id","terrain_id","study_year","objective","completed"),
+ "dems_archive":("id","resident_id","success_date","profile_json","history_json","archived_at"),
+ "promotion_votes":("id","resident_id","from_year","decision","reason","actor","created_at"),
+ "dems_votes":("id","resident_id","success_date","decision","reason","actor","created_at"),
+ "leave_years":("id","resident_id","year","earned_days","created_by"),
+ "leave_entries":("id","resident_id","start_date","end_date","days","notes","created_by","created_at"),
+ "external_rotations":("id","resident_id","supervisor","destination","hospital","country","rotation_type","start_date","end_date","notes","status","request_status","created_by","created_at","updated_at"),
+ "audit":("id","action","details","actor","created_at"),
+}
+def install_sync_change_triggers(c):
+ c.execute("""CREATE TABLE IF NOT EXISTS sync_change_log(
+  seq INTEGER PRIMARY KEY AUTOINCREMENT,
+  entity TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  operation TEXT NOT NULL CHECK(operation IN ('upsert','delete')),
+  payload_json TEXT,
+  changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+ )""")
+ c.execute("CREATE INDEX IF NOT EXISTS idx_sync_change_log_entity_seq ON sync_change_log(entity,seq)")
+ for table,fields in _SYNC_ENTITY_FIELDS.items():
+  pairs=", ".join("'"+field+"', NEW."+field for field in fields)
+  for suffix,operation in (("insert","upsert"),("update","upsert")):
+   name="sync_"+table+"_"+suffix
+   c.execute("DROP TRIGGER IF EXISTS "+name)
+   c.execute(f"""CREATE TRIGGER {name} AFTER {suffix.upper()} ON {table}
+    BEGIN INSERT INTO sync_change_log(entity,entity_id,operation,payload_json)
+    VALUES('{table}',CAST(NEW.id AS TEXT),'{operation}',json_object({pairs})); END""")
+  name="sync_"+table+"_delete"
+  c.execute("DROP TRIGGER IF EXISTS "+name)
+  c.execute(f"""CREATE TRIGGER {name} AFTER DELETE ON {table}
+   BEGIN INSERT INTO sync_change_log(entity,entity_id,operation,payload_json)
+   VALUES('{table}',CAST(OLD.id AS TEXT),'delete',json_object('id',OLD.id)); END""")
+
 def init():
  c=db()
  c.executescript("""
@@ -112,6 +158,7 @@ def init():
  # Fill any missing canonical periods in legacy/partially initialized databases.
  for n in ["01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"]:
   c.execute("INSERT OR IGNORE INTO periods(year_label,name) VALUES(?,?)",(y,n))
+ install_sync_change_triggers(c)
  c.commit(); c.close()
 @app.before_request
 def boot():
