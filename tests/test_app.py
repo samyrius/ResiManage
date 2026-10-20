@@ -3164,6 +3164,38 @@ def test_android_sync_client_requires_https_and_remote_apply_does_not_echo(tmp_p
     conn.close()
 
 
+
+def test_android_sync_pull_uses_explicit_data_directory(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
+            ("SyncPull", "Resident", 1, "active"),
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='SyncPull'").fetchone()[0]
+        fields = rotation_app._SYNC_ENTITY_FIELDS["residents"]
+        row = conn.execute("SELECT * FROM residents WHERE id=?", (rid,)).fetchone()
+        payload = {field: row[field] for field in fields}
+        conn.commit()
+    payload["surname"] = "PulledFromServer"
+    monkeypatch.setattr(sync_client, "_api", lambda *args, **kwargs: {
+        "changes": [{
+            "seq": 900, "entity": "residents", "entity_id": str(rid),
+            "operation": "upsert", "payload": payload,
+        }],
+        "next_seq": 900,
+        "has_more": False,
+    })
+    conn = rotation_app.db()
+    cursor, total = sync_client._pull_all(
+        conn, "https://sync.example.test", "T" * 43, 0, str(tmp_path)
+    )
+    assert (cursor, total) == (900, 1)
+    assert conn.execute("SELECT surname FROM residents WHERE id=?", (rid,)).fetchone()[0] == "PulledFromServer"
+    conn.close()
+
+
 def test_sync_api_transfers_resident_photo_with_write_token_and_version_guard(tmp_path, monkeypatch):
     from PIL import Image
 
