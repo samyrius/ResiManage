@@ -91,6 +91,7 @@ def test_login_branding_uses_resimanage_and_navy_cyan_identity(tmp_path, monkeyp
     assert b"ResiTrack" not in response.data
     assert b"#00dff755" in response.data
     assert b"#19dfbd" in response.data
+    assert b"white-space:normal;overflow-wrap:anywhere;max-width:100%;line-height:1.3;text-align:center" in response.data
     assert b"prefers-reduced-motion:reduce" in response.data
     assert b'src="/static/resimanage-3d-icon.jpg"' in response.data
     assert 'alt="ResiManage — médecin et stéthoscope"'.encode("utf-8") in response.data
