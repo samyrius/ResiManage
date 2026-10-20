@@ -93,7 +93,7 @@ def test_login_branding_uses_resimanage_and_navy_cyan_identity(tmp_path, monkeyp
     assert b"#19dfbd" in response.data
     assert b"prefers-reduced-motion:reduce" in response.data
     assert b'src="/static/resimanage-3d-icon.jpg"' in response.data
-    assert b'alt="ResiManage — médecin et stéthoscope"' in response.data
+    assert 'alt="ResiManage — médecin et stéthoscope"'.encode("utf-8") in response.data
     assert "💓".encode() not in response.data
     assert b"login-heartbeat" not in response.data
     assert b'type="image/jpeg" href="/static/resimanage-3d-icon.jpg"' in response.data
