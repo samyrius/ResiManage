@@ -837,10 +837,13 @@ def audit_log():
  return page("""<section><h3>{{t('audit')}}</h3><div class="wrap"><table><tr><th>{{t('date')}}</th><th>{{t('actor')}}</th><th>{{t('action')}}</th><th>{{t('details')}}</th></tr>{% for r in rows %}<tr><td>{{r.created_at}}</td><td>{{r.actor}}</td><td>{{r.action}}</td><td>{{r.details}}</td></tr>{% else %}<tr><td colspan="4">{{t('none')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
 
 
+def render_sync_devices_page(rows,issued):
+ return page("""<section><h3>Sync devices / Appareils de synchronisation / أجهزة المزامنة</h3><p>Enroll only trusted devices. The token grants access to resident data over the sync API; copy it once and store it securely. Remote API access requires HTTPS.</p>{% if issued %}<div style="padding:12px;border:1px solid #16a085;border-radius:12px"><strong>Copy this token now — it will not be shown again:</strong><p><code>{{issued.token}}</code></p><small>Device ID: {{issued.device_id}}</small></div>{% endif %}<form method="post"><input type="hidden" name="_csrf_token" value="{{csrf_token}}"><input type="hidden" name="action" value="enroll"><label>Device label</label><input name="label" maxlength="100" required placeholder="e.g. Resident phone 01"><button>Generate enrollment token</button></form></section><section><h3>Enrolled devices</h3><div class="wrap"><table><tr><th>Label</th><th>Device ID</th><th>Active</th><th>Created</th><th>Last seen</th><th>Action</th></tr>{% for d in rows %}<tr><td>{{d.label}}</td><td><code>{{d.device_id}}</code></td><td>{{'Yes' if d.active else 'Revoked'}}</td><td>{{d.created_at}}</td><td>{{d.last_seen or 'Never'}}</td><td>{% if d.active %}<form method="post"><input type="hidden" name="_csrf_token" value="{{csrf_token}}"><input type="hidden" name="action" value="revoke"><input type="hidden" name="device_id" value="{{d.device_id}}"><button>Revoke</button></form>{% else %}—{% endif %}</td></tr>{% else %}<tr><td colspan="6">No enrolled devices.</td></tr>{% endfor %}</table></div></section>""",rows=rows,issued=issued)
+
 @app.route("/sync-devices",methods=["GET","POST"])
 def manage_sync_devices():
  if super_guard(): return super_guard()
- c=db()
+ c=db(); issued=None
  if request.method=="POST":
   action=request.form.get("action","")
   if action=="enroll":
@@ -854,8 +857,8 @@ def manage_sync_devices():
     c.execute("INSERT INTO sync_devices(device_id,label,token_hash) VALUES(?,?,?)",(device_id,label,token_hash))
     audit_event(c,"sync_device.enrolled",f"device_id={device_id}; label={label}")
     c.commit()
-    session["issued_sync_device"]={"device_id":device_id,"label":label,"token":token}
-    flash("Device enrolled. Copy its bearer token now; it will only be shown once.")
+    issued={"device_id":device_id,"label":label,"token":token}
+    flash("Device enrolled. Copy its bearer token now; it is shown only in this response.")
   elif action=="revoke":
    device_id=request.form.get("device_id","").strip()
    row=c.execute("SELECT label,active FROM sync_devices WHERE device_id=?",(device_id,)).fetchone()
@@ -869,11 +872,10 @@ def manage_sync_devices():
     c.commit(); flash("Device token revoked.")
   else:
    c.close(); return ("Invalid sync-device action",400)
-  c.close(); return redirect("/sync-devices")
  rows=c.execute("SELECT device_id,label,active,created_at,last_seen FROM sync_devices ORDER BY created_at DESC").fetchall()
  c.close()
- issued=session.pop("issued_sync_device",None)
- return page("""<section><h3>Sync devices / Appareils de synchronisation / أجهزة المزامنة</h3><p>Enroll only trusted devices. The token grants access to resident data over the sync API; copy it once and store it securely. Remote API access requires HTTPS.</p>{% if issued %}<div style="padding:12px;border:1px solid #16a085;border-radius:12px"><strong>Copy this token now — it will not be shown again:</strong><p><code>{{issued.token}}</code></p><small>Device ID: {{issued.device_id}}</small></div>{% endif %}<form method="post"><input type="hidden" name="_csrf_token" value="{{csrf_token}}"><input type="hidden" name="action" value="enroll"><label>Device label</label><input name="label" maxlength="100" required placeholder="e.g. Resident phone 01"><button>Generate enrollment token</button></form></section><section><h3>Enrolled devices</h3><div class="wrap"><table><tr><th>Label</th><th>Device ID</th><th>Active</th><th>Created</th><th>Last seen</th><th>Action</th></tr>{% for d in rows %}<tr><td>{{d.label}}</td><td><code>{{d.device_id}}</code></td><td>{{'Yes' if d.active else 'Revoked'}}</td><td>{{d.created_at}}</td><td>{{d.last_seen or 'Never'}}</td><td>{% if d.active %}<form method="post"><input type="hidden" name="_csrf_token" value="{{csrf_token}}"><input type="hidden" name="action" value="revoke"><input type="hidden" name="device_id" value="{{d.device_id}}"><button>Revoke</button></form>{% else %}—{% endif %}</td></tr>{% else %}<tr><td colspan="6">No enrolled devices.</td></tr>{% endfor %}</table></div></section>""",rows=rows,issued=issued)
+ return render_sync_devices_page(rows,issued)
+
 def _authenticate_sync_device():
  authorization=request.headers.get("Authorization","")
  if not authorization.startswith("Bearer "):
