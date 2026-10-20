@@ -454,3 +454,11 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 - Ajout de `sync_change_log` et de triggers SQLite sur les principales tables métier : journal ordonné d’upserts JSON et de tombstones; les comptes/mots de passe ne sont pas journalisés. Commit code : `cd020434235e493a783be5cb5b256a68043774f8`; test : `9945e92796f080204042e01587e97a0b1efdd18c`.
 - La spécification précise que cette brique est uniquement un journal local. L’API authentifiée, l’enrôlement/révocation des appareils, le bootstrap, les files offline, le transfert photo, TLS/VPN et la résolution des conflits restent à développer; aucune synchronisation ne doit être annoncée.
 - Les runs Python/Windows du commit de test sont encore à consulter. Les échecs précédents ont été corrigés en deux étapes : migration de la colonne `request_status` (commit `69be842c366c028d0abac6529917a8f7a7e845f7`) puis ouverture du POST de demande aux comptes standards (commit `a05f06e772c9eace255fcdf68e5fc9d7a9ba61d4`).
+
+
+## 24. Résultat CI après corrections — 20 octobre 2026
+
+- Commit testé : `a9c6efd95ff514685466595b3ce197992c0e0254`.
+- Python CI push run `39406581599` et PR run `39406586914` : **succès, 111 tests passés** (45,53 s dans le log du run push).
+- Le run Windows EXE/installer `39406581573` était encore en cours lors de la consultation; son résultat reste à confirmer.
+- Cela valide les régressions Python de cette branche, pas l’APK, l’installation Android physique, ni la synchronisation réseau.
