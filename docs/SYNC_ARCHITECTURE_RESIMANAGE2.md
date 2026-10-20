@@ -69,3 +69,15 @@ La base locale évolue encore : les notes d’examen distinguent maintenant `exa
 Le code local crée maintenant une table `sync_change_log` et des déclencheurs SQLite pour les entités métier (résidents, terrains, périodes, capacités, affectations, historique, décisions, examens, objectifs, votes/archives DEMS, congés, stages externes et audit). Les insertions/modifications journalisent un instantané JSON de la ligne; les suppressions créent un tombstone avec l’identifiant. Les tables `users`, mots de passe et sessions ne sont pas incluses.
 
 Cette brique fournit une séquence locale pour préparer le pull incrémental, mais **ne réalise pas la synchronisation** : aucun endpoint API authentifié, enrôlement d’appareils, transfert photo, file d’opérations Android, résolution de conflits, TLS/VPN ou bootstrap initial n’est encore disponible. Les tests de régression du journal doivent réussir avant de poursuivre l’API.
+
+
+## API de lecture et enrôlement — phase serveur partielle
+
+Une première API authentifiée est maintenant présente :
+
+- Écran Super Admin `/sync-devices` pour générer un jeton aléatoire par appareil, stocker uniquement son SHA-256, afficher le jeton une seule fois dans la réponse d’enrôlement et révoquer un appareil.
+- `GET /api/sync/v1/status`, `/bootstrap?entity=...&after_id=...&limit=...` et `/pull?after_seq=...&limit=...` permettent une lecture initiale et incrémentale avec bearer token.
+- L’API refuse le HTTP depuis une adresse distante (426); HTTP loopback reste autorisé pour les tests locaux. Le pull est explicitement en lecture seule (`push_enabled=false`).
+- Le lanceur Windows peut écouter sur une IP VPN privée précise, avec certificat/clé TLS configurés via `RESIMANAGE_BIND`, `RESIMANAGE_PORT`, `RESIMANAGE_TLS_CERT` et `RESIMANAGE_TLS_KEY`. Les wildcard binds et adresses IP publiques sont refusés. Par défaut, il reste sur `127.0.0.1`.
+
+**La synchronisation complète n’est toujours pas réalisée.** L’APK Android démarre son serveur embarqué sur loopback et n’a pas encore d’écran de connexion au serveur distant, de stockage sécurisé du jeton, d’application du bootstrap/pull dans sa base, de push bidirectionnel, de queue hors ligne ou de résolution de conflits. Ne déployer l’API que sur VPN privé et ne pas l’exposer sur Internet.
