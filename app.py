@@ -865,7 +865,8 @@ def manage_sync_devices():
     token=secrets.token_urlsafe(32)
     token_hash=hashlib.sha256(token.encode("utf-8")).hexdigest()
     mode=request.form.get("mode","read_only")
-    if mode not in ("read_only","read_write"): raise ValueError("Invalid device access mode.")
+    if mode not in ("read_only","read_write"):
+     c.close(); return ("Invalid sync-device access mode",400)
     c.execute("INSERT INTO sync_devices(device_id,label,token_hash,mode) VALUES(?,?,?,?)",(device_id,label,token_hash,mode))
     audit_event(c,"sync_device.enrolled",f"device_id={device_id}; label={label}")
     c.commit()
