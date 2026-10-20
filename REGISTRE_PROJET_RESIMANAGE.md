@@ -471,3 +471,13 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 - **API volontairement pull-only** : pas de push, pas de client Android configuré, pas de mode hors ligne ni de résolution de conflits. C’est une fondation serveur, pas une synchronisation complète.
 - Python CI sur commit `1b1d1083ff25cdecdb0b4eb8ff12fd71cc0a4d35`: succès, **113 tests passés** (run push `39407504659`, PR `39407510921`). Le run Windows EXE/installer `39407504449` était encore en cours; vérifier son résultat.
 - Windows restore : le remplacement par `os.replace` échouait sur runner Windows (WinError 5). Le code utilise maintenant l’API SQLite backup pour restaurer dans le fichier existant; une régression garde volontairement une connexion SQLite inactive ouverte. Le run Windows sur le commit incluant cette correction est à confirmer.
+
+
+## 26. Client Android de synchronisation — source ajoutée, non compilée — 20 octobre 2026
+
+- Ajout de `android/app/src/main/python/sync_client.py` : bootstrap paginé, pull incrémental, push local coalescé vers les entités autorisées, détection de conflits/rejets et avertissement pour les entités non prises en charge.
+- Ajout du bridge natif dans `MainActivity.java` : URL et bearer token chiffrés AES-GCM avec clé Android Keystore; le secret n’est pas écrit dans SQLite ni renvoyé au JavaScript après sauvegarde.
+- Ajout de l’écran `/sync` réservé Super Admin pour configurer et lancer une synchronisation manuelle. Le premier appairage exige une base sans dossiers/stages pour éviter les collisions d’identifiants entiers.
+- Les triggers locaux capturent désormais le `base_seq` par ligne et permettent de supprimer les échos des lignes reçues du serveur. Cela prépare le contrôle de conflit lorsque le client poussera ses edits.
+- **Limites restantes :** le client n’a pas été compilé ni testé sur appareil; pas de résolution de conflit UI, pas de synchronisation planifiée, pas de transfert de photos, pas de push des votes officiels/archives DEMS/décisions, pas de client Windows secondaire. L’APK reste volontairement non compilé jusqu’à la validation finale demandée.
+- Les runs Python/Windows déclenchés par ces commits sont à consulter; deux échecs CI étaient dus au client de test CSRF injectant `data` en plus de `json` pour l’API bearer, corrigé dans le test helper commit `479e0d43f8b812e1527113b55f87afaabfdd88f2`.
