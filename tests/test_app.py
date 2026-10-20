@@ -3150,7 +3150,7 @@ def test_android_sync_client_requires_https_and_remote_apply_does_not_echo(tmp_p
     sync_client._apply_remote_batch(conn, [{
         "seq": 500, "entity": "residents", "entity_id": str(rid),
         "operation": "upsert", "payload": payload,
-    }])
+    }], "https://sync.example.test", "T" * 43, str(tmp_path))
     assert conn.execute("SELECT surname FROM residents WHERE id=?", (rid,)).fetchone()[0] == "ServerPulled"
     assert conn.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log").fetchone()[0] == local_seq_before
     assert conn.execute("SELECT server_seq FROM sync_row_versions WHERE entity='residents' AND entity_id=?", (str(rid),)).fetchone()[0] == 500
