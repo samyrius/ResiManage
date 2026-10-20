@@ -3208,3 +3208,37 @@ def test_sync_api_transfers_resident_photo_with_write_token_and_version_guard(tm
         data=source.getvalue(), headers=headers, content_type="image/png",
     )
     assert stale_upload.status_code == 409
+
+
+def test_android_sync_client_downloads_remote_photo_to_local_profile_path(tmp_path, monkeypatch):
+    from PIL import Image
+
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status,photo_path) VALUES(?,?,?,?,?)",
+            ("PhotoPull", "Resident", 1, "active", ""),
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='PhotoPull'").fetchone()[0]
+        fields = rotation_app._SYNC_ENTITY_FIELDS["residents"]
+        row = conn.execute("SELECT * FROM residents WHERE id=?", (rid,)).fetchone()
+        payload = {field: row[field] for field in fields}
+        local_seq_before = conn.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log").fetchone()[0]
+        conn.commit()
+
+    image_bytes = io.BytesIO()
+    Image.new("RGB", (20, 20), "blue").save(image_bytes, format="WEBP")
+    monkeypatch.setattr(sync_client, "_api_bytes", lambda *args: (image_bytes.getvalue(), "image/webp"))
+    payload["photo_path"] = "/photos/resident_%s_server.webp" % rid
+    conn = rotation_app.db()
+    sync_client._apply_remote_batch(conn, [{
+        "seq": 700, "entity": "residents", "entity_id": str(rid),
+        "operation": "upsert", "payload": payload,
+    }], "https://sync.example.test", "T" * 43, str(tmp_path))
+    local_path = conn.execute("SELECT photo_path FROM residents WHERE id=?", (rid,)).fetchone()[0]
+    assert local_path.startswith("/photos/resident_%s_sync_700" % rid)
+    assert (tmp_path / "resident_photos" / os.path.basename(local_path)).is_file()
+    assert conn.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log").fetchone()[0] == local_seq_before
+    assert conn.execute("SELECT server_seq FROM sync_row_versions WHERE entity='residents' AND entity_id=?", (str(rid),)).fetchone()[0] == 700
+    conn.close()
