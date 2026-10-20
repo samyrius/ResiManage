@@ -255,6 +255,9 @@ def _push_local_changes(conn, base_url, token, device_id, remote_cursor, data_di
                     (original["entity"], original["entity_id"], entity_seq),
                 )
                 if item.get("status") == "applied" and item["op_id"] in photo_uploads:
+                    # Close the row-version transaction before network I/O.
+                    # The photo update is saved in a separate short transaction below.
+                    conn.commit()
                     local_photo, ext = photo_uploads[item["op_id"]]
                     mime = {".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webp":"image/webp"}[ext]
                     with open(local_photo, "rb") as photo_handle:
