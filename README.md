@@ -70,8 +70,9 @@ The Windows launcher remains loopback-only by default. To deliberately bind it t
 ```powershell
 $env:RESIMANAGE_BIND = "10.55.0.8" # exact private VPN address of this Windows PC
 $env:RESIMANAGE_PORT = "5000"
-$env:RESIMANAGE_TLS_CERT = "C:\\ResiManage\\certs\\server.pem"
+$env:RESIMANAGE_TLS_CERT = "C:\\ResiManage\\certs\\server.pem" # certificate SAN should match the VPN DNS name
 $env:RESIMANAGE_TLS_KEY = "C:\\ResiManage\\certs\\server-key.pem"
+# On the Android device, use https://resimanage-vpn.example.org:5000 if that VPN DNS name resolves to 10.55.0.8.
 ```
 
 Use your organization/VPN certificate authority; allow TCP 5000 only through the VPN firewall. Remote HTTP is rejected. This is an unfinished server-side sync milestone, not a claim that the phone and PCs are already synchronized.
