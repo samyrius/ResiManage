@@ -1150,6 +1150,7 @@ def _validate_sync_push_row(c,entity,payload):
   if not c.execute("SELECT 1 FROM residents WHERE id=?",(row["resident_id"],)).fetchone(): raise ValueError("external stage references an unknown resident")
   start=date.fromisoformat(row["start_date"]); end=date.fromisoformat(row["end_date"])
   if end<start: raise ValueError("external stage end date precedes start date")
+  reject_external_overlap_with_local_assignment(c,row["resident_id"],start,end)
   if row["request_status"]!="pending" or row["status"]!="requested": raise ValueError("remote devices may submit requests only; approval must happen on the central administrator")
   overlap=c.execute("SELECT id FROM external_rotations WHERE resident_id=? AND id<>? AND request_status NOT IN ('rejected','cancelled') AND start_date<=? AND end_date>=?",(row["resident_id"],row["id"],end.isoformat(),start.isoformat())).fetchone()
   if overlap: raise ValueError("external request overlaps another non-rejected request/stage")
