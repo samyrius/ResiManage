@@ -1,6 +1,6 @@
 # ResiManage 2 — architecture de synchronisation PC ↔ Android
 
-Statut : **conception préparatoire, pas encore implémentée**. Ce document fixe une architecture de travail avant d’ouvrir le réseau à des données de résidents. Il ne constitue pas une promesse que la synchronisation fonctionne déjà.
+Statut : **implémentation partielle, non prête pour des données réelles**. Ce document décrit l’architecture cible et distingue les briques déjà présentes des fonctions restantes. Aucune synchronisation ne doit être déclarée opérationnelle avant les tests de bout en bout Windows central + Windows secondaire + Android et la revue de sécurité.
 
 ## Décisions de départ
 
@@ -15,7 +15,7 @@ Statut : **conception préparatoire, pas encore implémentée**. Ce document fix
 
 1. **Serveur central Windows** : service local démarré avec ResiManage, base SQLite centrale et dossier de données séparé du dossier du programme. Écoute uniquement sur l’interface VPN ou une interface explicitement autorisée, jamais sur toutes les interfaces par défaut.
 2. **Clients** : ResiManage Windows secondaire et Android utilisent une file d’opérations locales lorsque le réseau est absent. Chaque opération reçoit un identifiant unique, un appareil d’origine, une date, un type d’objet et la version de base connue.
-3. **API versionnée** : endpoints conceptuels `/api/sync/v1/bootstrap`, `/push`, `/pull` et `/status`. Ces routes ne sont pas encore présentes et ne doivent pas être considérées comme actives.
+3. **API versionnée** : `/api/sync/v1/bootstrap`, `/push`, `/pull`, `/status` et les routes photo existent partiellement dans le code. Elles ne doivent être activées que sur VPN privé avec TLS et enrôlement d’appareils.
 4. **Authentification des appareils** : enrôlement explicite par un administrateur, jeton révocable propre à chaque appareil, stockage du hash du jeton côté serveur, expiration/rotation, limitation des tentatives et révocation immédiate.
 5. **Transport** : TLS obligatoire ; validation stricte de la taille, du type, des champs et des identifiants ; contrôle de rôle sur chaque opération ; protection contre rejeu par identifiant idempotent.
 6. **Audit et diagnostic** : journaliser le type d’action, l’appareil, l’heure, le résultat et l’identifiant de corrélation. Ne pas journaliser les mots de passe, codes de vérification, jetons, notes médicales ou contenu des dossiers.
@@ -54,21 +54,21 @@ Statut : **conception préparatoire, pas encore implémentée**. Ce document fix
 
 - Le serveur Android actuel écoute sur `127.0.0.1:5000` et n’est pas un serveur de synchronisation réseau.
 - Le lanceur Windows local est prévu pour ouvrir une interface sur boucle locale ; l’exposition à une interface VPN doit être conçue séparément et rester désactivée par défaut.
-- Il n’existe pas encore d’API de synchronisation, de file d’attente distribuée, de gestion de conflits ni d’enrôlement d’appareils. Aucun de ces éléments ne doit être présenté comme opérationnel.
+- L’API, l’enrôlement par jeton, le journal local, le client Android manuel et le transfert de photos ont des premières implémentations. La synchronisation reste incomplète : la file locale n’est pas une file d’opérations complète pour toutes les entités, la résolution interactive des conflits, le push des votes/archives DEMS, la planification et les essais sur appareils physiques restent à faire.
 
 
 ## État actualisé avant implémentation de la synchronisation
 
 La base locale évolue encore : les notes d’examen distinguent maintenant `exam_type` et `attempt` (virtuel, réel, rattrapage et sessions DEMS), et les contrôles de compte permettent des changements de rôle/mot de passe audités. Ces champs et ces règles doivent être inclus dans le modèle de versions avant de créer l’API ; il ne faut pas démarrer une réplication qui ne comprendrait que les anciens champs.
 
-**État d’exécution :** la synchronisation réseau reste non implémentée. Le travail doit commencer après la stabilisation Windows et la validation de la base locale. La vérification Android via GitHub Actions est suspendue à la demande de l’utilisateur jusqu’à la fin de toutes les directives ; aucun endpoint de synchronisation ne doit être exposé en attendant la conception complète de l’enrôlement, de TLS/VPN, des opérations idempotentes et des conflits.
+**État d’exécution :** la synchronisation réseau est partiellement implémentée dans le code, mais elle n’est pas validée de bout en bout. L’API et le client ne doivent pas être utilisés avec des données réelles. Les vérifications Android sur téléphone restent à faire ; aucun port ne doit être exposé publiquement.
 
 
 ## Journal local de changements — première brique ajoutée (20 octobre 2026)
 
 Le code local crée maintenant une table `sync_change_log` et des déclencheurs SQLite pour les entités métier (résidents, terrains, périodes, capacités, affectations, historique, décisions, examens, objectifs, votes/archives DEMS, congés, stages externes et audit). Les insertions/modifications journalisent un instantané JSON de la ligne; les suppressions créent un tombstone avec l’identifiant. Les tables `users`, mots de passe et sessions ne sont pas incluses.
 
-Cette brique fournit une séquence locale pour préparer le pull incrémental, mais **ne réalise pas la synchronisation** : aucun endpoint API authentifié, enrôlement d’appareils, transfert photo, file d’opérations Android, résolution de conflits, TLS/VPN ou bootstrap initial n’est encore disponible. Les tests de régression du journal doivent réussir avant de poursuivre l’API.
+Cette brique fournit une séquence locale pour préparer le pull incrémental. Elle ne suffit pas à elle seule ; elle est désormais associée à une API partielle et à un client manuel décrits ci-dessous. Les tests de régression et de sécurité doivent continuer à couvrir chaque évolution.
 
 
 ## API de lecture et enrôlement — phase serveur partielle
