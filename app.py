@@ -920,13 +920,15 @@ def sync_api_bootstrap():
   c.close(); return jsonify(error="invalid_pagination"),400
  fields=_SYNC_ENTITY_FIELDS[entity]
  columns=", ".join('"'+field+'"' for field in fields)
- rows=c.execute(f"SELECT {columns} FROM {entity} WHERE id>? ORDER BY id LIMIT ?",(after_id,limit+1)).fetchall()
+ # Keep the row page and its journal cursor in one SQLite read snapshot.
+ c.execute("BEGIN")
  latest=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log").fetchone()[0]
+ rows=c.execute(f"SELECT {columns} FROM {entity} WHERE id>? ORDER BY id LIMIT ?",(after_id,limit+1)).fetchall()
  has_more=len(rows)>limit
  rows=rows[:limit]
  payload=[{field:row[field] for field in fields} for row in rows]
  cursor=rows[-1]["id"] if rows else after_id
- c.close()
+ c.commit(); c.close()
  return jsonify(entity=entity,rows=payload,next_id=cursor,has_more=has_more,snapshot_cursor=latest)
 
 @app.get("/api/sync/v1/pull")
