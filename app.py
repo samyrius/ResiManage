@@ -1455,6 +1455,17 @@ def export():
   w.writerow([x[1] for x in c.execute('PRAGMA table_info("'+table+'")')])
   for row in c.execute('SELECT * FROM "'+table+'"'):w.writerow(list(row))
  c.close(); f=io.BytesIO(("\ufeff"+out.getvalue()).encode("utf-8")); return send_file(f,mimetype="text/csv",as_attachment=True,download_name="rotation_export.csv")
+
+def _sqlite_backup_file(source_path, destination_path):
+ """Copy a SQLite snapshot through the backup API (safe for Windows file locks)."""
+ source=sqlite3.connect(source_path,timeout=30)
+ destination=sqlite3.connect(destination_path,timeout=30)
+ try:
+  source.backup(destination)
+  destination.commit()
+ finally:
+  destination.close(); source.close()
+
 def create_full_backup_bytes(directory):
  with tempfile.TemporaryDirectory(prefix="resimanage_backup_",dir=directory) as workdir:
   snapshot=os.path.join(workdir,"rotation.db")
@@ -1547,12 +1558,14 @@ def restore():
    with open(full_before,"wb") as handle:
     handle.write(create_full_backup_bytes(directory))
    old_db_path=os.path.join(directory,"rotation_backup_before_restore_"+timestamp+".db")
-   shutil.copy2(DB,old_db_path)
+   _sqlite_backup_file(DB,old_db_path)
    photo_dir=os.path.join(directory,"resident_photos")
    if restore_photos and os.path.exists(photo_dir):
     old_photo_path=os.path.join(directory,"resident_photos_before_restore_"+timestamp)
     os.replace(photo_dir,old_photo_path)
-   os.replace(staged_db,DB); staged_db=None; db_replaced=True
+   # Restore pages into the existing DB through SQLite's online backup API.
+   # Windows may deny os.replace() when any process still has the database open.
+   _sqlite_backup_file(staged_db,DB); db_replaced=True
    if restore_photos:
     os.replace(staged_photos,photo_dir); staged_photos=None; photos_replaced=True
    app._ready=False
@@ -1561,7 +1574,7 @@ def restore():
    flash("Restore completed. Pre-restore full backup saved as "+os.path.basename(full_before))
   except Exception as exc:
    if db_replaced and old_db_path and os.path.exists(old_db_path):
-    try: shutil.copy2(old_db_path,DB); app._ready=False
+    try: _sqlite_backup_file(old_db_path,DB); app._ready=False
     except Exception: pass
    if photos_replaced:
     photo_dir=os.path.join(directory,"resident_photos")
