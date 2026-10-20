@@ -215,7 +215,8 @@ def sync_once(data_directory, base_url, token):
         if saved_cursor is None:
             cursor = int(status.get("server_cursor", 0))
             _bootstrap_empty_device(conn, base_url, token, cursor)
-            pulled = 0
+            # Catch server changes committed while the paged snapshot was being downloaded.
+            cursor, pulled = _pull_all(conn, base_url, token, cursor)
         else:
             cursor, pulled = _pull_all(conn, base_url, token, int(saved_cursor))
         push_result = {"pushed": 0, "skipped_entities": []}
