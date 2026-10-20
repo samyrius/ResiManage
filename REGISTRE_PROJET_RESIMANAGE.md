@@ -447,3 +447,10 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 - Le premier commit de la demande de stage externe a déclenché un échec Python : le code interrogeait `request_status` sans que la colonne/migration ait été ajoutée. Le log indiquait 33 échecs et 76 réussites.
 - Correction poussée dans `69be842c366c028d0abac6529917a8f7a7e845f7` : colonne dans le schéma neuf et migration additive pour les bases existantes.
 - Le nouveau run Python correspondant et le run de la dernière mise à jour du registre sont en attente/en cours au moment de cette note; vérifier leurs conclusions avant toute clôture.
+
+
+## 23. Journal local pour la synchronisation — 20 octobre 2026
+
+- Ajout de `sync_change_log` et de triggers SQLite sur les principales tables métier : journal ordonné d’upserts JSON et de tombstones; les comptes/mots de passe ne sont pas journalisés. Commit code : `cd020434235e493a783be5cb5b256a68043774f8`; test : `9945e92796f080204042e01587e97a0b1efdd18c`.
+- La spécification précise que cette brique est uniquement un journal local. L’API authentifiée, l’enrôlement/révocation des appareils, le bootstrap, les files offline, le transfert photo, TLS/VPN et la résolution des conflits restent à développer; aucune synchronisation ne doit être annoncée.
+- Les runs Python/Windows du commit de test sont encore à consulter. Les échecs précédents ont été corrigés en deux étapes : migration de la colonne `request_status` (commit `69be842c366c028d0abac6529917a8f7a7e845f7`) puis ouverture du POST de demande aux comptes standards (commit `a05f06e772c9eace255fcdf68e5fc9d7a9ba61d4`).
