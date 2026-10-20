@@ -83,9 +83,19 @@ def install_sync_change_triggers(c):
   entity_id TEXT NOT NULL,
   operation TEXT NOT NULL CHECK(operation IN ('upsert','delete')),
   payload_json TEXT,
+  base_seq INTEGER NOT NULL DEFAULT 0,
   changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
  )""")
+ ensure_column(c,"sync_change_log","base_seq","INTEGER NOT NULL DEFAULT 0")
  c.execute("CREATE INDEX IF NOT EXISTS idx_sync_change_log_entity_seq ON sync_change_log(entity,seq)")
+ c.execute("""CREATE TABLE IF NOT EXISTS sync_row_versions(
+  entity TEXT NOT NULL, entity_id TEXT NOT NULL, server_seq INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(entity,entity_id)
+ )""")
+ c.execute("""CREATE TABLE IF NOT EXISTS sync_control(
+  id INTEGER PRIMARY KEY CHECK(id=1), suppress_log INTEGER NOT NULL DEFAULT 0
+ )""")
+ c.execute("INSERT OR IGNORE INTO sync_control(id,suppress_log) VALUES(1,0)")
  c.execute("""CREATE TABLE IF NOT EXISTS sync_devices(
   device_id TEXT PRIMARY KEY,
   label TEXT NOT NULL,
@@ -110,13 +120,17 @@ def install_sync_change_triggers(c):
    name="sync_"+table+"_"+suffix
    c.execute("DROP TRIGGER IF EXISTS "+name)
    c.execute(f"""CREATE TRIGGER {name} AFTER {suffix.upper()} ON {table}
-    BEGIN INSERT INTO sync_change_log(entity,entity_id,operation,payload_json)
-    VALUES('{table}',CAST(NEW.id AS TEXT),'{operation}',json_object({pairs})); END""")
+    WHEN COALESCE((SELECT suppress_log FROM sync_control WHERE id=1),0)=0
+    BEGIN INSERT INTO sync_change_log(entity,entity_id,operation,payload_json,base_seq)
+    VALUES('{table}',CAST(NEW.id AS TEXT),'{operation}',json_object({pairs}),
+     COALESCE((SELECT server_seq FROM sync_row_versions WHERE entity='{table}' AND entity_id=CAST(NEW.id AS TEXT)),0)); END""")
   name="sync_"+table+"_delete"
   c.execute("DROP TRIGGER IF EXISTS "+name)
   c.execute(f"""CREATE TRIGGER {name} AFTER DELETE ON {table}
-   BEGIN INSERT INTO sync_change_log(entity,entity_id,operation,payload_json)
-   VALUES('{table}',CAST(OLD.id AS TEXT),'delete',json_object('id',OLD.id)); END""")
+   WHEN COALESCE((SELECT suppress_log FROM sync_control WHERE id=1),0)=0
+   BEGIN INSERT INTO sync_change_log(entity,entity_id,operation,payload_json,base_seq)
+   VALUES('{table}',CAST(OLD.id AS TEXT),'delete',json_object('id',OLD.id),
+    COALESCE((SELECT server_seq FROM sync_row_versions WHERE entity='{table}' AND entity_id=CAST(OLD.id AS TEXT)),0)); END""")
 
 def init():
  c=db()
