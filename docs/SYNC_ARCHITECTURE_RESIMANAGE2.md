@@ -82,3 +82,10 @@ Une première API authentifiée est maintenant présente :
 - Le lanceur Windows peut écouter sur une IP VPN privée précise, avec certificat/clé TLS configurés via `RESIMANAGE_BIND`, `RESIMANAGE_PORT`, `RESIMANAGE_TLS_CERT` et `RESIMANAGE_TLS_KEY`. Les wildcard binds et adresses IP publiques sont refusés. Par défaut, il reste sur `127.0.0.1`.
 
 **La synchronisation complète n’est toujours pas réalisée.** L’APK Android a maintenant un écran manuel `/sync`, un bridge natif qui chiffre URL/jeton avec Android Keystore, et un client Python qui peut bootstrap/pull et pousser les entités autorisées. Mais le client Android n’a pas encore été compilé/testé sur téléphone; il refuse le premier appairage si des données résidents/stages existent déjà, n’a pas d’interface de résolution de conflits, n’effectue pas de synchronisation planifiée et ne pousse pas encore les votes officiels/archives DEMS. Ne déployer l’API que sur VPN privé et ne pas l’exposer sur Internet.
+
+
+### Synchronisation des photos (première implémentation)
+
+- Le serveur expose `GET /api/sync/v1/photo/<resident_id>` et `PUT /api/sync/v1/photo/<resident_id>?base_seq=...` avec le même jeton appareil. L’upload vérifie le type image, limite à 4 MB, normalise en WEBP et refuse un upload si la version de la fiche a changé depuis le dernier pull.
+- Le client Android source télécharge les photos lors du bootstrap/pull, les range dans son dossier privé `resident_photos`, et les envoie après l’upsert de la fiche résidente. Les fichiers locaux et le curseur de ligne sont suivis séparément.
+- Ce code source doit encore être compilé et testé sur un téléphone; aucun run Android n’a été lancé. La résolution interactive de conflit de photo et le nettoyage des anciennes versions de fichiers restent à faire.
