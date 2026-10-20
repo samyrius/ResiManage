@@ -3060,8 +3060,6 @@ def test_sync_write_device_push_is_idempotent_conflict_aware_and_downgrades_assi
     headers = {"Authorization": "Bearer " + token}
     status = client.get("/api/sync/v1/status", headers=headers)
     assert status.status_code == 200 and status.json["push_enabled"] is True
-    base_seq = status.json["server_cursor"]
-
     with rotation_app.db() as conn:
         conn.execute(
             "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
@@ -3076,6 +3074,8 @@ def test_sync_write_device_push_is_idempotent_conflict_aware_and_downgrades_assi
         ).fetchone()[0]
         period = conn.execute("SELECT id,year_label,name FROM periods ORDER BY id LIMIT 1").fetchone()
         conn.commit()
+    # The fixture inserted this resident on the server; use its current cursor for the test update.
+    base_seq = client.get("/api/sync/v1/status", headers=headers).json["server_cursor"]
 
     resident_payload["surname"] = "PushedUpdate"
     operation = {
