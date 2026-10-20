@@ -404,3 +404,12 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 - Commit `91aaac3dd263d0eb26334242a55ff9a2c0ec742b` : la fonction de rendu ouvre désormais une seule connexion pour lire l’année et la ferme systématiquement avant le rendu final.
 - Commit `8c57f31b5f4b8f6d3d7626f4770a7e5c34147e8d` : le test de restauration vérifie explicitement que le message de réussite apparaît, en plus de vérifier le contenu restauré. Cela empêche qu’une réponse HTTP 200 masque un échec métier.
 - **État : correction poussée, mais workflow Windows à relancer/consulter pour confirmer.** Ne pas annoncer le problème résolu avant le résultat du workflow. Aucun workflow Android ni APK n’a été lancé.
+
+
+## 20. Point de retour avant travaux parallèles — 20 octobre 2026
+
+- Création de la branche de référence immuable **`resimanage2-apk-baseline-20261020`**, pointée sur le commit source `6b137c90acbb3efdd312c467840d273f22e5bb6d` (état de ResiManage 2 avant lancement d'agents).
+- Le workflow manuel `.github/workflows/build-resimanage-apk.yml` accepte maintenant un champ `source_ref`, installe explicitement Java 17, Android SDK 35 et NDK 27.2, puis génère un artefact `ResiManage-2-reference-apk` contenant `ResiManage-2-reference.apk`, la référence source et le SHA-256. Commit workflow : `479df335d1068f30c049b32fba254c18d69d5fd4`.
+- **L'APK n'est pas encore compilé ni téléchargeable** : le connecteur GitHub disponible ici permet de lire et modifier les fichiers, mais pas de lancer un workflow Actions. L'utilisateur doit déclencher manuellement le workflow depuis GitHub Actions et sélectionner la branche de référence; ensuite, vérifier que le run réussit et télécharger l'artefact.
+- Ce repère conserve le code source, pas les données SQLite privées du téléphone/PC. Avant installation ou désinstallation, faire aussi une sauvegarde depuis l'application.
+- Les workflows Android restent manuels. Ne lancer aucune compilation de la branche active après le début des agents sans accord; le repère doit être construit depuis la branche de référence ci-dessus.
