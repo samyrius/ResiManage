@@ -566,6 +566,7 @@ def residents():
     year=int(request.form.get("year","0"))
     repeat_year=request.form.get("repeat_year","0")
     status=request.form.get("status","")
+    change_reason=request.form.get("change_reason","").strip()
    except (TypeError,ValueError):
     flash("Invalid resident update.")
    else:
@@ -573,15 +574,15 @@ def residents():
     if not target:
      flash("Resident not found.")
     elif target["status"]=="graduated":
-     flash("Graduated residents are archived; status cannot be changed here.")
+     flash("Les dossiers DEMS archivés doivent être corrigés depuis la gestion des archives.")
     elif year not in (1,2,3,4) or repeat_year not in ("0","1") or status not in ("active","inactive"):
-     flash("Year, repeat flag or status is invalid. DEMS graduation must use the official archive workflow.")
-    elif year!=target["year"]:
-     flash("Study-year changes must use the official exam/promotion workflow.")
+     flash("Année, redoublement ou statut invalide.")
+    elif year!=target["year"] and not change_reason:
+     flash("Un motif est obligatoire pour toute correction d’année, de passage ou de redoublement.")
     else:
      c.execute("UPDATE residents SET year=?,repeat_year=?,status=? WHERE id=?",(year,int(repeat_year),status,rid))
-     audit_event(c,"resident.updated",f"resident_id={rid}; year={year}; status={status}")
-     c.commit(); flash(tr("done"))
+     audit_event(c,"resident.admin_corrected",f"resident_id={rid}; year_before={target['year']}; year_after={year}; repeat_year={repeat_year}; status_before={target['status']}; status_after={status}; reason={change_reason}")
+     c.commit(); flash("Dossier résident corrigé et opération journalisée.")
   else:
    if session.get("role")!="super_admin":
     c.close(); return ("Forbidden — Super Admin only",403)
@@ -602,7 +603,7 @@ def residents():
     audit_event(c,"resident.created",surname+" "+firstname)
     c.commit(); flash(tr("done"))
  rows=c.execute("SELECT * FROM residents ORDER BY status DESC,year DESC,surname").fetchall(); c.close()
- return page("""<section><h3>{{t('add')}} — {{t('resident')}}</h3><form method="post"><div class="grid"><div><label>{{t('surname')}}</label><input name="surname" required></div><div><label>{{t('firstname')}}</label><input name="firstname" required></div><div><label>{{t('study_year')}}</label><select name="year">{% for y in range(1,5) %}<option>{{y}}</option>{% endfor %}</select></div><div><label>{{t('phone')}}</label><input name="phone"></div></div><label><input type="checkbox" name="repeat_year" value="1"> {{t('repeat')}}</label><button>{{t('add')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('save')}}</th></tr>{% for r in rows %}<tr><td><a href="/profile/{{r.id}}">{{r.surname}} {{r.firstname}}</a></td><td>{{r.year}}</td><td>{% if r.status=='graduated' %}<span>Graduated — DEMS archive</span>{% else %}<form method="post"><input type="hidden" name="action" value="edit"><input type="hidden" name="rid" value="{{r.id}}"><span>Year {{r.year}}</span><input type="hidden" name="year" value="{{r.year}}"><label><input type="checkbox" name="repeat_year" value="1" {% if r.repeat_year %}checked{% endif %}> {{t('repeat')}}</label><select name="status"><option value="active" {% if r.status=='active' %}selected{% endif %}>{{t('active')}}</option><option value="inactive" {% if r.status=='inactive' %}selected{% endif %}>{{t('inactive')}}</option></select><button>{{t('save')}}</button></form>{% endif %}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
+ return page("""<section><h3>{{t('add')}} — {{t('resident')}}</h3><form method="post"><div class="grid"><div><label>{{t('surname')}}</label><input name="surname" required></div><div><label>{{t('firstname')}}</label><input name="firstname" required></div><div><label>{{t('study_year')}}</label><select name="year">{% for y in range(1,5) %}<option>{{y}}</option>{% endfor %}</select></div><div><label>{{t('phone')}}</label><input name="phone"></div></div><label><input type="checkbox" name="repeat_year" value="1"> {{t('repeat')}}</label><button>{{t('add')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('save')}}</th></tr>{% for r in rows %}<tr><td><a href="/profile/{{r.id}}">{{r.surname}} {{r.firstname}}</a></td><td>{{r.year}}</td><td>{% if r.status=='graduated' %}<span>Graduated — DEMS archive</span>{% else %}<form method="post"><input type="hidden" name="action" value="edit"><input type="hidden" name="rid" value="{{r.id}}"><label>Année de post-graduation / année d’études<select name="year" required>{% for yy in range(1,5) %}<option value="{{yy}}" {% if r.year==yy %}selected{% endif %}>{{yy}}</option>{% endfor %}</select></label><label><input type="checkbox" name="repeat_year" value="1" {% if r.repeat_year %}checked{% endif %}> {{t('repeat')}}</label><select name="status"><option value="active" {% if r.status=='active' %}selected{% endif %}>{{t('active')}}</option><option value="inactive" {% if r.status=='inactive' %}selected{% endif %}>{{t('inactive')}}</option></select><label>Motif si changement d’année<input name="change_reason" maxlength="500" placeholder="Passage, redoublement ou correction"></label><button>{{t('save')}}</button></form>{% endif %}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
 @app.route("/terrains",methods=["GET","POST"])
 def terrains():
  if guard(): return redirect("/login")
