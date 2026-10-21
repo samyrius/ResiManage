@@ -6,6 +6,7 @@ on:
       - "resimanage-2-work"
     paths:
       - ".github/workflows/build-resimanage-windows.yml"
+      - ".github/workflows/android-apk.yml"
       - "app.py"
       - "requirements.txt"
       - "windows_launcher.py"
