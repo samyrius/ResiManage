@@ -90,3 +90,25 @@ Une première API authentifiée est maintenant présente :
 - Le serveur expose `GET /api/sync/v1/photo/<resident_id>` et `PUT /api/sync/v1/photo/<resident_id>?base_seq=...` avec le même jeton appareil. L’upload vérifie le type image, limite à 4 MB, normalise en WEBP et refuse un upload si la version de la fiche a changé depuis le dernier pull.
 - Le client Android source télécharge les photos lors du bootstrap/pull, les range dans son dossier privé `resident_photos`, et les envoie après l’upsert de la fiche résidente. Les fichiers locaux et le curseur de ligne sont suivis séparément.
 - Ce code source doit encore être compilé et testé sur un téléphone; aucun run Android n’a été lancé. La résolution interactive de conflit de photo et le nettoyage des anciennes versions de fichiers restent à faire.
+
+
+## Extension demandée — deux smartphones Android
+
+Le cas d’usage demandé est désormais explicité dans l’interface Android : **deux téléphones Android se synchronisent via le même serveur central Windows**, et non en connexion directe téléphone-à-téléphone. Cela conserve une seule base de référence et évite d’ouvrir un serveur de données sur un téléphone. Chaque téléphone doit être enrôlé séparément dans « Appareils » avec un libellé distinct et son propre jeton ; les deux utilisent la même origine HTTPS privée. Ne jamais partager un jeton entre appareils.
+
+### Procédure de test à réaliser
+
+1. Faire une sauvegarde vérifiée de la base Windows et exporter les données locales des téléphones si nécessaire.
+2. Enrôler « Android 1 » et « Android 2 » séparément sur le PC central, avec des jetons différents et le niveau d’accès minimal nécessaire.
+3. Utiliser deux téléphones de test avec bases locales vides pour le premier appairage ; ne pas effacer ni remplacer une base contenant des données métier.
+4. Configurer la même adresse HTTPS/VPN sur les deux téléphones, mais le jeton propre à chacun.
+5. Synchroniser le téléphone A, vérifier sur le PC central, puis synchroniser le téléphone B et vérifier qu’il récupère la modification. Répéter dans le sens inverse.
+6. Tester révocation d’un jeton, perte/reprise du réseau, opérations répétées, deux modifications concurrentes et conflit sur une affectation/examen/congé.
+7. Vérifier les journaux d’audit et les sauvegardes avant de considérer le scénario accepté.
+
+### Limites à ne pas masquer
+
+- Le déclenchement Android reste manuel (« Synchroniser maintenant ») ; une synchronisation automatique en arrière-plan n’est pas implémentée.
+- La file hors connexion n’est pas complète pour toutes les entités ; les votes officiels de promotion/DEMS, l’archive des diplômés et la résolution interactive des conflits restent incomplets.
+- La synchronisation multi-téléphone n’est **pas déclarée validée** tant que les tests de bout en bout sur deux appareils physiques n’ont pas réussi et que les workflows Android correspondants n’ont pas passé.
+- Ne pas utiliser cette synchronisation partielle avec des données réelles de résidents avant la revue de sécurité et les tests de restauration.
