@@ -574,7 +574,7 @@ def residents():
     if not target:
      flash("Resident not found.")
     elif target["status"]=="graduated":
-     flash("Les dossiers DEMS archivés doivent être corrigés depuis la gestion des archives.")
+     flash("Graduated residents are archived; les dossiers DEMS doivent être corrigés depuis la gestion des archives.")
     elif year not in (1,2,3,4) or repeat_year not in ("0","1") or status not in ("active","inactive"):
      flash("Année, redoublement ou statut invalide.")
     elif year!=target["year"] and not change_reason:
