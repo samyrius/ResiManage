@@ -489,3 +489,16 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 - Le client Android source utilise la clé Android Keystore pour chiffrer sa configuration, applique les lignes distantes avec suppression des échos, conserve le curseur/version de ligne, puis pousse les changements locaux autorisés. Il refuse un bootstrap sur une base ayant déjà des résidents/stages; c’est volontaire pour éviter les collisions d’IDs avant une vraie migration/merge.
 - Python CI commit `1411a4451fe5751fa24983f1d6c8c0025d04f88c`: succès, **115 tests passés** (run `39408673873`). Des changements postérieurs (version de ligne serveur, navigation WebView, trust CA et documentation) ont de nouveaux runs en cours; attendre leurs résultats.
 - Toujours non livré : APK compilé, test physique, transfert photos, synchronisation votes/archives DEMS et décisions officielles, client Windows secondaire, résolution de conflit interactive et sync planifiée.
+
+
+## 28. Exigences validées le 21 octobre 2026 — sélecteur d’année et droits Super Admin
+
+- Le champ « année de post-graduation » doit être un **menu déroulant**, pas un lien qui ouvre une page d’historique distincte.
+- La sélection de l’année active le contexte de consultation de cette année dans l’application : affectations, capacités, tableau de répartition, stages historiques et résumés disponibles.
+- Années historiques à proposer au départ : 2022-2023, 2023-2024, 2024-2025 et 2026-2027, plus les années présentes en base et les nouvelles années créées par les paramètres. Une année sans données doit rester vide et ne doit pas être remplie par des données inventées.
+- Chaque année doit rassembler les informations disponibles qui lui appartiennent : terrains/stages réalisés, affectations par période, examens et notes, année de formation, décisions de passage/redoublement, congés acquis/pris/reportés et autres activités enregistrées. Les données historiques doivent rester consultables quand l’année active change.
+- Les Super Admin peuvent ajouter, modifier, corriger et supprimer toute information, y compris les affectations, profils, examens/notes, décisions de passage/redoublement, congés et données historiques. Les dérogations aux contrôles habituels sont permises à ce rôle.
+- Les opérations sensibles doivent être journalisées avec l’acteur, l’horodatage, l’année concernée, les valeurs avant/après et le motif quand nécessaire. Préserver les possibilités de récupération/archivage pour limiter les pertes accidentelles.
+- Calcul des congés sur l’ensemble du parcours depuis la première inscription en première année : droits annuels applicables, jours déjà pris, reports et solde disponible. Le calcul doit empêcher les doubles comptages et chevauchements; les corrections manuelles du Super Admin doivent laisser une trace.
+- L’interface doit utiliser partout « année de post-graduation » à la place d’« année universitaire », et l’en-tête institutionnel doit inclure « Centre Hospitalio-Universitaire Nedir Mohamed — Tizi Ouzou ».
+- État d’implémentation au début de cette étape : sélecteur année à connecter aux vues existantes; couverture exhaustive des données par année, droits complets et calcul consolidé des congés restent à tester/compléter. Cette entrée est une exigence, pas une preuve de livraison.
