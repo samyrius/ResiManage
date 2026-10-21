@@ -637,7 +637,45 @@ def capacities():
 @app.route("/rotation-board")
 def rotation_board():
  if guard(): return redirect("/login")
- c=db(); y=request.args.get("year",setting(c,"year"))
+ c=db(); y=request.form.get("year",request.args.get("year",setting(c,"year")))
+ if request.method=="POST":
+  if session.get("role")!="super_admin":
+   c.close(); return ("Forbidden — Super Admin only",403)
+  action=request.form.get("action","")
+  try:
+   tid=int(request.form.get("terrain_id","0")); pid=int(request.form.get("period_id","0"))
+   period=c.execute("SELECT id,name FROM periods WHERE id=? AND year_label=?",(pid,y)).fetchone()
+   terrain=c.execute("SELECT id,name FROM terrains WHERE id=? AND active=1",(tid,)).fetchone()
+   if not period or not terrain: raise ValueError("Terrain or period not found")
+   if action=="capacity":
+    places=int(request.form.get("places",""))
+    if places<0: raise ValueError("Capacity cannot be negative")
+    c.execute("INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,?) ON CONFLICT(year_label,terrain_id,period_id) DO UPDATE SET places=excluded.places",(y,tid,pid,places))
+    audit_event(c,"capacity.updated","year="+y+"; terrain_id="+str(tid)+"; period_id="+str(pid)+"; places="+str(places))
+    c.commit(); flash("Capacité enregistrée / Capacity saved")
+   elif action=="assign":
+    rid=int(request.form.get("resident_id","0"))
+    ok,msg,status=check(c,rid,tid,pid,y)
+    if not ok:
+     flash(msg)
+    else:
+     old=c.execute("SELECT id,status FROM assignments WHERE resident_id=? AND period_id=?",(rid,pid)).fetchone()
+     if old and old["status"] not in ("rejected","cancelled"):
+      flash(tr("duplicate"))
+     elif old:
+      c.execute("UPDATE assignments SET terrain_id=?,status=? WHERE id=?",(tid,status,old["id"]))
+      audit_event(c,"assignment.replaced","assignment_id="+str(old["id"])+"; resident_id="+str(rid)+"; terrain_id="+str(tid)+"; period_id="+str(pid)+"; status="+str(status))
+      c.commit(); flash(msg)
+     else:
+      c.execute("INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,?)",(rid,tid,pid,status))
+      audit_event(c,"assignment.created","resident_id="+str(rid)+"; terrain_id="+str(tid)+"; period_id="+str(pid)+"; status="+str(status))
+      c.commit(); flash(msg)
+   else:
+    raise ValueError("Unknown board action")
+  except Exception as exc:
+   c.rollback(); flash("Modification impossible : "+str(exc)[:180])
+  c.close()
+  return redirect("/rotation-board?year="+y.replace("&","%26").replace(" ","%20"))
  years=[x["year_label"] for x in c.execute("SELECT DISTINCT year_label FROM periods ORDER BY year_label DESC").fetchall()]
  if y not in years and years: y=years[0]
  periods=c.execute("SELECT * FROM periods WHERE year_label=? ORDER BY id",(y,)).fetchall()
@@ -648,6 +686,7 @@ def rotation_board():
  WHERE p.year_label=? AND a.status IN ('confirmed','pending')
  ORDER BY a.period_id,r.year DESC,r.surname,r.firstname""",(y,)).fetchall()
  capacities=c.execute("SELECT terrain_id,period_id,places FROM capacities WHERE year_label=?",(y,)).fetchall()
+ residents=c.execute("SELECT id,surname,firstname,year FROM residents WHERE status='active' ORDER BY year DESC,surname,firstname").fetchall()
  c.close()
  capmap={(x["terrain_id"],x["period_id"]):x["places"] for x in capacities}
  assigned={}
@@ -674,7 +713,7 @@ def rotation_board():
    title_style=ParagraphStyle("BoardTitle",parent=styles["Title"],fontName="Helvetica-Bold",fontSize=15,leading=18,alignment=TA_CENTER,textColor=colors.HexColor("#183c5a"),spaceAfter=5)
    cell_style=ParagraphStyle("BoardCell",parent=styles["BodyText"],fontName="Helvetica",fontSize=7,leading=9,alignment=TA_LEFT,wordWrap="CJK")
    head_style=ParagraphStyle("BoardHead",parent=cell_style,fontName="Helvetica-Bold",alignment=TA_CENTER,textColor=colors.white)
-   story=[Paragraph("ResiManage — Tableau général de répartition des stages",title_style),Paragraph("Année universitaire : "+str(y),styles["Normal"]),Spacer(1,5*mm)]
+   story=[Paragraph("Centre Hospitalo-Universitaire Nedir Mohamed",title_style),Paragraph("Département d’Anesthésie-Réanimation",title_style),Paragraph("Chef de service : Professeur Benhocine",styles["Normal"]),Paragraph("Tableau général de répartition des stages — Année universitaire : "+str(y),styles["Normal"]),Spacer(1,5*mm)]
    data=[[Paragraph("Terrain de stage",head_style)]+[Paragraph(str(p["name"]),head_style) for p in periods]]
    for item in board:
     row=[Paragraph(item["name"],cell_style)]
@@ -692,7 +731,7 @@ def rotation_board():
    return send_file(output,mimetype="application/pdf",as_attachment=True,download_name="ResiManage_repartition_"+str(y).replace("/","-")+".pdf")
   except ImportError:
    return ("PDF export requires the reportlab package. Install requirements.txt and retry.",500)
- return page("""<section class="rt-board-head"><h2>Tableau général de répartition des stages</h2><p>Année universitaire : <strong>{{year_label}}</strong>. Les affectations confirmées et en attente sont affichées. Une capacité non définie est indiquée par « — ».</p><form method="get" class="rt-board-controls"><label>Année universitaire<select name="year">{% for yy in years %}<option value="{{yy}}" {% if yy==year_label %}selected{% endif %}>{{yy}}</option>{% endfor %}</select></label><button type="submit">Afficher</button></form><div class="rt-board-actions"><a href="/rotation-board?year={{year_label|urlencode}}&format=pdf">Exporter en PDF</a><button type="button" onclick="window.print()">Imprimer le tableau</button><a href="/assign">Retour à la répartition</a></div></section><section class="rt-board-table"><div class="wrap"><table><thead><tr><th>Terrain de stage</th>{% for p in periods %}<th>{{p.name}}</th>{% endfor %}</tr></thead><tbody>{% for item in board %}<tr><th>{{item.name}}</th>{% for cell in item.cells %}<td class="{% if cell.capacity is not none and cell.remaining==0 %}rt-board-full{% elif cell.used>0 %}rt-board-partial{% else %}rt-board-free{% endif %}"><div class="rt-board-roster">{% if cell.names %}{% for n in cell.names %}<div class="rt-board-name">{{n.surname}} {{n.firstname}} <small>({{n.year}}e année{% if n.status=='pending' %}, en attente{% endif %})</small></div>{% endfor %}{% else %}<span class="muted">Aucun résident affecté</span>{% endif %}</div><div class="rt-board-count">Occupées : <strong>{{cell.used}}</strong> / {{cell.capacity if cell.capacity is not none else "—"}}</div><div class="rt-board-remaining">Places restantes : <strong>{{cell.remaining if cell.remaining is not none else "capacité non définie"}}</strong></div></td>{% endfor %}</tr>{% endfor %}</tbody></table></div><p class="muted">La capacité doit être configurée dans « Capacités » pour calculer les places restantes. Les affectations en attente sont incluses et identifiées.</p></section><style>.rt-board-head h2{margin-top:0}.rt-board-controls{display:flex;align-items:end;gap:12px;flex-wrap:wrap}.rt-board-controls label{min-width:210px;flex:1}.rt-board-actions{display:flex;gap:8px;flex-wrap:wrap}.rt-board-table table{min-width:950px;table-layout:fixed}.rt-board-table th:first-child{width:175px}.rt-board-table th{background:#214e79;color:white}.rt-board-table td{vertical-align:top;min-width:160px}.rt-board-name{padding:4px 0;border-bottom:1px solid #dce6f0}.rt-board-name small{color:#526274}.rt-board-count{margin-top:8px;padding-top:5px;border-top:1px solid #dce6f0}.rt-board-remaining{font-weight:600;margin-top:4px}.rt-board-full{background:#ffe8e6}.rt-board-partial{background:#fff5db}.rt-board-free{background:#e7f7ee}@media print{body{background:white!important;color:black}header,.main-nav,.rt-board-controls,.rt-board-actions,footer{display:none!important}main{max-width:none;padding:0!important}.rt-board-head,.rt-board-table{border:0;box-shadow:none;break-inside:avoid}.rt-board-table .wrap{overflow:visible}.rt-board-table table{min-width:0;width:100%;font-size:8pt;table-layout:fixed}.rt-board-table th:first-child{width:18%}.rt-board-table th,.rt-board-table td{padding:4px;border:1px solid #777;overflow-wrap:anywhere;break-inside:avoid}.rt-board-table th{background:#e8eef4!important;color:#111!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.rt-board-table tr{break-inside:avoid}}@media(max-width:600px){.rt-board-actions>*{flex:1;text-align:center}}</style>""",year_label=y,years=years,periods=periods,board=board)
+ return page("""<section class="rt-board-head"><div class="rt-board-print-heading"><h2>Centre Hospitalo-Universitaire Nedir Mohamed</h2><h3>Département d’Anesthésie-Réanimation</h3><p><strong>Chef de service : Professeur Benhocine</strong></p></div><h2>Tableau général de répartition des stages</h2><p>Année universitaire : <strong>{{year_label}}</strong>. Les affectations confirmées et en attente sont affichées. Une capacité non définie est indiquée par « — ».</p><form method="get" class="rt-board-controls"><label>Année universitaire<select name="year">{% for yy in years %}<option value="{{yy}}" {% if yy==year_label %}selected{% endif %}>{{yy}}</option>{% endfor %}</select></label><button type="submit">Afficher</button></form><div class="rt-board-actions"><a href="/rotation-board?year={{year_label|urlencode}}&format=pdf">Exporter en PDF</a><button type="button" onclick="window.print()">Imprimer le tableau</button><a href="/assign">Retour à la répartition</a></div></section><section class="rt-board-table"><div class="wrap"><table><thead><tr><th>Terrain de stage</th>{% for p in periods %}<th>{{p.name}}</th>{% endfor %}</tr></thead><tbody>{% for item in board %}<tr><th>{{item.name}}</th>{% for cell in item.cells %}<td class="{% if cell.capacity is not none and cell.remaining==0 %}rt-board-full{% elif cell.used>0 %}rt-board-partial{% else %}rt-board-free{% endif %}"><div class="rt-board-roster">{% if cell.names %}{% for n in cell.names %}<div class="rt-board-name">{{n.surname}} {{n.firstname}} <small>({{n.year}}e année{% if n.status=='pending' %}, en attente{% endif %})</small></div>{% endfor %}{% else %}<span class="muted">Aucun résident affecté</span>{% endif %}</div><div class="rt-board-count">Occupées : <strong>{{cell.used}}</strong> / {{cell.capacity if cell.capacity is not none else "—"}}</div><div class="rt-board-remaining">Places restantes : <strong>{{cell.remaining if cell.remaining is not none else "capacité non définie"}}</strong></div>{% if session.get('role')=='super_admin' %}<form method="post" class="rt-board-cell-form"><input type="hidden" name="action" value="capacity"><input type="hidden" name="year" value="{{year_label}}"><input type="hidden" name="terrain_id" value="{{item.id}}"><input type="hidden" name="period_id" value="{{cell.period_id}}"><label>Nombre de places<input type="number" min="0" step="1" name="places" value="{{cell.capacity if cell.capacity is not none else ''}}" placeholder="À définir" required></label><button type="submit">Enregistrer</button></form><form method="post" class="rt-board-cell-form"><input type="hidden" name="action" value="assign"><input type="hidden" name="year" value="{{year_label}}"><input type="hidden" name="terrain_id" value="{{item.id}}"><input type="hidden" name="period_id" value="{{cell.period_id}}"><label>Ajouter un résident<select name="resident_id" required><option value="">Choisir un résident…</option>{% for year_group, residents_in_year in residents|groupby('year')|reverse %}<optgroup label="{{year_group}}e année">{% for resident in residents_in_year %}<option value="{{resident.id}}">{{resident.surname}} {{resident.firstname}}</option>{% endfor %}</optgroup>{% endfor %}</select></label><button type="submit">Affecter</button></form>{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div><p class="muted">La capacité doit être configurée dans « Capacités » pour calculer les places restantes. Les affectations en attente sont incluses et identifiées.</p></section><style>.rt-board-print-heading{display:none}.rt-board-head h2{margin-top:0}.rt-board-controls{display:flex;align-items:end;gap:12px;flex-wrap:wrap}.rt-board-controls label{min-width:210px;flex:1}.rt-board-actions{display:flex;gap:8px;flex-wrap:wrap}.rt-board-table table{min-width:950px;table-layout:fixed}.rt-board-table th:first-child{width:175px}.rt-board-table th{background:#214e79;color:white}.rt-board-table td{vertical-align:top;min-width:160px}.rt-board-name{padding:4px 0;border-bottom:1px solid #dce6f0}.rt-board-name small{color:#526274}.rt-board-count{margin-top:8px;padding-top:5px;border-top:1px solid #dce6f0}.rt-board-remaining{font-weight:600;margin-top:4px}.rt-board-cell-form{display:grid;gap:4px;margin-top:8px;padding-top:7px;border-top:1px solid #dce6f0}.rt-board-cell-form label{font-size:12px;font-weight:600}.rt-board-cell-form input,.rt-board-cell-form select{width:100%;min-width:0;padding:5px;border:1px solid #b7c7d7;border-radius:5px;background:white}.rt-board-cell-form button{padding:5px 7px;font-size:12px}.rt-board-full{background:#ffe8e6}.rt-board-partial{background:#fff5db}.rt-board-free{background:#e7f7ee}@media print{body{background:white!important;color:black}header,nav,.main-nav,.rt-board-controls,.rt-board-actions,.rt-board-cell-form,footer{display:none!important}.rt-board-print-heading{display:block;text-align:center;margin-bottom:12px}.rt-board-print-heading h2{margin:0;font-size:17pt}.rt-board-print-heading h3{margin:3px 0;font-size:12pt}.rt-board-print-heading p{margin:3px 0}main{max-width:none;padding:0!important}.rt-board-head,.rt-board-table{border:0;box-shadow:none;break-inside:avoid}.rt-board-table .wrap{overflow:visible}.rt-board-table table{min-width:0;width:100%;font-size:8pt;table-layout:fixed}.rt-board-table th:first-child{width:18%}.rt-board-table th,.rt-board-table td{padding:4px;border:1px solid #777;overflow-wrap:anywhere;break-inside:avoid}.rt-board-table th{background:#e8eef4!important;color:#111!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.rt-board-table tr{break-inside:avoid}}@media(max-width:600px){.rt-board-actions>*{flex:1;text-align:center}}</style>""",year_label=y,years=years,periods=periods,board=board)
 
 def check(c,rid,tid,pid,y):
  r=c.execute("SELECT * FROM residents WHERE id=? AND status='active'",(rid,)).fetchone(); t=c.execute("SELECT * FROM terrains WHERE id=?",(tid,)).fetchone(); p=c.execute("SELECT * FROM periods WHERE id=? AND year_label=?",(pid,y)).fetchone()
