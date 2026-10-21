@@ -578,7 +578,7 @@ def residents():
     elif year not in (1,2,3,4) or repeat_year not in ("0","1") or status not in ("active","inactive"):
      flash("Année, redoublement ou statut invalide.")
     elif year!=target["year"] and not change_reason:
-     flash("Un motif est obligatoire pour toute correction d’année, de passage ou de redoublement.")
+     flash("Study-year changes must use the official exam/promotion workflow; provide a reason for an authorized administrative correction.")
     else:
      c.execute("UPDATE residents SET year=?,repeat_year=?,status=? WHERE id=?",(year,int(repeat_year),status,rid))
      audit_event(c,"resident.admin_corrected",f"resident_id={rid}; year_before={target['year']}; year_after={year}; repeat_year={repeat_year}; status_before={target['status']}; status_after={status}; reason={change_reason}")
@@ -1932,6 +1932,9 @@ def exams():
   elif action=="record":
    if session.get("role")!="super_admin":
     c.close(); return ("Forbidden — Super Admin only",403)
+   if resident["status"]=="graduated" or sy>int(resident["year"]):
+    flash("Cannot record marks for a future study year or for an archived DEMS graduate.")
+    c.close(); return redirect("/exams")
    try:
     module=request.form.get("module","").strip()
     exam_type=request.form.get("exam_type","actual").strip()
