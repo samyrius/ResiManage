@@ -38,9 +38,15 @@ def available_postgrad_years(c):
  years={"2022-2023","2023-2024","2024-2025","2025-2026","2026-2027"}
  current=setting(c,"year")
  if current: years.add(current)
- for table in ("periods","history"):
+ # Recover years from every feature that stores its own postgraduate-year label.
+ # Older databases may not have every newer table/column yet, so each source is
+ # deliberately queried independently and missing schema is tolerated.
+ for table,column in (("periods","year_label"),("history","year_label"),
+                      ("exam_records","postgrad_year"),("decisions","postgrad_year")):
   try:
-   years.update(str(row[0]) for row in c.execute("SELECT DISTINCT year_label FROM "+table+" WHERE year_label IS NOT NULL AND year_label<>''").fetchall())
+   years.update(str(row[0]) for row in c.execute(
+    "SELECT DISTINCT "+column+" FROM "+table+" WHERE "+column+" IS NOT NULL AND "+column+"<>''"
+   ).fetchall())
   except sqlite3.Error:
    pass
  return sorted((y for y in years if re.fullmatch(r"\d{4}-\d{4}",y) and int(y.split("-")[1])==int(y.split("-")[0])+1),reverse=True)
