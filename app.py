@@ -1796,7 +1796,7 @@ def resident_profile(rid):
    continue
  leave_rows=c.execute("SELECT start_date,end_date,days,notes FROM leave_entries WHERE resident_id=? ORDER BY start_date DESC",(rid,)).fetchall()
  external_rows=c.execute("SELECT supervisor,destination,hospital,country,rotation_type,start_date,end_date,notes,status,request_status FROM external_rotations WHERE resident_id=? ORDER BY start_date DESC",(rid,)).fetchall()
- leave_earned=accrued_leave_days(r["registration_date"],today)
+ leave_earned=max(accrued_leave_days(r["registration_date"],today),c.execute("SELECT COALESCE(SUM(earned_days),0) FROM leave_years WHERE resident_id=? AND year<=?",(rid,today.year)).fetchone()[0])
  leave_used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND end_date<=?",(rid,today.isoformat())).fetchone()[0]
  leave_remaining=leave_earned-leave_used
  terrains=c.execute("SELECT * FROM terrains ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END,name").fetchall(); c.close()
@@ -2215,18 +2215,34 @@ def leave_management():
             if end<start: raise ValueError("End date must not precede start date.")
             days=(end-start).days+1
             overlap=c.execute("SELECT id FROM leave_entries WHERE resident_id=? AND start_date<=? AND end_date>=?",(rid,end.isoformat(),start.isoformat())).fetchone()
-            if overlap: raise ValueError("Leave dates overlap an existing entry.")
+            if overlap: raise ValueError("Leave dates overlap an existing entry")
             historical=request.form.get("historical_record")=="1"
             resident=c.execute("SELECT registration_date FROM residents WHERE id=?",(rid,)).fetchone()
             if historical and end>date.today():
                 raise ValueError("Historical leave entries must end today or earlier.")
             if not historical:
-                if not resident["registration_date"]:
-                    raise ValueError("Set the resident's first-year registration date in their profile before recording non-historical leave.")
-                earned=accrued_leave_days(resident["registration_date"],end)
+                # Maintain explicit annual quotas. If a legacy resident has no registration
+                # date yet, record the 30-day entitlement per calendar year being entered;
+                # admins can later correct the first-year registration date in the profile.
+                if resident["registration_date"]:
+                    first_year=date.fromisoformat(resident["registration_date"]).year
+                    last_year=end.year
+                    earned=accrued_leave_days(resident["registration_date"],end)
+                    eligible_years=[]
+                    for entitlement_year in range(first_year,last_year+1):
+                        anniversary_year=date(entitlement_year,1,1)
+                        if entitlement_year<first_year: continue
+                        c.execute("INSERT OR IGNORE INTO leave_years(resident_id,year,earned_days,created_by) VALUES(?,?,30,?)",(rid,entitlement_year,session.get("user","")))
+                    earned_rows=c.execute("SELECT COALESCE(SUM(earned_days),0) FROM leave_years WHERE resident_id=? AND year<=?",(rid,last_year)).fetchone()
+                    earned=max(earned,int(earned_rows[0] or 0))
+                else:
+                    first_year=start.year
+                    for entitlement_year in range(first_year,end.year+1):
+                        c.execute("INSERT OR IGNORE INTO leave_years(resident_id,year,earned_days,created_by) VALUES(?,?,30,?)",(rid,entitlement_year,session.get("user","")))
+                    earned=c.execute("SELECT COALESCE(SUM(earned_days),0) FROM leave_years WHERE resident_id=? AND year<=?",(rid,end.year)).fetchone()[0]
                 used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND end_date<=?",(rid,end.isoformat())).fetchone()[0]
                 if used+days>earned:
-                    raise ValueError(f"Insufficient accrued leave on {end.isoformat()}: {max(0,earned-used)} days available.")
+                    raise ValueError(f"Insufficient accrued leave balance: {max(0,earned-used)} days available on {end.isoformat()}.")
             c.execute("INSERT INTO leave_entries(resident_id,start_date,end_date,days,notes,created_by) VALUES(?,?,?,?,?,?)",(rid,start.isoformat(),end.isoformat(),days,request.form.get("notes","").strip(),session.get("user","")))
             audit_event(c,"leave.entry_created",f"resident_id={rid}; start={start}; end={end}; days={days}")
             c.commit(); flash(f"Leave recorded: {days} calendar days. Unused entitlement carries forward.")
