@@ -7,6 +7,7 @@ on:
       - "resimanage-2-work"
     paths:
       - ".github/workflows/android-apk.yml"
+      - ".github/workflows/build-resimanage-windows.yml"
       - "android/**"
       - "app.py"
       - "requirements.txt"
