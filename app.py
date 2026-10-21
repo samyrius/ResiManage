@@ -730,6 +730,7 @@ def rotation_board():
  WHERE p.year_label=? AND a.status IN ('confirmed','pending')
  ORDER BY a.period_id,r.year DESC,r.surname,r.firstname""",(y,)).fetchall()
  capacities=c.execute("SELECT terrain_id,period_id,places FROM capacities WHERE year_label=?",(y,)).fetchall()
+ capmap={(row["terrain_id"],row["period_id"]):row["places"] for row in capacities}
  residents=c.execute("SELECT id,surname,firstname,year FROM residents WHERE status='active' ORDER BY year DESC,surname,firstname").fetchall()
  assigned={}
  for a in assignments: assigned.setdefault((a["terrain_id"],a["period_id"]),[]).append(a)
