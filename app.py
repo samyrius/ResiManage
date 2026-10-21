@@ -238,6 +238,28 @@ html[data-rm-theme="sunset"] section,html[data-rm-theme="sunset"] .rt-stat,html[
 .rm-theme-control{animation:rm-theme-glow 3.8s ease-in-out infinite;transform:translateZ(0)}
 @keyframes rm-theme-glow{0%,100%{box-shadow:0 0 0 #26d9e000}50%{box-shadow:0 0 18px #26d9e033}}
 @media(prefers-reduced-motion:reduce){.rm-theme-control{animation:none!important}}
+
+/* Mobile navigation overflow fix: prevent long submenu titles (including sync) from overlapping */
+.main-nav,.nav-group,.nav-menu{min-width:0;max-width:100%}
+.nav-group summary{display:flex;align-items:center;gap:8px;white-space:normal!important;overflow-wrap:anywhere;word-break:normal;line-height:1.35;min-width:0;max-width:100%}
+.nav-group summary>span:not(.nav-icon){flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.nav-group summary:after{flex:0 0 auto;margin-inline-start:auto}
+.nav-group[open] .nav-menu{box-sizing:border-box;width:max-content;min-width:min(220px,85vw);max-width:min(320px,85vw)}
+.nav-menu a{box-sizing:border-box;min-width:0;white-space:normal!important;overflow-wrap:anywhere;word-break:normal;line-height:1.4;height:auto;min-height:38px;padding:9px 10px!important}
+@media(max-width:680px){
+ .main-nav{grid-template-columns:repeat(2,minmax(0,1fr))!important;align-items:start}
+ .main-nav>.nav-group{width:100%;min-width:0;align-self:start}
+ .main-nav>.nav-group>summary{width:100%;min-height:48px;padding:8px 9px!important;font-size:12px!important;justify-content:flex-start;white-space:normal!important}
+ .main-nav>.nav-group>summary .nav-icon{flex:0 0 20px;min-width:20px;margin:0}
+ .main-nav>.nav-group[open]{grid-column:1/-1;width:100%}
+ .main-nav>.nav-group[open]>.nav-menu{position:static!important;display:flex;width:100%;min-width:0;max-width:100%!important;max-height:45vh!important;overflow-y:auto;overflow-x:hidden;margin:6px 0 2px;padding:7px}
+ .main-nav>.nav-group[open]>.nav-menu>a{display:flex;width:100%;min-width:0;height:auto;min-height:40px;white-space:normal!important;overflow-wrap:anywhere;align-items:center}
+}
+@media(max-width:360px){
+ .main-nav{grid-template-columns:minmax(0,1fr)!important}
+ .main-nav>.nav-home,.main-nav>.nav-group,.main-nav>.nav-group[open],.main-nav>.rt-language{grid-column:1/-1}
+ .main-nav>.nav-group>summary{font-size:13px!important;min-height:44px}
+}
 </style><header class="brand-header"><div class="brand-lockup"><img class="brand-icon" src="/static/resimanage-3d-icon.jpg" width="64" height="64" alt="ResiManage"><div><h2>{{t('app')}}</h2><p class="brand-tagline">{% if lang=='ar' %}تسيير تربصات الأطباء المقيمين{% elif lang=='fr' %}Gestion des stages des médecins résidents{% else %}Resident rotation management{% endif %}</p><span class="brand-year">{{t('year')}}: {{year}}</span></div></div></header><div class="rt-app-shell">{% if user %}<nav class="main-nav" aria-label="{% if lang=='ar' %}التنقل الرئيسي{% elif lang=='fr' %}Navigation principale{% else %}Main navigation{% endif %}">
 <a class="nav-home {% if request.path=='/' %}is-active{% endif %}" href="/"><span class="nav-icon">⌂</span><span>{{t('home')}}</span></a>
 <details class="nav-group" {% if request.path in ['/residents','/objectives','/import','/exams','/dems'] %}open{% endif %}><summary><span class="nav-icon">♙</span><span>{{t('residents')}}</span></summary><div class="nav-menu"><a href="/residents" class="{% if request.path=='/residents' %}is-active{% endif %}">{{t('manage_residents')}}</a><a href="/objectives" class="{% if request.path=='/objectives' %}is-active{% endif %}">{{t('objectives')}}</a><a href="/import" class="{% if request.path=='/import' %}is-active{% endif %}">{{t('import_residents')}}</a><a href="/exams" class="{% if request.path=='/exams' %}is-active{% endif %}">{{t('promotion')}}</a><a href="/dems" class="{% if request.path=='/dems' %}is-active{% endif %}">{{t('dems_success')}}</a></div></details>
