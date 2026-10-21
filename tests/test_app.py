@@ -3466,3 +3466,13 @@ def test_android_sync_client_downloads_remote_photo_to_local_profile_path(tmp_pa
     assert conn.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log").fetchone()[0] == local_seq_before
     assert conn.execute("SELECT server_seq FROM sync_row_versions WHERE entity='residents' AND entity_id=?", (str(rid),)).fetchone()[0] == 700
     conn.close()
+
+def test_rotation_board_route_loads_without_server_error(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+
+    response = client.get("/rotation-board")
+
+    assert response.status_code == 200
+    assert b"rotation" in response.data.lower() or b"\xd8\xac\xd8\xaf\xd9\x88\xd9\x84" in response.data
+
