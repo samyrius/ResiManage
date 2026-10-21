@@ -2254,7 +2254,30 @@ def leave_management():
     if guard(): return redirect("/login")
     c=db()
     if request.method=="POST":
+        action=request.form.get("action","create_entry")
         if super_guard(): c.close(); return ("Forbidden — Super Admin only",403)
+        if action in ("delete_entry","update_entry"):
+            try:
+                entry_id=int(request.form.get("entry_id","0"))
+                existing=c.execute("SELECT * FROM leave_entries WHERE id=?",(entry_id,)).fetchone()
+                if not existing: raise ValueError("Leave entry does not exist.")
+                if action=="delete_entry":
+                    audit_event(c,"leave.entry_deleted",f"entry_id={entry_id}; resident_id={existing['resident_id']}; start={existing['start_date']}; end={existing['end_date']}; days={existing['days']}; notes={existing['notes']}")
+                    c.execute("DELETE FROM leave_entries WHERE id=?",(entry_id,))
+                    c.commit(); flash("Congé supprimé par le Super Admin; opération inscrite au journal d’audit.")
+                else:
+                    start=date.fromisoformat(request.form["start_date"]); end=date.fromisoformat(request.form["end_date"])
+                    if end<start: raise ValueError("End date must not precede start date.")
+                    overlap=c.execute("SELECT id FROM leave_entries WHERE resident_id=? AND id<>? AND start_date<=? AND end_date>=?",(existing["resident_id"],entry_id,end.isoformat(),start.isoformat())).fetchone()
+                    if overlap: raise ValueError("Leave dates overlap another entry.")
+                    days=(end-start).days+1
+                    notes=request.form.get("notes","").strip()
+                    c.execute("UPDATE leave_entries SET start_date=?,end_date=?,days=?,notes=? WHERE id=?",(start.isoformat(),end.isoformat(),days,notes,entry_id))
+                    audit_event(c,"leave.entry_updated",f"entry_id={entry_id}; resident_id={existing['resident_id']}; before={existing['start_date']}..{existing['end_date']} ({existing['days']} days); after={start}..{end} ({days} days); notes={notes}")
+                    c.commit(); flash("Congé corrigé par le Super Admin; ancienne et nouvelle valeurs inscrites au journal.")
+            except Exception as exc:
+                c.rollback(); flash("Leave update failed: "+str(exc)[:220])
+            c.close(); return redirect("/leave")
         try:
             rid=int(request.form["resident_id"])
             if not c.execute("SELECT 1 FROM residents WHERE id=?",(rid,)).fetchone():
@@ -2297,14 +2320,21 @@ def leave_management():
         except Exception as exc: c.rollback(); flash("Leave not saved: "+str(exc)[:220])
         c.close(); return redirect("/leave")
     residents=c.execute("SELECT id,surname,firstname,registration_date FROM residents ORDER BY year DESC,surname").fetchall()
-    now=date.today(); balances=[]
+    selected_year=active_postgrad_year(c)
+    try:
+        year_start=date(int(selected_year.split("-")[0]),2,1)
+        year_end=date(int(selected_year.split("-")[1]),1,31)
+    except (TypeError,ValueError,IndexError):
+        year_start=date.today().replace(month=1,day=1); year_end=date.today()
+    as_of=min(year_end,date.today())
+    balances=[]
     for r in residents:
-        earned=accrued_leave_days(r["registration_date"],now)
-        used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND end_date<=?",(r["id"],now.isoformat())).fetchone()[0]
+        earned=accrued_leave_days(r["registration_date"],as_of)
+        used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND end_date<=?",(r["id"],as_of.isoformat())).fetchone()[0]
         balances.append({"name":r["surname"]+" "+r["firstname"],"earned":earned,"used":used,"remaining":earned-used,"registration_date":r["registration_date"] or ""})
-    entries=c.execute("SELECT l.*,r.surname,r.firstname FROM leave_entries l JOIN residents r ON r.id=l.resident_id ORDER BY l.start_date DESC").fetchall()
+    entries=c.execute("SELECT l.*,r.surname,r.firstname FROM leave_entries l JOIN residents r ON r.id=l.resident_id WHERE l.start_date<=? AND l.end_date>=? ORDER BY l.start_date DESC",(as_of.isoformat(),year_start.isoformat())).fetchall()
     c.commit(); c.close()
-    return page("""<section><h3>الإجازات / Congés / Annual leave</h3><p>30 days per completed year from first-year registration. Enter prior leave as historical records, including 2022 onward.</p><form method="post"><label>Resident <select name="resident_id" required>{% for r in residents %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}}</option>{% endfor %}</select></label><div class="grid"><label>Start <input type="date" name="start_date" required></label><label>End <input type="date" name="end_date" required></label></div><label>Notes <input name="notes" maxlength="500"></label><label><input type="checkbox" name="historical_record" value="1"> Historical leave already taken (2022 onward; bypass quota validation)</label><button>Record leave</button></form></section><section><h3>Balances</h3><div class="wrap"><table><tr><th>Resident</th><th>Accrued</th><th>Used</th><th>Remaining</th><th>Registration date</th></tr>{% for b in balances %}<tr><td>{{b.name}}</td><td>{{b.earned}}</td><td>{{b.used}}</td><td>{{b.remaining}}</td><td>{{b.registration_date or "Not set — edit resident profile"}}</td></tr>{% endfor %}</table></div></section><section><h3>History</h3><div class="wrap"><table><tr><th>Resident</th><th>Start</th><th>End</th><th>Days</th><th>Notes</th></tr>{% for e in entries %}<tr><td>{{e.surname}} {{e.firstname}}</td><td>{{e.start_date}}</td><td>{{e.end_date}}</td><td>{{e.days}}</td><td>{{e.notes}}</td></tr>{% endfor %}</table></div></section>""",residents=residents,balances=balances,entries=entries)
+    return page("""<section><h3>الإجازات / Congés / Annual leave — {{year}}</h3><p>Solde calculé jusqu’à {{as_of_label}} (année de post-graduation sélectionnée). 30 days per completed year from first-year registration.</p><form method="post"><label>Resident <select name="resident_id" required>{% for r in residents %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}}</option>{% endfor %}</select></label><div class="grid"><label>Start <input type="date" name="start_date" required></label><label>End <input type="date" name="end_date" required></label></div><label>Notes <input name="notes" maxlength="500"></label><label><input type="checkbox" name="historical_record" value="1"> Historical leave already taken (2022 onward; bypass quota validation)</label><button>Record leave</button></form></section><section><h3>Balances</h3><div class="wrap"><table><tr><th>Resident</th><th>Accrued</th><th>Used</th><th>Remaining</th><th>Registration date</th></tr>{% for b in balances %}<tr><td>{{b.name}}</td><td>{{b.earned}}</td><td>{{b.used}}</td><td>{{b.remaining}}</td><td>{{b.registration_date or "Not set — edit resident profile"}}</td></tr>{% endfor %}</table></div></section><section><h3>History</h3><div class="wrap"><table><tr><th>Resident</th><th>Start</th><th>End</th><th>Days</th><th>Notes</th><th>Actions Super Admin</th></tr>{% for e in entries %}<tr><td>{{e.surname}} {{e.firstname}}</td><td colspan="4"><form method="post" style="display:grid;grid-template-columns:repeat(4,minmax(90px,1fr));gap:6px"><input type="hidden" name="action" value="update_entry"><input type="hidden" name="entry_id" value="{{e.id}}"><label>Début<input type="date" name="start_date" value="{{e.start_date}}" required></label><label>Fin<input type="date" name="end_date" value="{{e.end_date}}" required></label><label>Jours calculés<input value="{{e.days}}" readonly></label><label>Notes<input name="notes" value="{{e.notes}}" maxlength="500"></label><button type="submit">Enregistrer la correction</button></form></td><td><form method="post" onsubmit="return confirm('Supprimer ce congé ? Cette action sera journalisée.');"><input type="hidden" name="action" value="delete_entry"><input type="hidden" name="entry_id" value="{{e.id}}"><button type="submit">Supprimer</button></form></td></tr>{% endfor %}</table></div></section>""",residents=residents,balances=balances,entries=entries,as_of_label=as_of.isoformat())
 
 @app.route("/external-rotations", methods=["GET","POST"])
 def external_rotations():
