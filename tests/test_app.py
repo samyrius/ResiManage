@@ -3482,3 +3482,29 @@ def test_rotation_board_route_loads_without_server_error(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert b"rotation" in response.data.lower() or b"\xd8\xac\xd8\xaf\xd9\x88\xd9\x84" in response.data
 
+def test_postgraduate_year_options_include_exam_and_decision_history(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    conn = rotation_app.db()
+    try:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)",
+            ("YearSource", "Resident", 2),
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='YearSource'"
+        ).fetchone()["id"]
+        conn.execute(
+            "INSERT INTO exam_records(resident_id,study_year,module,theory,practical,postgrad_year) VALUES(?,?,?,?,?,?)",
+            (rid, 2, "Test module", 12, 13, "2028-2029"),
+        )
+        conn.execute(
+            "INSERT INTO decisions(details,decision,reason,actor,postgrad_year) VALUES(?,?,?,?,?)",
+            ("Historical promotion decision", "Approved", "Test", "test-admin", "2029-2030"),
+        )
+        conn.commit()
+        years = rotation_app.available_postgrad_years(conn)
+        assert "2028-2029" in years
+        assert "2029-2030" in years
+    finally:
+        conn.close()
