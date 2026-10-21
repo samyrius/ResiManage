@@ -34,6 +34,21 @@ def db():
  c=sqlite3.connect(DB,timeout=20); c.row_factory=sqlite3.Row; c.execute("PRAGMA foreign_keys=ON"); return c
 def setting(c,k,default=""):
  r=c.execute("SELECT value FROM settings WHERE key=?",(k,)).fetchone(); return r["value"] if r else default
+def available_postgrad_years(c):
+ years={"2022-2023","2023-2024","2024-2025","2025-2026","2026-2027"}
+ current=setting(c,"year")
+ if current: years.add(current)
+ for table in ("periods","history"):
+  try:
+   years.update(str(row[0]) for row in c.execute("SELECT DISTINCT year_label FROM "+table+" WHERE year_label IS NOT NULL AND year_label<>''").fetchall())
+  except sqlite3.Error:
+   pass
+ return sorted((y for y in years if re.fullmatch(r"\\d{4}-\\d{4}",y) and int(y.split("-")[1])==int(y.split("-")[0])+1),reverse=True)
+def active_postgrad_year(c):
+ candidate=str(session.get("selected_postgrad_year","")).strip()
+ if re.fullmatch(r"\\d{4}-\\d{4}",candidate) and int(candidate.split("-")[1])==int(candidate.split("-")[0])+1:
+  return candidate
+ return setting(c,"year")
 def hash_password(password):
  salt=os.urandom(16).hex()
  digest=hashlib.pbkdf2_hmac("sha256",password.encode("utf-8"),bytes.fromhex(salt),310000).hex()
@@ -357,15 +372,16 @@ html[data-interior-theme="holographic"] body{background:radial-gradient(ellipse 
 </script></html>"""
  c=db()
  try:
-  current_year=setting(c,"year")
+  current_year=active_postgrad_year(c)
+  year_options=available_postgrad_years(c)
  finally:
   c.close()
- context={"t":tr,"lang":lang,"year":current_year}
+ context={"t":tr,"lang":lang,"year":current_year,"year_options":year_options}
  context.update(kw)
  context.setdefault("role",session.get("role",""))
  context.setdefault("csrf_token",csrf_token)
  inner=render_template_string(body,**context)
- return render_template_string(shell,body=inner,lang=lang,t=tr,year=current_year,user=bool(session.get("user")),role=session.get("role",""))
+ return render_template_string(shell,body=inner,lang=lang,t=tr,year=current_year,year_options=year_options,user=bool(session.get("user")),role=session.get("role",""))
 def guard():
  username=session.get("user")
  if not username: return redirect("/login")
@@ -517,16 +533,26 @@ def verify_email():
 
 @app.get("/logout")
 def logout(): session.clear(); return redirect("/login")
+@app.post("/select-year")
+def select_postgrad_year():
+ if guard(): return redirect("/login")
+ year=request.form.get("year","").strip()
+ if not re.fullmatch(r"\\d{4}-\\d{4}",year) or int(year.split("-")[1])!=int(year.split("-")[0])+1:
+  flash("Année de post-graduation invalide.")
+  return redirect("/")
+ session["selected_postgrad_year"]=year
+ return redirect("/")
+
 @app.get("/")
 def home():
  if guard(): return redirect("/login")
- c=db(); y=setting(c,"year"); rs=c.execute("SELECT * FROM residents WHERE status='active' ORDER BY year DESC,surname").fetchall()
+ c=db(); y=active_postgrad_year(c); rs=c.execute("SELECT * FROM residents WHERE status='active' ORDER BY year DESC,surname").fetchall()
  count=c.execute("SELECT COUNT(*) FROM terrains").fetchone()[0]; confirmed=c.execute("SELECT COUNT(*) FROM assignments a JOIN periods p ON p.id=a.period_id WHERE p.year_label=? AND a.status='confirmed'",(y,)).fetchone()[0]
  rows=[]
  for r in rs:
   n=c.execute("SELECT COUNT(*) FROM assignments a JOIN periods p ON p.id=a.period_id WHERE a.resident_id=? AND p.year_label=? AND a.status='confirmed'",(r["id"],y)).fetchone()[0]; rows.append((r,n))
  c.close()
- return page("""<section><h3 class="rt-dashboard-title"><span class="rt-dot"></span>{{t('overview')}}</h3><p>{{t('priority')}}</p><div class="rt-stats"><div class="rt-stat"><span>{{t('residents')}}</span><strong>{{rows|length}}</strong></div><div class="rt-stat"><span>{{t('terrains')}}</span><strong>{{count}}</strong></div><div class="rt-stat"><span>{{t('confirmed')}}</span><strong>{{confirmed}}</strong></div><a class="rt-stat rt-year-select" href="/history?year_label={{year|urlencode}}" aria-label="Choisir l’année post-graduation"><span>{{t('year')}}</span><strong style="font-size:17px">{{year}}</strong><small>Cliquer pour consulter les archives ↗</small></a></div></section><div class="rt-quick-actions"><a class="rt-action-card" href="/residents"><span class="rt-action-icon">♙</span><span><strong>{{t('manage_residents')}}</strong><small>Profils · années · coordonnées</small></span></a><a class="rt-action-card" href="/assign"><span class="rt-action-icon">⇄</span><span><strong>{{t('assign')}}</strong><small>Répartition des stages — affecter un résident</small></span></a><a class="rt-action-card" href="/rotation-board"><span class="rt-action-icon">▦</span><span><strong>{% if lang=='ar' %}جدول التوزيع{% elif lang=='fr' %}Tableau général de répartition{% else %}Rotation board{% endif %}</strong><small>Terrains × périodes · capacités · résidents · PDF / impression</small></span></a><a class="rt-action-card" href="/terrains"><span class="rt-action-icon">▥</span><span><strong>{{t('terrains')}}</strong><small>Terrains obligatoires et optionnels</small></span></a><a class="rt-action-card" href="/capacities"><span class="rt-action-icon">▦</span><span><strong>{{t('capacities')}}</strong><small>Places disponibles par terrain et période</small></span></a><a class="rt-action-card" href="/import"><span class="rt-action-icon">⇧</span><span><strong>{{t('import_residents')}}</strong><small>Import avec aperçu et validation</small></span></a><a class="rt-action-card" href="/leave"><span class="rt-action-icon">◷</span><span><strong>الإجازات / Congés / Leave</strong><small>30 days yearly · carry forward</small></span></a><a class="rt-action-card" href="/external-rotations"><span class="rt-action-icon">✈</span><span><strong>التربصات الخارجية / Stages à l’étranger / External rotations</strong><small>Supervisor · hospital · country · dates</small></span></a></div><section><h3 class="rt-dashboard-title"><span class="rt-dot"></span>{{t('four')}}</h3><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('count')}}</th></tr>{% for r,n in rows %}<tr><td><a class="rt-resident-link" href="/profile/{{r.id}}">{{r.surname}} {{r.firstname}}</a></td><td><span class="rt-year-chip">{{r.year}}</span></td><td><span class="rt-progress"><span style="width:{{[n*25,100]|min}}%"></span></span> {{n}} / 4</td></tr>{% else %}<tr><td colspan="3">{{t('none')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows,count=count,confirmed=confirmed,year=y)
+ return page("""<section><h3 class="rt-dashboard-title"><span class="rt-dot"></span>{{t('overview')}}</h3><p>{{t('priority')}}</p><div class="rt-stats"><div class="rt-stat"><span>{{t('residents')}}</span><strong>{{rows|length}}</strong></div><div class="rt-stat"><span>{{t('terrains')}}</span><strong>{{count}}</strong></div><div class="rt-stat"><span>{{t('confirmed')}}</span><strong>{{confirmed}}</strong></div><form class="rt-stat rt-year-select" action="/select-year" method="post" aria-label="Choisir l’année de post-graduation"><span>{{t('year')}}</span><select name="year" aria-label="Année de post-graduation" onchange="this.form.submit()">{% for yy in year_options %}<option value="{{yy}}" {% if yy==year %}selected{% endif %}>{{yy}}</option>{% endfor %}</select><small>Choisir une année pour consulter ses données</small></form></div></section><div class="rt-quick-actions"><a class="rt-action-card" href="/residents"><span class="rt-action-icon">♙</span><span><strong>{{t('manage_residents')}}</strong><small>Profils · années · coordonnées</small></span></a><a class="rt-action-card" href="/assign"><span class="rt-action-icon">⇄</span><span><strong>{{t('assign')}}</strong><small>Répartition des stages — affecter un résident</small></span></a><a class="rt-action-card" href="/rotation-board"><span class="rt-action-icon">▦</span><span><strong>{% if lang=='ar' %}جدول التوزيع{% elif lang=='fr' %}Tableau général de répartition{% else %}Rotation board{% endif %}</strong><small>Terrains × périodes · capacités · résidents · PDF / impression</small></span></a><a class="rt-action-card" href="/terrains"><span class="rt-action-icon">▥</span><span><strong>{{t('terrains')}}</strong><small>Terrains obligatoires et optionnels</small></span></a><a class="rt-action-card" href="/capacities"><span class="rt-action-icon">▦</span><span><strong>{{t('capacities')}}</strong><small>Places disponibles par terrain et période</small></span></a><a class="rt-action-card" href="/import"><span class="rt-action-icon">⇧</span><span><strong>{{t('import_residents')}}</strong><small>Import avec aperçu et validation</small></span></a><a class="rt-action-card" href="/leave"><span class="rt-action-icon">◷</span><span><strong>الإجازات / Congés / Leave</strong><small>30 days yearly · carry forward</small></span></a><a class="rt-action-card" href="/external-rotations"><span class="rt-action-icon">✈</span><span><strong>التربصات الخارجية / Stages à l’étranger / External rotations</strong><small>Supervisor · hospital · country · dates</small></span></a></div><section><h3 class="rt-dashboard-title"><span class="rt-dot"></span>{{t('four')}}</h3><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('count')}}</th></tr>{% for r,n in rows %}<tr><td><a class="rt-resident-link" href="/profile/{{r.id}}">{{r.surname}} {{r.firstname}}</a></td><td><span class="rt-year-chip">{{r.year}}</span></td><td><span class="rt-progress"><span style="width:{{[n*25,100]|min}}%"></span></span> {{n}} / 4</td></tr>{% else %}<tr><td colspan="3">{{t('none')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows,count=count,confirmed=confirmed,year=y)
 @app.route("/residents",methods=["GET","POST"])
 def residents():
  if guard(): return redirect("/login")
@@ -613,7 +639,7 @@ def terrains():
 @app.route("/capacities",methods=["GET","POST"])
 def capacities():
  if guard(): return redirect("/login")
- c=db(); y=setting(c,"year")
+ c=db(); y=active_postgrad_year(c)
  if request.method=="POST":
   if session.get("role")!="super_admin": c.close(); return ("Forbidden — Super Admin only",403)
   try:
@@ -637,7 +663,7 @@ def capacities():
 @app.route("/rotation-board", methods=["GET","POST"])
 def rotation_board():
  if guard(): return redirect("/login")
- c=db(); y=request.form.get("year",request.args.get("year",setting(c,"year")))
+ c=db(); y=request.form.get("year",request.args.get("year",active_postgrad_year(c)))
  if request.method=="POST":
   if session.get("role")!="super_admin":
    c.close(); return ("Forbidden — Super Admin only",403)
@@ -815,7 +841,7 @@ def check(c,rid,tid,pid,y):
 @app.route("/assign",methods=["GET","POST"])
 def assign():
  if guard():return redirect("/login")
- c=db(); y=setting(c,"year")
+ c=db(); y=active_postgrad_year(c)
  if request.method=="POST":
   if session.get("role")!="super_admin":
    c.close(); return ("Forbidden — Super Admin only",403)
@@ -890,15 +916,16 @@ def history():
    c.commit(); flash(tr("done"))
   except (TypeError,ValueError,sqlite3.IntegrityError) as exc:
    c.rollback(); flash(str(exc) or "Invalid historical rotation.")
- rs=c.execute("SELECT * FROM residents ORDER BY year DESC,surname").fetchall(); ts=c.execute("SELECT * FROM terrains WHERE active=1 ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END, name").fetchall(); rows=c.execute("SELECT h.*,r.surname,r.firstname,t.name terrain FROM history h JOIN residents r ON r.id=h.resident_id JOIN terrains t ON t.id=h.terrain_id ORDER BY h.id DESC").fetchall(); c.close()
- return page("""<section><h3>{{t('history_add')}}</h3><form method="post"><label>{{t('resident')}}</label><select name="resident">{% for r in rs %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}} — {{r.year}}</option>{% endfor %}</select><label>{{t('terrain')}}</label><select name="terrain">{% for x in ts %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select><label>{{t('academic_year')}}</label><input name="year_label" required placeholder="2025-2026"><label>{{t('period')}}</label><select name="period"><option value="">—</option>{% for p in ["01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"] %}<option value="{{p}}">{{p}}</option>{% endfor %}</select><label>{{t('date')}}</label><input type="date" name="date_done"><button>{{t('save')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('terrain')}}</th><th>{{t('academic_year')}}</th><th>{{t('period')}}</th><th>{{t('date')}}</th></tr>{% for h in rows %}<tr><td>{{h.surname}} {{h.firstname}}</td><td>{{h.terrain}}</td><td>{{h.year_label}}</td><td>{{h.period}}</td><td>{{h.date_done}}</td></tr>{% endfor %}</table></div></section>""",rs=rs,ts=ts,rows=rows)
+ rs=c.execute("SELECT * FROM residents ORDER BY year DESC,surname").fetchall(); ts=c.execute("SELECT * FROM terrains WHERE active=1 ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END, name").fetchall(); selected_year=active_postgrad_year(c)
+ rows=c.execute("SELECT h.*,r.surname,r.firstname,t.name terrain FROM history h JOIN residents r ON r.id=h.resident_id JOIN terrains t ON t.id=h.terrain_id WHERE h.year_label=? ORDER BY h.id DESC",(selected_year,)).fetchall(); c.close()
+ return page("""<section><h3>{{t('history_add')}}</h3><form method="post"><label>{{t('resident')}}</label><select name="resident">{% for r in rs %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}} — {{r.year}}</option>{% endfor %}</select><label>{{t('terrain')}}</label><select name="terrain">{% for x in ts %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select><label>{{t('academic_year')}}</label><input name="year_label" required value="{{year}}" placeholder="2025-2026"><label>{{t('period')}}</label><select name="period"><option value="">—</option>{% for p in ["01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"] %}<option value="{{p}}">{{p}}</option>{% endfor %}</select><label>{{t('date')}}</label><input type="date" name="date_done"><button>{{t('save')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('terrain')}}</th><th>{{t('academic_year')}}</th><th>{{t('period')}}</th><th>{{t('date')}}</th></tr>{% for h in rows %}<tr><td>{{h.surname}} {{h.firstname}}</td><td>{{h.terrain}}</td><td>{{h.year_label}}</td><td>{{h.period}}</td><td>{{h.date_done}}</td></tr>{% endfor %}</table></div></section>""",rs=rs,ts=ts,rows=rows)
 @app.get("/summary")
 def summary():
  if guard():return redirect("/login")
- c=db(); y=setting(c,"year"); rs=c.execute("SELECT * FROM residents ORDER BY year DESC,surname").fetchall(); rows=[]
+ c=db(); y=active_postgrad_year(c); rs=c.execute("SELECT * FROM residents ORDER BY year DESC,surname").fetchall(); rows=[]
  for r in rs:
   a=c.execute("SELECT p.name period,t.name terrain,a.status FROM assignments a JOIN periods p ON p.id=a.period_id JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=? AND p.year_label=? ORDER BY p.id",(r["id"],y)).fetchall()
-  h=c.execute("SELECT t.name terrain,h.year_label,h.period,h.date_done FROM history h JOIN terrains t ON t.id=h.terrain_id WHERE h.resident_id=?",(r["id"],)).fetchall()
+  h=c.execute("SELECT t.name terrain,h.year_label,h.period,h.date_done FROM history h JOIN terrains t ON t.id=h.terrain_id WHERE h.resident_id=? AND h.year_label=?",(r["id"],y)).fetchall()
   x=c.execute("SELECT hospital,country,rotation_type,start_date,end_date,status FROM external_rotations WHERE resident_id=? AND status<>'cancelled' ORDER BY start_date DESC",(r["id"],)).fetchall()
   rows.append((r,a,h,x))
  c.close()
