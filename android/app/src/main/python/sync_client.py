@@ -39,8 +39,8 @@ def _configure_ca(data_directory, ca_certificate_pem):
     path = os.path.join(data_directory, "resimanage_sync_ca.pem")
     temporary = path + ".tmp"
     try:
-        with open(temporary, "w", encoding="ascii", newline="\\n") as handle:
-            handle.write(pem + "\\n")
+        with open(temporary, "w", encoding="ascii", newline="\n") as handle:
+            handle.write(pem + "\n")
         context = ssl.create_default_context(cafile=certifi.where())
         context.load_verify_locations(cafile=temporary)
         os.replace(temporary, path)
@@ -63,7 +63,7 @@ def _api(base_url, token, path, body=None):
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=data, headers=headers, method="GET" if data is None else "POST")
     try:
-        with urllib.request.urlopen(req, timeout=30, context=ssl.create_default_context(cafile=certifi.where())) as response:
+        with urllib.request.urlopen(req, timeout=30, context=_ssl_context()) as response:
             raw = response.read(2_000_001)
             if len(raw) > 2_000_000:
                 raise SyncError("Sync response exceeded the 2 MB safety limit.")
@@ -108,7 +108,7 @@ def _api_bytes(base_url, token, path):
     req = urllib.request.Request(base_url.rstrip("/") + path,
         headers={"Accept": "image/*", "Authorization": "Bearer " + token}, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=30, context=ssl.create_default_context(cafile=certifi.where())) as response:
+        with urllib.request.urlopen(req, timeout=30, context=_ssl_context()) as response:
             raw = response.read(4 * 1024 * 1024 + 1)
             if not raw or len(raw) > 4 * 1024 * 1024:
                 raise SyncError("Synced photo is empty or exceeds 4 MB.")
@@ -124,7 +124,7 @@ def _api_put_bytes(base_url, token, path, raw, content_type):
         headers={"Authorization": "Bearer " + token, "Content-Type": content_type, "Accept": "application/json"},
         method="PUT")
     try:
-        with urllib.request.urlopen(req, timeout=30, context=ssl.create_default_context(cafile=certifi.where())) as response:
+        with urllib.request.urlopen(req, timeout=30, context=_ssl_context()) as response:
             return json.loads(response.read(65536).decode("utf-8"))
     except urllib.error.HTTPError as exc:
         raise SyncError("Photo upload failed (HTTP %s): %s" % (exc.code, exc.read(4096).decode("utf-8", "replace"))) from exc
