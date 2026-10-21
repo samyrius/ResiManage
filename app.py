@@ -161,7 +161,7 @@ def init():
  CREATE TABLE IF NOT EXISTS capacities(id INTEGER PRIMARY KEY,year_label TEXT NOT NULL,terrain_id INTEGER,period_id INTEGER,places INTEGER NOT NULL,UNIQUE(year_label,terrain_id,period_id));
  CREATE TABLE IF NOT EXISTS assignments(id INTEGER PRIMARY KEY,resident_id INTEGER,terrain_id INTEGER,period_id INTEGER,status TEXT DEFAULT 'confirmed',UNIQUE(resident_id,period_id));
  CREATE TABLE IF NOT EXISTS history(id INTEGER PRIMARY KEY,resident_id INTEGER,terrain_id INTEGER,year_label TEXT,period TEXT,date_done TEXT);
- CREATE TABLE IF NOT EXISTS decisions(id INTEGER PRIMARY KEY,details TEXT,decision TEXT,reason TEXT,actor TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+ CREATE TABLE IF NOT EXISTS decisions(id INTEGER PRIMARY KEY,details TEXT,decision TEXT,reason TEXT,actor TEXT,postgrad_year TEXT NOT NULL DEFAULT '',created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY,action TEXT,details TEXT,actor TEXT DEFAULT '',created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
  """)
@@ -170,6 +170,7 @@ def init():
   ensure_column(c,"residents",col,spec)
  ensure_column(c,"terrains","active","INTEGER NOT NULL DEFAULT 1")
  ensure_column(c,"audit","actor","TEXT DEFAULT ''")
+ ensure_column(c,"decisions","postgrad_year","TEXT NOT NULL DEFAULT ''")
  c.executescript("""
  CREATE TABLE IF NOT EXISTS exam_records(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL,study_year INTEGER NOT NULL,module TEXT NOT NULL,theory REAL NOT NULL,practical REAL NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE IF NOT EXISTS objectives(id INTEGER PRIMARY KEY,terrain_id INTEGER NOT NULL,study_year INTEGER NOT NULL,objective TEXT NOT NULL,completed INTEGER NOT NULL DEFAULT 0);
@@ -979,15 +980,15 @@ def decisions():
       dup=c.execute("SELECT id FROM assignments WHERE resident_id=? AND period_id=? AND id<>? AND status IN ('confirmed','pending')",(a["resident_id"],a["period_id"],aid)).fetchone()
       if not cap or used>=cap["places"] or dup: flash(tr("full") if not dup else tr("duplicate"))
       else:
-       c.execute("UPDATE assignments SET status='confirmed' WHERE id=?",(aid,)); c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(a["surname"]+" "+a["firstname"]+" — "+a["terrain"],tr("approve"),reason,session["user"]))
+       c.execute("UPDATE assignments SET status='confirmed' WHERE id=?",(aid,)); c.execute("INSERT INTO decisions(details,decision,reason,actor,postgrad_year) VALUES(?,?,?,?,?)",(a["surname"]+" "+a["firstname"]+" — "+a["terrain"],tr("approve"),reason,session["user"],a["year_label"]))
        audit_event(c,"assignment.override_approved",f"assignment_id={aid}; reason={reason}")
        c.commit(); flash(tr("done"))
    else:
-    c.execute("UPDATE assignments SET status='rejected' WHERE id=?",(aid,)); c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(a["surname"]+" "+a["firstname"]+" — "+a["terrain"],tr("reject"),reason,session["user"]))
+    c.execute("UPDATE assignments SET status='rejected' WHERE id=?",(aid,)); c.execute("INSERT INTO decisions(details,decision,reason,actor,postgrad_year) VALUES(?,?,?,?,?)",(a["surname"]+" "+a["firstname"]+" — "+a["terrain"],tr("reject"),reason,session["user"],a["year_label"]))
     audit_event(c,"assignment.override_rejected",f"assignment_id={aid}; reason={reason}")
     c.commit(); flash(tr("done"))
- pending=c.execute("SELECT a.id,r.surname,r.firstname,r.year,t.name terrain,p.name period FROM assignments a JOIN residents r ON r.id=a.resident_id JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id WHERE a.status='pending' AND p.year_label=?",(selected_year,)).fetchall(); ds=c.execute("SELECT * FROM decisions ORDER BY id DESC").fetchall(); c.close()
- return page("""<section><h3>{{t('decisions')}} — {{year}}</h3>{% for a in pending %}<p><b>{{a.surname}} {{a.firstname}}</b> — {{a.terrain}} / {{a.period}}</p><form method="post"><input type="hidden" name="aid" value="{{a.id}}"><input name="reason" placeholder="{{t('reason')}}" required><button name="outcome" value="approve">{{t('approve')}}</button> <button name="outcome" value="reject">{{t('reject')}}</button></form>{% else %}<p>{{t('none')}}</p>{% endfor %}</section><section><div class="wrap"><table><tr><th>Date</th><th>{{t('assign')}}</th><th>{{t('status')}}</th><th>{{t('reason')}}</th></tr>{% for d in ds %}<tr><td>{{d.created_at}}</td><td>{{d.details}}</td><td>{{d.decision}}</td><td>{{d.reason}}</td></tr>{% endfor %}</table></div></section>""",pending=pending,ds=ds,year=selected_year)
+ pending=c.execute("SELECT a.id,r.surname,r.firstname,r.year,t.name terrain,p.name period FROM assignments a JOIN residents r ON r.id=a.resident_id JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id WHERE a.status='pending' AND p.year_label=?",(selected_year,)).fetchall(); ds=c.execute("SELECT * FROM decisions WHERE postgrad_year=? ORDER BY id DESC",(selected_year,)).fetchall(); legacy_ds=c.execute("SELECT * FROM decisions WHERE COALESCE(postgrad_year,'')='' ORDER BY id DESC").fetchall(); c.close()
+ return page("""<section><h3>{{t('decisions')}} — {{year}}</h3>{% for a in pending %}<p><b>{{a.surname}} {{a.firstname}}</b> — {{a.terrain}} / {{a.period}}</p><form method="post"><input type="hidden" name="aid" value="{{a.id}}"><input name="reason" placeholder="{{t('reason')}}" required><button name="outcome" value="approve">{{t('approve')}}</button> <button name="outcome" value="reject">{{t('reject')}}</button></form>{% else %}<p>{{t('none')}}</p>{% endfor %}</section><section><div class="wrap"><table><tr><th>Date</th><th>{{t('assign')}}</th><th>{{t('status')}}</th><th>{{t('reason')}}</th></tr>{% for d in ds %}<tr><td>{{d.created_at}}</td><td>{{d.details}}</td><td>{{d.decision}}</td><td>{{d.reason}}</td></tr>{% endfor %}</table></div></section>{% if legacy_ds %}<section><h4>Décisions historiques sans année de post-graduation associée</h4><div class="wrap"><table><tr><th>Date</th><th>Décision</th><th>Résultat</th><th>Motif</th></tr>{% for d in legacy_ds %}<tr><td>{{d.created_at}}</td><td>{{d.details}}</td><td>{{d.decision}}</td><td>{{d.reason}}</td></tr>{% endfor %}</table></div></section>{% endif %}""",pending=pending,ds=ds,legacy_ds=legacy_ds,year=selected_year)
 
 @app.route("/settings",methods=["GET","POST"])
 def settings():
@@ -1986,7 +1987,7 @@ def exams():
     else:
      average=sum((x["theory"]+x["practical"])/2 for x in records)/len(records)
      passed=average>=10 and all(x["theory"]>=10 and x["practical"]>=10 for x in records)
-     c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — first-year exams — postgraduate year {postgrad_year}","Passed" if passed else "Failed",f"Average={average:.2f}/20; all theory/practical marks >=10: {all(x['theory']>=10 and x['practical']>=10 for x in records)}; postgraduate_year={postgrad_year}",session["user"]))
+     c.execute("INSERT INTO decisions(details,decision,reason,actor,postgrad_year) VALUES(?,?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — first-year exams — postgraduate year {postgrad_year}","Passed" if passed else "Failed",f"Average={average:.2f}/20; all theory/practical marks >=10: {all(x['theory']>=10 and x['practical']>=10 for x in records)}; postgraduate_year={postgrad_year}",session["user"],postgrad_year))
      audit_event(c,"exam.first_year_evaluated",f"resident_id={rid}; average={average:.2f}; passed={passed}")
      advanced=False
      if passed and resident["year"]==1 and resident["status"]=="active":
@@ -2030,13 +2031,13 @@ def exams():
      if approved:
       c.execute("UPDATE residents SET year=? WHERE id=? AND year=? AND status='active'",(sy+1,rid,sy))
       if c.execute("SELECT changes()").fetchone()[0]:
-       c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — year {sy}","Approved by both official administrators",combined_reason,actor_names))
+       c.execute("INSERT INTO decisions(details,decision,reason,actor,postgrad_year) VALUES(?,?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — year {sy}","Approved by both official administrators",combined_reason,actor_names,active_postgrad_year(c)))
        audit_event(c,"resident.year_advanced",f"resident_id={rid}; from={sy}; to={sy+1}; officials={actor_names}")
        flash("Approved by both official administrators; resident advanced.")
       else:
        flash("Resident status changed before the vote was finalized; no progression was applied.")
      else:
-      c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — year {sy}","Rejected by official vote",combined_reason,actor_names))
+      c.execute("INSERT INTO decisions(details,decision,reason,actor,postgrad_year) VALUES(?,?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — year {sy}","Rejected by official vote",combined_reason,actor_names,active_postgrad_year(c)))
       audit_event(c,"promotion.vote_rejected",f"resident_id={rid}; from_year={sy}; officials={actor_names}")
       flash("Progression not approved; both official votes are recorded.")
      c.execute("DELETE FROM promotion_votes WHERE resident_id=? AND from_year=?",(rid,sy))
@@ -2086,11 +2087,11 @@ def dems():
      profile={k:r[k] for k in r.keys()}
      c.execute("INSERT INTO dems_archive(resident_id,success_date,profile_json,history_json) VALUES(?,?,?,?)",(rid,success_date,json.dumps(profile,ensure_ascii=False),json.dumps({"history":[dict(x) for x in hist],"assignments":[dict(x) for x in asgs],"exams":[dict(x) for x in exams_snapshot]},ensure_ascii=False)))
      c.execute("UPDATE residents SET status='graduated',dems_status='success' WHERE id=?",(rid,))
-     c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{r['surname']} {r['firstname']} — DEMS","Success approved by both official administrators",combined_reason,actor_names))
+     c.execute("INSERT INTO decisions(details,decision,reason,actor,postgrad_year) VALUES(?,?,?,?,?)",(f"{r['surname']} {r['firstname']} — DEMS","Success approved by both official administrators",combined_reason,actor_names,active_postgrad_year(c)))
      audit_event(c,"dems.archived",f"resident_id={rid}; success_date={success_date}; officials={actor_names}")
      flash("DEMS success approved by both officials; profile and history archived.")
     else:
-     c.execute("INSERT INTO decisions(details,decision,reason,actor) VALUES(?,?,?,?)",(f"{r['surname']} {r['firstname']} — DEMS","Not approved by official vote",combined_reason,actor_names))
+     c.execute("INSERT INTO decisions(details,decision,reason,actor,postgrad_year) VALUES(?,?,?,?,?)",(f"{r['surname']} {r['firstname']} — DEMS","Not approved by official vote",combined_reason,actor_names,active_postgrad_year(c)))
      audit_event(c,"dems.vote_rejected",f"resident_id={rid}; success_date={success_date}; officials={actor_names}")
      flash("DEMS success was not approved; both official votes are recorded.")
     c.execute("DELETE FROM dems_votes WHERE resident_id=? AND success_date=?",(rid,success_date))
