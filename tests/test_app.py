@@ -3202,6 +3202,12 @@ def test_sync_push_leave_validation_supports_cross_year_leave_and_rejects_overla
             rotation_app._validate_sync_push_row(conn, "leave_entries", payload)
 
 
+def test_android_sync_client_rejects_invalid_private_ca_certificate(tmp_path):
+    with pytest.raises(sync_client.SyncError, match="PEM"):
+        sync_client._configure_ca(tmp_path, "not a certificate")
+    assert not (tmp_path / "resimanage_sync_ca.pem").exists()
+
+
 def test_android_sync_client_requires_https_and_remote_apply_does_not_echo(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)

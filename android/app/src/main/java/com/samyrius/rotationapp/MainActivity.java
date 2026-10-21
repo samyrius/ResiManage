@@ -251,7 +251,7 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public String saveConfig(String serverUrl, String bearerToken) {
+        public String saveConfig(String serverUrl, String bearerToken, String caCertificatePem) {
             try {
                 URI uri = new URI(serverUrl == null ? "" : serverUrl.trim());
                 if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null
@@ -264,9 +264,17 @@ public class MainActivity extends Activity {
                 if (token.length() < 32 || token.length() > 256) {
                     return new JSONObject().put("ok", false).put("message", "The bearer token is missing or invalid.").toString();
                 }
+                String caPem = caCertificatePem == null ? "" : caCertificatePem.trim();
+                if (!caPem.isEmpty() && (caPem.length() > 65536
+                        || !caPem.contains("-----BEGIN CERTIFICATE-----")
+                        || !caPem.contains("-----END CERTIFICATE-----"))) {
+                    return new JSONObject().put("ok", false)
+                            .put("message", "The private CA must be a PEM certificate no larger than 64 KB.").toString();
+                }
                 JSONObject config = new JSONObject();
                 config.put("serverUrl", uri.toString().replaceAll("/+$", ""));
                 config.put("token", token);
+                config.put("caCertificatePem", caPem);
                 preferences.edit().putString("encrypted_config", encrypt(config.toString())).apply();
                 return new JSONObject().put("ok", true).put("message", "Sync settings saved encrypted in Android Keystore-backed storage.").toString();
             } catch (Exception ex) {
@@ -302,7 +310,8 @@ public class MainActivity extends Activity {
                     Python python = Python.getInstance();
                     result = python.getModule("sync_client").callAttr(
                             "sync_once", appDataDirectory,
-                            config.getString("serverUrl"), config.getString("token")).toString();
+                            config.getString("serverUrl"), config.getString("token"),
+                            config.optString("caCertificatePem", "")).toString();
                 } catch (Throwable ex) {
                     try { result = new JSONObject().put("ok", false).put("message", ex.getMessage()).toString(); }
                     catch (Exception ignored) { result = "{\"ok\":false,\"message\":\"Sync failed.\"}"; }

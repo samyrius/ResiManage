@@ -17,6 +17,44 @@ class SyncError(RuntimeError):
     pass
 
 
+_SYNC_CA_FILE = None
+
+
+def _ssl_context():
+    context = ssl.create_default_context(cafile=certifi.where())
+    if _SYNC_CA_FILE:
+        context.load_verify_locations(cafile=_SYNC_CA_FILE)
+    return context
+
+
+def _configure_ca(data_directory, ca_certificate_pem):
+    global _SYNC_CA_FILE
+    pem = str(ca_certificate_pem or "").strip()
+    if not pem:
+        _SYNC_CA_FILE = None
+        return None
+    if len(pem) > 65536 or "-----BEGIN CERTIFICATE-----" not in pem or "-----END CERTIFICATE-----" not in pem:
+        raise SyncError("Private CA certificate must be PEM encoded and no larger than 64 KB.")
+    os.makedirs(data_directory, exist_ok=True)
+    path = os.path.join(data_directory, "resimanage_sync_ca.pem")
+    temporary = path + ".tmp"
+    try:
+        with open(temporary, "w", encoding="ascii", newline="\\n") as handle:
+            handle.write(pem + "\\n")
+        context = ssl.create_default_context(cafile=certifi.where())
+        context.load_verify_locations(cafile=temporary)
+        os.replace(temporary, path)
+    except Exception as exc:
+        for candidate in (temporary, path):
+            try:
+                os.remove(candidate)
+            except OSError:
+                pass
+        raise SyncError("Invalid private CA certificate PEM: " + str(exc)) from exc
+    _SYNC_CA_FILE = path
+    return path
+
+
 def _api(base_url, token, path, body=None):
     url = base_url.rstrip("/") + path
     data = None if body is None else json.dumps(body, ensure_ascii=False).encode("utf-8")
@@ -296,11 +334,12 @@ def _push_local_changes(conn, base_url, token, device_id, remote_cursor, data_di
     return {"pushed": pushed, "skipped_entities": sorted(skipped), "skipped_photos": sorted(set(skipped_photos))}
 
 
-def sync_once(data_directory, base_url, token):
+def sync_once(data_directory, base_url, token, ca_certificate_pem=""):
     """Run one manual sync and return a JSON result string to the native Android bridge."""
     conn = None
     try:
         base_url, token = _validate_config(base_url, token)
+        _configure_ca(data_directory, ca_certificate_pem)
         conn = sqlite3.connect(os.path.join(data_directory, "rotation.db"), timeout=30)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout=30000")
