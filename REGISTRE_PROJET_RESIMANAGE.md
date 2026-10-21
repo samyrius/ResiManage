@@ -502,3 +502,14 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 - Calcul des congés sur l’ensemble du parcours depuis la première inscription en première année : droits annuels applicables, jours déjà pris, reports et solde disponible. Le calcul doit empêcher les doubles comptages et chevauchements; les corrections manuelles du Super Admin doivent laisser une trace.
 - L’interface doit utiliser partout « année de post-graduation » à la place d’« année universitaire », et l’en-tête institutionnel doit inclure « Centre Hospitalio-Universitaire Nedir Mohamed — Tizi Ouzou ».
 - État d’implémentation au début de cette étape : sélecteur année à connecter aux vues existantes; couverture exhaustive des données par année, droits complets et calcul consolidé des congés restent à tester/compléter. Cette entrée est une exigence, pas une preuve de livraison.
+
+## 5. Correctifs et vérifications du 21 octobre 2026
+
+- Correctif du tableau général de répartition : la correspondance entre terrain/période et capacité est maintenant construite avant le rendu du tableau. Un test de régression vérifie que la route `/rotation-board` répond sans erreur serveur.
+- Les contrôles d’administration empêchent le changement d’année d’étude sans passer par le processus officiel ou fournir un motif de correction autorisée. L’enregistrement des notes est refusé pour une année d’étude future ou pour un résident déjà archivé après réussite au DEMS.
+- Les corrections de dossier sont journalisées sous l’action `resident.updated`, avec les valeurs avant/après et le motif.
+- Le sélecteur d’année s’applique maintenant aussi aux décisions d’affectation en attente et aux stages extérieurs affichés dans le registre et le bilan. Les décisions sont associées à l’année de post-graduation ; les anciennes décisions sans année connue doivent rester identifiées comme historiques non associées, sans leur inventer d’année.
+- La synchronisation Android accepte désormais un certificat d’autorité privée (CA) au format PEM en option, pour les serveurs HTTPS privés/VPN. Le certificat est validé et ajouté au magasin de confiance utilisé par le client Python ; la validation TLS n’est pas désactivée.
+- Sur le commit `f9167480ed69e7cb7d174010bd644518fc9a4145`, la CI Python a réussi : **126 tests passés**. La compilation APK Android et la génération Windows doivent encore être confirmées par leurs workflows et leurs tests de démarrage.
+- Limites encore ouvertes : validation réelle de la synchronisation entre plusieurs téléphones, résolution interactive des conflits, file d’attente hors connexion complète, synchronisation des votes/archives DEMS, historique fiable de l’année d’étude du résident pour chaque année de post-graduation, et vérification visuelle sur un téléphone physique.
+
