@@ -634,6 +634,66 @@ def capacities():
  ts=c.execute("SELECT * FROM terrains WHERE active=1 ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END, name").fetchall(); ps=c.execute("SELECT * FROM periods WHERE year_label=? ORDER BY id",(y,)).fetchall()
  rows=c.execute("SELECT t.name terrain,p.name period,cap.places,(SELECT COUNT(*) FROM assignments a WHERE a.terrain_id=t.id AND a.period_id=p.id AND a.status IN ('confirmed','pending')) used FROM capacities cap JOIN terrains t ON t.id=cap.terrain_id JOIN periods p ON p.id=cap.period_id WHERE cap.year_label=?",(y,)).fetchall(); c.close()
  return page("""<section><h3>{{t('capacities')}}</h3><form method="post"><div class="grid"><div><label>{{t('terrain')}}</label><select name="terrain">{% for x in ts %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select></div><div><label>{{t('period')}}</label><select name="period">{% for x in ps %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select></div><div><label>{{t('places')}}</label><input type="number" min="0" name="places" required></div></div><button>{{t('save')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('period')}}</th><th>{{t('terrain')}}</th><th>{{t('places')}}</th><th>{{t('used')}}</th><th>{{t('remaining')}}</th></tr>{% for r in rows %}<tr><td>{{r.period}}</td><td>{{r.terrain}}</td><td>{{r.places}}</td><td>{{r.used}}</td><td>{{r.places-r.used}}</td></tr>{% endfor %}</table></div></section>""",ts=ts,ps=ps,rows=rows)
+@app.route("/rotation-board")
+def rotation_board():
+ if guard(): return redirect("/login")
+ c=db(); y=request.args.get("year",setting(c,"year"))
+ years=[x["year_label"] for x in c.execute("SELECT DISTINCT year_label FROM periods ORDER BY year_label DESC").fetchall()]
+ if y not in years and years: y=years[0]
+ periods=c.execute("SELECT * FROM periods WHERE year_label=? ORDER BY id",(y,)).fetchall()
+ terrains=c.execute("SELECT * FROM terrains WHERE active=1 ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END,name").fetchall()
+ assignments=c.execute("""SELECT a.terrain_id,a.period_id,a.status,r.surname,r.firstname,r.year
+ FROM assignments a JOIN residents r ON r.id=a.resident_id
+ JOIN periods p ON p.id=a.period_id
+ WHERE p.year_label=? AND a.status IN ('confirmed','pending')
+ ORDER BY a.period_id,r.year DESC,r.surname,r.firstname""",(y,)).fetchall()
+ capacities=c.execute("SELECT terrain_id,period_id,places FROM capacities WHERE year_label=?",(y,)).fetchall()
+ c.close()
+ capmap={(x["terrain_id"],x["period_id"]):x["places"] for x in capacities}
+ assigned={}
+ for a in assignments: assigned.setdefault((a["terrain_id"],a["period_id"]),[]).append(a)
+ board=[]
+ for terrain in terrains:
+  cells=[]
+  for period in periods:
+   names=assigned.get((terrain["id"],period["id"]),[])
+   capacity=capmap.get((terrain["id"],period["id"]))
+   cells.append({"period_id":period["id"],"names":names,"used":len(names),"capacity":capacity,"remaining":max(0,capacity-len(names)) if capacity is not None else None})
+  board.append({"id":terrain["id"],"name":terrain["name"],"cells":cells})
+ if request.args.get("format")=="pdf":
+  try:
+   from reportlab.lib import colors
+   from reportlab.lib.pagesizes import A4, landscape
+   from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+   from reportlab.lib.enums import TA_CENTER, TA_LEFT
+   from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+   from reportlab.lib.units import mm
+   output=io.BytesIO()
+   doc=SimpleDocTemplate(output,pagesize=landscape(A4),rightMargin=9*mm,leftMargin=9*mm,topMargin=10*mm,bottomMargin=10*mm,title="ResiManage - Répartition des stages")
+   styles=getSampleStyleSheet()
+   title_style=ParagraphStyle("BoardTitle",parent=styles["Title"],fontName="Helvetica-Bold",fontSize=15,leading=18,alignment=TA_CENTER,textColor=colors.HexColor("#183c5a"),spaceAfter=5)
+   cell_style=ParagraphStyle("BoardCell",parent=styles["BodyText"],fontName="Helvetica",fontSize=7,leading=9,alignment=TA_LEFT,wordWrap="CJK")
+   head_style=ParagraphStyle("BoardHead",parent=cell_style,fontName="Helvetica-Bold",alignment=TA_CENTER,textColor=colors.white)
+   story=[Paragraph("ResiManage — Tableau général de répartition des stages",title_style),Paragraph("Année universitaire : "+str(y),styles["Normal"]),Spacer(1,5*mm)]
+   data=[[Paragraph("Terrain de stage",head_style)]+[Paragraph(str(p["name"]),head_style) for p in periods]]
+   for item in board:
+    row=[Paragraph(item["name"],cell_style)]
+    for cell in item["cells"]:
+     roster="<br/>".join(("• "+(str(a["surname"] or "")+" "+str(a["firstname"] or "")).strip()+" (A"+str(a["year"])+(" — en attente" if a["status"]=="pending" else "")+")") for a in cell["names"])
+     cap="Capacité : "+str(cell["capacity"]) if cell["capacity"] is not None else "Capacité : non définie"
+     remaining=("Places restantes : "+str(cell["remaining"])) if cell["remaining"] is not None else "Places restantes : —"
+     content=(roster+"<br/>" if roster else "")+"Occupées : "+str(cell["used"])+" / "+(str(cell["capacity"]) if cell["capacity"] is not None else "—")+"<br/>"+remaining
+     row.append(Paragraph(content,cell_style))
+    data.append(row)
+   widths=[42*mm]+[(landscape(A4)[0]-18*mm-42*mm)/max(1,len(periods))]*len(periods)
+   table=Table(data,colWidths=widths,repeatRows=1,hAlign="LEFT")
+   table.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.HexColor("#214e79")),("GRID",(0,0),(-1,-1),0.4,colors.HexColor("#cbd8e4")),("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),5),("RIGHTPADDING",(0,0),(-1,-1),5),("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,colors.HexColor("#f0f6fb")])]))
+   story.append(table); doc.build(story); output.seek(0)
+   return send_file(output,mimetype="application/pdf",as_attachment=True,download_name="ResiManage_repartition_"+str(y).replace("/","-")+".pdf")
+  except ImportError:
+   return ("PDF export requires the reportlab package. Install requirements.txt and retry.",500)
+ return page("""<section class="rt-board-head"><h2>Tableau général de répartition des stages</h2><p>Année universitaire : <strong>{{year_label}}</strong>. Les affectations confirmées et en attente sont affichées. Une capacité non définie est indiquée par « — ».</p><form method="get" class="rt-board-controls"><label>Année universitaire<select name="year">{% for yy in years %}<option value="{{yy}}" {% if yy==year_label %}selected{% endif %}>{{yy}}</option>{% endfor %}</select></label><button type="submit">Afficher</button></form><div class="rt-board-actions"><a href="/rotation-board?year={{year_label|urlencode}}&format=pdf">Exporter en PDF</a><button type="button" onclick="window.print()">Imprimer le tableau</button><a href="/assign">Retour à la répartition</a></div></section><section class="rt-board-table"><div class="wrap"><table><thead><tr><th>Terrain de stage</th>{% for p in periods %}<th>{{p.name}}</th>{% endfor %}</tr></thead><tbody>{% for item in board %}<tr><th>{{item.name}}</th>{% for cell in item.cells %}<td class="{% if cell.capacity is not none and cell.remaining==0 %}rt-board-full{% elif cell.used>0 %}rt-board-partial{% else %}rt-board-free{% endif %}"><div class="rt-board-roster">{% if cell.names %}{% for n in cell.names %}<div class="rt-board-name">{{n.surname}} {{n.firstname}} <small>({{n.year}}e année{% if n.status=='pending' %}, en attente{% endif %})</small></div>{% endfor %}{% else %}<span class="muted">Aucun résident affecté</span>{% endif %}</div><div class="rt-board-count">Occupées : <strong>{{cell.used}}</strong> / {{cell.capacity if cell.capacity is not none else "—"}}</div><div class="rt-board-remaining">Places restantes : <strong>{{cell.remaining if cell.remaining is not none else "capacité non définie"}}</strong></div></td>{% endfor %}</tr>{% endfor %}</tbody></table></div><p class="muted">La capacité doit être configurée dans « Capacités » pour calculer les places restantes. Les affectations en attente sont incluses et identifiées.</p></section><style>.rt-board-head h2{margin-top:0}.rt-board-controls{display:flex;align-items:end;gap:12px;flex-wrap:wrap}.rt-board-controls label{min-width:210px;flex:1}.rt-board-actions{display:flex;gap:8px;flex-wrap:wrap}.rt-board-table table{min-width:950px;table-layout:fixed}.rt-board-table th:first-child{width:175px}.rt-board-table th{background:#214e79;color:white}.rt-board-table td{vertical-align:top;min-width:160px}.rt-board-name{padding:4px 0;border-bottom:1px solid #dce6f0}.rt-board-name small{color:#526274}.rt-board-count{margin-top:8px;padding-top:5px;border-top:1px solid #dce6f0}.rt-board-remaining{font-weight:600;margin-top:4px}.rt-board-full{background:#ffe8e6}.rt-board-partial{background:#fff5db}.rt-board-free{background:#e7f7ee}@media print{body{background:white!important;color:black}header,.main-nav,.rt-board-controls,.rt-board-actions,footer{display:none!important}main{max-width:none;padding:0!important}.rt-board-head,.rt-board-table{border:0;box-shadow:none;break-inside:avoid}.rt-board-table .wrap{overflow:visible}.rt-board-table table{min-width:0;width:100%;font-size:8pt;table-layout:fixed}.rt-board-table th:first-child{width:18%}.rt-board-table th,.rt-board-table td{padding:4px;border:1px solid #777;overflow-wrap:anywhere;break-inside:avoid}.rt-board-table th{background:#e8eef4!important;color:#111!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.rt-board-table tr{break-inside:avoid}}@media(max-width:600px){.rt-board-actions>*{flex:1;text-align:center}}</style>""",year_label=y,years=years,periods=periods,board=board)
+
 def check(c,rid,tid,pid,y):
  r=c.execute("SELECT * FROM residents WHERE id=? AND status='active'",(rid,)).fetchone(); t=c.execute("SELECT * FROM terrains WHERE id=?",(tid,)).fetchone(); p=c.execute("SELECT * FROM periods WHERE id=? AND year_label=?",(pid,y)).fetchone()
  if not r or not t or not t["active"] or not p: return False,tr("none"),None
