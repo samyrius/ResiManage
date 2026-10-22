@@ -905,7 +905,7 @@ def test_external_rotation_blocks_overlapping_local_period(tmp_path, monkeypatch
         conn.commit()
         allowed, message, status = rotation_app.check(conn, rid, tid, period["id"], period["year_label"])
         assert allowed is False
-        assert "External rotation" in message
+        assert "stage à l’étranger approuvé bloque l’affectation locale".casefold() in message.casefold()
 
 
 def test_external_rotation_form_requires_all_destination_details(tmp_path, monkeypatch):
@@ -978,7 +978,7 @@ def test_external_rotation_returned_record_still_blocks_overlapping_period(tmp_p
         conn.commit()
         allowed, message, _ = rotation_app.check(conn, rid, tid, period["id"], period["year_label"])
     assert allowed is False
-    assert "External rotation" in message
+    assert "stage à l’étranger approuvé bloque l’affectation locale".casefold() in message.casefold()
 
 
 def test_assignment_resident_options_mark_external_period_conflicts(tmp_path, monkeypatch):
