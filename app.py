@@ -1633,15 +1633,15 @@ def blank_templates():
   if extension not in (".csv",".xlsx",".docx",".pdf"):
    flash(L("Choisissez CSV, Excel (.xlsx), Word (.docx) ou PDF.","Choose CSV, Excel (.xlsx), Word (.docx), or PDF.","اختر CSV أو Excel (.xlsx) أو Word (.docx) أو PDF.")); return redirect("/templates")
   if form_type=="residents_full" or form_type=="residents_by_year":
-   headers=["surname","firstname","birth_date","birth_place","postal_address","email","phone1","phone2","resident_card_number","national_id_number","medical_order_registered","medical_order_number","social_security_number","registration_date","study_year","resident_type","origin_hospital","external_start_date","external_end_date","additional_info"]
+   headers=["surname","firstname","birth_date","birth_place","address","email","phone","phone2","resident_card_number","national_id_number","medical_order_registered","medical_order_number","social_security_number","registration_date","year","resident_type","origin_hospital","external_start_date","external_end_date","additional_info"]
    labels=["Nom","Prénom","Date de naissance (AAAA-MM-JJ)","Lieu de naissance","Adresse postale","Adresse e-mail","Téléphone 1","Téléphone 2","Numéro de carte de résident","NIN / numéro d’identification nationale","Inscrit à l’Ordre des médecins (oui/non)","Numéro de l’Ordre des médecins","Numéro de sécurité sociale","Date de première inscription","Année de post-graduation (1-4)","Catégorie (local/external)","Établissement d’origine (si externe)","Début du stage au CHU","Fin du stage au CHU","Autres informations utiles"]
    if form_type=="residents_by_year":
-    headers=["surname","firstname","study_year"]+[h for h in headers if h not in ("surname","firstname","study_year")]
+    headers=["surname","firstname","year"]+[h for h in headers if h not in ("surname","firstname","year")]
     labels=["Nom","Prénom","Année de post-graduation (1-4)"]+[h for h in labels if h not in ("Nom","Prénom","Année de post-graduation (1-4)")]
     if year not in ("1","2","3","4"): year="1"
   elif form_type=="rotation_history":
-   headers=["resident_surname","resident_firstname","resident_type","origin_hospital","terrain_name","postgrad_year","period","start_date","end_date","date_done","notes"]
-   labels=["Nom du résident","Prénom du résident","Catégorie (local/external)","Établissement d’origine","Service de stage","Année de post-graduation (AAAA-AAAA)","Période (1-4 ou nom de période)","Date de début","Date de fin","Date d’achèvement","Notes / référence du document justificatif"]
+   headers=["resident","terrain","year_label","period","date_done","start_date","end_date","resident_type","origin_hospital","notes"]
+   labels=["Nom et prénom du résident (Nom Prénom)","Service de stage","Année de post-graduation (AAAA-AAAA)","Période (nom exact ou vide)","Date d’achèvement","Date de début","Date de fin","Catégorie (local/external)","Établissement d’origine","Notes / référence du document justificatif"]
   else:
    headers=["postgrad_year","period","period_start_date","period_end_date","terrain_name","capacity","resident_surname","resident_firstname","resident_type","origin_hospital","assignment_status","decision_reason"]
    labels=["Année de post-graduation (AAAA-AAAA)","Période","Début de période","Fin de période","Service","Capacité / nombre de postes","Nom du résident","Prénom du résident","Catégorie (local/external)","Établissement d’origine","État (confirmé/en attente)","Motif / décision"]
