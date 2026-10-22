@@ -1607,19 +1607,24 @@ def sync_api_push():
 
 def normalize_header(value):
  value=str(value or "").strip().lower()
- value=re.sub(r"[\s_\-]+"," ",value)
+ # Accept both machine-readable CSV/XLSX headers and the human-readable labels
+ # printed in the Word/PDF templates. Remove parenthetical instructions such as
+ # "(AAAA-MM-JJ)" before matching, while preserving the original cell values.
+ value=re.sub(r"\([^)]*\)"," ",value)
+ value=re.sub(r"[,:;|/]+"," ",value)
+ value=re.sub(r"[\s_\-]+"," ",value).strip()
  aliases={
   "surname":"surname","nom":"surname","family name":"surname","last name":"surname","اللقب":"surname",
   "firstname":"firstname","first name":"firstname","prénom":"firstname","prenom":"firstname","given name":"firstname","الاسم":"firstname",
-  "year":"year","study year":"year","study_year":"year","année":"year","annee":"year","niveau":"year","السنة":"year",
+  "year":"year","study year":"year","study_year":"year","année":"year","annee":"year","année d’étude":"year","annee d’étude":"year","niveau":"year","السنة":"year",
   "phone":"phone","phone 1":"phone","telephone":"phone","téléphone":"phone","mobile":"phone","الهاتف":"phone","phone 2":"phone2","telephone 2":"phone2","téléphone 2":"phone2",
   "birth place":"birth_place","lieu de naissance":"birth_place","مكان الميلاد":"birth_place",
   "birth date":"birth_date","date de naissance":"birth_date","تاريخ الميلاد":"birth_date","postal address":"address","adresse postale":"address","email address":"email","adresse e mail":"email","email":"email","resident card number":"resident_card_number","numéro de carte de résident":"resident_card_number","nin":"national_id_number","national id number":"national_id_number","medical order registered":"medical_order_registered","medical order registered yes":"medical_order_registered_yes","registered at medical order":"medical_order_registered_yes","inscrit ordre des médecins":"medical_order_registered_yes","inscrit à l ordre des médecins":"medical_order_registered_yes","medical order registered no":"medical_order_registered_no","not registered at medical order":"medical_order_registered_no","non inscrit ordre des médecins":"medical_order_registered_no","non inscrit à l ordre des médecins":"medical_order_registered_no","medical order number":"medical_order_number","social security number":"social_security_number","registration date":"registration_date","date de première inscription":"registration_date","resident type":"resident_type","catégorie":"resident_type","origin hospital":"origin_hospital","external start date":"external_start_date","external end date":"external_end_date","additional info":"additional_info",
-  "resident":"resident","resident name":"resident","resident full name":"resident","nom du résident":"resident","nom resident":"resident","المقيم":"resident",
+  "resident":"resident","resident name":"resident","resident full name":"resident","nom du résident":"resident","nom et prénom du résident":"resident","nom resident":"resident","المقيم":"resident",
   "terrain":"terrain","service":"terrain","stage":"terrain","rotation":"terrain","service de stage":"terrain","المصلحة":"terrain","التربص":"terrain",
   "academic year":"year_label","year label":"year_label","academic year label":"year_label","année de post-graduation":"year_label","annee universitaire":"year_label","سنة ما بعد التدرج":"year_label",
   "period":"period","rotation period":"period","période":"period","periode":"period","الفترة":"period",
-  "date done":"date_done","completion date":"date_done","date completed":"date_done","date de réalisation":"date_done","date de fin":"date_done","تاريخ الإنجاز":"date_done"
+  "date done":"date_done","completion date":"date_done","date completed":"date_done","date de réalisation":"date_done","date d’achèvement":"date_done","date de fin":"date_done","تاريخ الإنجاز":"date_done","notes référence du document justificatif":"notes"
  }
  return aliases.get(value,value.replace(" ","_"))
 def parse_import_file(path, extension, import_type='residents'):
@@ -1708,10 +1713,10 @@ def blank_templates():
    flash(L("Choisissez CSV, Excel (.xlsx), Word (.docx) ou PDF.","Choose CSV, Excel (.xlsx), Word (.docx), or PDF.","اختر CSV أو Excel (.xlsx) أو Word (.docx) أو PDF.")); return redirect("/templates")
   if form_type=="residents_full" or form_type=="residents_by_year":
    headers=["surname","firstname","birth_date","birth_place","address","email","phone","phone2","resident_card_number","national_id_number","medical_order_registered_yes","medical_order_registered_no","medical_order_number","social_security_number","registration_date","year","resident_type","origin_hospital","external_start_date","external_end_date","additional_info"]
-   labels=["Nom","Prénom","Date de naissance (AAAA-MM-JJ)","Lieu de naissance","Adresse postale","Adresse e-mail","Téléphone 1","Téléphone 2","Numéro de carte de résident","NIN / numéro d’identification nationale","☐ Inscrit à l’Ordre des médecins (cocher 1 ou X)","☐ Non inscrit à l’Ordre des médecins (cocher 1 ou X)","Numéro de l’Ordre des médecins (si inscrit)","Numéro de sécurité sociale","Date de première inscription","Année de post-graduation (1-4)","Catégorie (local/external)","Établissement d’origine (EHS Cardio DBK, CAC DBK ou autre)","Début du stage au CHU","Fin du stage au CHU","Autres informations utiles"]
+   labels=["Nom","Prénom","Date de naissance (AAAA-MM-JJ)","Lieu de naissance","Adresse postale","Adresse e-mail","Téléphone 1","Téléphone 2","Numéro de carte de résident","NIN / numéro d’identification nationale","☐ Inscrit à l’Ordre des médecins (cocher 1 ou X)","☐ Non inscrit à l’Ordre des médecins (cocher 1 ou X)","Numéro de l’Ordre des médecins (si inscrit)","Numéro de sécurité sociale","Date de première inscription","Année d’étude (1-4)","Catégorie (local/external)","Établissement d’origine (EHS Cardio DBK, CAC DBK ou autre)","Début du stage au CHU","Fin du stage au CHU","Autres informations utiles"]
    if form_type=="residents_by_year":
     headers=["surname","firstname","year"]+[h for h in headers if h not in ("surname","firstname","year")]
-    labels=["Nom","Prénom","Année de post-graduation (1-4)"]+[h for h in labels if h not in ("Nom","Prénom","Année de post-graduation (1-4)")]
+    labels=["Nom","Prénom","Année d’étude (1-4)"]+[h for h in labels if h not in ("Nom","Prénom","Année d’étude (1-4)")]
     if year not in ("1","2","3","4"): year="1"
   elif form_type=="rotation_history":
    headers=["resident","terrain","year_label","period","date_done","start_date","end_date","resident_type","origin_hospital","notes"]
