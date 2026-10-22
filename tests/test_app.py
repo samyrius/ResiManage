@@ -3538,6 +3538,22 @@ def test_postgraduate_year_options_include_exam_and_decision_history(tmp_path, m
     finally:
         conn.close()
 
+def test_planning_nav_hides_separate_capacity_page_and_uses_inline_board_capacity(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+
+    planning = client.get("/terrains")
+    assert planning.status_code == 200
+    assert b'<summary>Ajouter un service</summary>' in planning.data
+    assert b'<details class="rt-add-terrain"' in planning.data
+
+    board = client.get("/rotation-board")
+    assert board.status_code == 200
+    assert b'name="places"' in board.data
+    assert b"Nombre de places" in board.data
+    assert b'href="/capacities"' not in board.data
+
+
 def test_rotation_board_updates_occupancy_after_assignment_and_uses_readable_contrast(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
