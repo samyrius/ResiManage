@@ -2251,6 +2251,48 @@ def backup():
  data=create_full_backup_bytes(directory)
  return send_file(io.BytesIO(data),mimetype="application/zip",as_attachment=True,download_name="resimanage_full_backup.zip")
 
+@app.route("/trash",methods=["GET","POST"])
+def trash():
+ if guard(): return redirect("/login")
+ if session.get("role")!="super_admin": return ("Forbidden — Super Admin only",403)
+ c=db(); now=datetime.now()
+ for item in c.execute("SELECT id,deleted_at FROM trash_items").fetchall():
+  try:
+   deleted=datetime.fromisoformat(item["deleted_at"])
+   month=deleted.month+6; year=deleted.year+(month-1)//12; month=(month-1)%12+1
+   day=min(deleted.day,__import__("calendar").monthrange(year,month)[1])
+   if now>=deleted.replace(year=year,month=month,day=day):
+    c.execute("DELETE FROM trash_items WHERE id=?",(item["id"],))
+    audit_event(c,"trash.expired",f"trash_id={item['id']}; purged_after_six_calendar_months")
+  except (ValueError,TypeError): continue
+ c.commit()
+ if request.method=="POST":
+  action=request.form.get("action",""); tid=int(request.form.get("trash_id","0"))
+  item=c.execute("SELECT * FROM trash_items WHERE id=?",(tid,)).fetchone()
+  if not item: flash(L("Élément introuvable ou délai de conservation écoulé.","Item not found or retention period expired.","العنصر غير موجود أو انتهت مدة الاحتفاظ."))
+  elif action=="restore":
+   try:
+    snap=json.loads(item["snapshot_json"])
+    if item["entity_type"]!="resident": raise ValueError("Unsupported trash type")
+    resident=snap["resident"]; cols=[x[1] for x in c.execute("PRAGMA table_info(residents)") if x[1] in resident]
+    c.execute("INSERT INTO residents("+",".join(cols)+") VALUES("+",".join("?" for _ in cols)+")",[resident[x] for x in cols])
+    for table,records in snap.get("related",{}).items():
+     allowed={x[1] for x in c.execute("PRAGMA table_info("+table+")")}
+     for record in records:
+      cols=[k for k in record if k in allowed]
+      c.execute("INSERT INTO "+table+"("+",".join(cols)+") VALUES("+",".join("?" for _ in cols)+")",[record[k] for k in cols])
+    c.execute("DELETE FROM trash_items WHERE id=?",(tid,))
+    audit_event(c,"trash.restored",f"trash_id={tid}; resident_id={item['entity_id']}")
+    c.commit(); flash(L("Dossier et données associées restaurés.","Resident record and related data restored.","تمت استعادة ملف المقيم والبيانات المرتبطة."))
+   except (ValueError,TypeError,KeyError,sqlite3.Error) as exc:
+    c.rollback(); app.logger.warning("Trash restore failed: %s",exc); flash(L("Restauration impossible. Vérifiez que ce dossier n’existe pas déjà.","Restore failed. Check whether the record already exists.","تعذرت الاستعادة. تحقق من أن الملف غير موجود مسبقًا."))
+  elif action=="purge":
+   c.execute("DELETE FROM trash_items WHERE id=?",(tid,)); audit_event(c,"trash.purged_early",f"trash_id={tid}; actor={session.get('username','')}")
+   c.commit(); flash(L("Élément supprimé définitivement de la corbeille.","Item permanently deleted from trash.","تم حذف العنصر نهائيًا من سلة المهملات."))
+  return redirect("/trash")
+ rows=c.execute("SELECT * FROM trash_items ORDER BY deleted_at DESC").fetchall(); c.close()
+ return page("""<section><h3>{{L('Corbeille — conservation de six mois','Trash — six-month retention','سلة المهملات — الاحتفاظ ستة أشهر')}}</h3><p>{{L('Les dossiers restent restaurables pendant six mois calendaires. Après échéance, leur contenu est supprimé définitivement automatiquement lors de la prochaine ouverture de cette rubrique.','Records can be restored for six calendar months. After expiry, their contents are permanently purged automatically when this section is next opened.','يمكن استعادة الملفات خلال ستة أشهر تقويمية. بعد انتهاء المدة تُحذف محتوياتها نهائيًا تلقائيًا عند فتح هذا القسم مرة أخرى.')}}</p><div class="wrap"><table><tr><th>{{L('Élément','Item','العنصر')}}</th><th>{{L('Motif','Reason','السبب')}}</th><th>{{L('Supprimé le','Deleted at','تاريخ الحذف')}}</th><th>{{L('Supprimé par','Deleted by','حذف بواسطة')}}</th><th>{{L('Actions','Actions','الإجراءات')}}</th></tr>{% for x in rows %}<tr><td>{{x.label}} ({{x.entity_type}})</td><td>{{x.reason}}</td><td>{{x.deleted_at}}</td><td>{{x.deleted_by}}</td><td><form method="post"><input type="hidden" name="trash_id" value="{{x.id}}"><button name="action" value="restore">{{L('Restaurer','Restore','استعادة')}}</button></form><form method="post" onsubmit="return confirm('{{L('Supprimer définitivement maintenant ?','Permanently delete now?','حذف نهائي الآن؟')}}')"><input type="hidden" name="trash_id" value="{{x.id}}"><button name="action" value="purge">{{L('Supprimer définitivement','Purge permanently','حذف نهائي')}}</button></form></td></tr>{% else %}<tr><td colspan="5">{{L('La corbeille est vide.','Trash is empty.','سلة المهملات فارغة.')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
+
 @app.route("/restore",methods=["GET","POST"])
 def restore():
  if super_guard(): return super_guard()
