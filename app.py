@@ -1545,10 +1545,10 @@ def normalize_header(value):
  aliases={
   "surname":"surname","nom":"surname","family name":"surname","last name":"surname","اللقب":"surname",
   "firstname":"firstname","first name":"firstname","prénom":"firstname","prenom":"firstname","given name":"firstname","الاسم":"firstname",
-  "year":"year","study year":"year","année":"year","annee":"year","niveau":"year","السنة":"year",
-  "phone":"phone","telephone":"phone","téléphone":"phone","mobile":"phone","الهاتف":"phone",
+  "year":"year","study year":"year","study_year":"year","année":"year","annee":"year","niveau":"year","السنة":"year",
+  "phone":"phone","phone 1":"phone","telephone":"phone","téléphone":"phone","mobile":"phone","الهاتف":"phone","phone 2":"phone2","telephone 2":"phone2","téléphone 2":"phone2",
   "birth place":"birth_place","lieu de naissance":"birth_place","مكان الميلاد":"birth_place",
-  "birth date":"birth_date","date de naissance":"birth_date","تاريخ الميلاد":"birth_date",
+  "birth date":"birth_date","date de naissance":"birth_date","تاريخ الميلاد":"birth_date","postal address":"address","adresse postale":"address","email address":"email","adresse e mail":"email","email":"email","resident card number":"resident_card_number","numéro de carte de résident":"resident_card_number","nin":"national_id_number","national id number":"national_id_number","medical order registered":"medical_order_registered","medical order number":"medical_order_number","social security number":"social_security_number","registration date":"registration_date","date de première inscription":"registration_date","resident type":"resident_type","catégorie":"resident_type","origin hospital":"origin_hospital","external start date":"external_start_date","external end date":"external_end_date","additional info":"additional_info",
   "resident":"resident","resident name":"resident","resident full name":"resident","nom du résident":"resident","nom resident":"resident","المقيم":"resident",
   "terrain":"terrain","service":"terrain","stage":"terrain","rotation":"terrain","service de stage":"terrain","المصلحة":"terrain","التربص":"terrain",
   "academic year":"year_label","year label":"year_label","academic year label":"year_label","année de post-graduation":"year_label","annee universitaire":"year_label","سنة ما بعد التدرج":"year_label",
