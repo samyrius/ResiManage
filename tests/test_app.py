@@ -125,7 +125,6 @@ def test_login_branding_uses_resimanage_and_navy_cyan_identity(tmp_path, monkeyp
     assert "Tous droits réservés · ResiManage · Dr Dris".encode() in response.data
     assert b"All rights reserved" not in response.data
     assert "جميع الحقوق محفوظة".encode() not in response.data
-    assert b"All rights reserved" in response.data
     assert "ResiManage · Dr Dris".encode() in response.data
     assert "جميع الحقوق محفوظة".encode() in response.data
     assert "✚".encode() not in response.data
@@ -318,7 +317,7 @@ def test_repeat_is_blocked_until_all_core_terrains_are_completed(tmp_path, monke
         with rotation_app.db() as conn:
             allowed, message, status = rotation_app.check(conn, rid, target, period_id, year_label)
             assert allowed is False
-            assert "التربص منجز سابقاً" in message
+            assert "Stage déjà effectué" in message
 
     with rotation_app.db() as conn:
         conn.execute(
@@ -337,7 +336,7 @@ def test_repeat_is_blocked_until_all_core_terrains_are_completed(tmp_path, monke
             allowed, message, status = rotation_app.check(conn, rid, target, period_id, year_label)
     assert allowed is True
     assert status == "confirmed"
-    assert "يمكن التكرار" in message
+    assert "Répétition autorisée" in message
 
 def test_resident_profile_and_objectives_are_saved_and_audited(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
@@ -2268,7 +2267,7 @@ def test_login_accepts_registered_email_as_identifier(tmp_path, monkeypatch):
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b"Resident" in response.data or "المقيمون".encode() in response.data
+    assert "Résidents".encode() in response.data
 
 
 def test_objective_completion_is_toggleable_audited_and_color_coded(tmp_path, monkeypatch):
@@ -3045,7 +3044,7 @@ def test_sync_device_enrollment_api_pull_tls_guard_and_revocation(tmp_path, monk
     match = re.search(rb"<p><code>([A-Za-z0-9_-]{40,})</code></p>", enrolled.data)
     assert match, enrolled.data.decode("utf-8", errors="replace")
     token = match.group(1).decode("ascii")
-    assert b"Copy this token now" in enrolled.data
+    assert "Copiez ce jeton maintenant".encode() in enrolled.data
     with client.session_transaction() as sess:
         assert "issued_sync_device" not in sess
 
