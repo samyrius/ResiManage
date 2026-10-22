@@ -3872,3 +3872,54 @@ def test_deleted_exam_result_stays_in_trash_and_can_be_restored(tmp_path, monkey
         record = conn.execute("SELECT module,theory,practical FROM exam_records WHERE id=?", (exam_id,)).fetchone()
         assert record is not None
         assert tuple(record) == ("Test module", 12.0, 13.0)
+
+
+
+def test_removed_assignment_is_retained_in_trash_and_can_be_restored(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        year = conn.execute("SELECT value FROM settings WHERE key='year'").fetchone()[0]
+        period_id = conn.execute("SELECT id FROM periods WHERE year_label=? ORDER BY id LIMIT 1", (year,)).fetchone()[0]
+        terrain_id = conn.execute("SELECT id FROM terrains WHERE active=1 ORDER BY id LIMIT 1").fetchone()[0]
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
+                     ("Trash", "Assignment", 1, "active"))
+        resident_id = conn.execute("SELECT id FROM residents WHERE surname='Trash' AND firstname='Assignment'").fetchone()[0]
+        conn.execute("INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",
+                     (resident_id, terrain_id, period_id))
+        assignment_id = conn.execute("SELECT id FROM assignments WHERE resident_id=? AND period_id=?",
+                                     (resident_id, period_id)).fetchone()[0]
+    removed = client.post("/rotation-board", data={
+        "action": "unassign", "year": year, "terrain_id": str(terrain_id),
+        "period_id": str(period_id), "resident_id": str(resident_id),
+    }, follow_redirects=True)
+    assert removed.status_code == 200
+    with rotation_app.db() as conn:
+        assignment = conn.execute("SELECT status FROM assignments WHERE id=?", (assignment_id,)).fetchone()
+        assert assignment["status"] == "cancelled"
+        trash = conn.execute("SELECT id,reason FROM trash_items WHERE entity_type='assignment' AND entity_id=?",
+                             (str(assignment_id),)).fetchone()
+        assert trash is not None
+        assert "six" in trash["reason"].lower() or "six" in trash["reason"].lower() or "six" in str(trash["reason"]).lower() or "Super Admin" in trash["reason"]
+        trash_id = trash["id"]
+    restored = client.post("/trash", data={"action": "restore", "trash_id": str(trash_id)}, follow_redirects=True)
+    assert restored.status_code == 200
+    with rotation_app.db() as conn:
+        assignment = conn.execute("SELECT status FROM assignments WHERE id=?", (assignment_id,)).fetchone()
+        assert assignment["status"] == "confirmed"
+        assert conn.execute("SELECT 1 FROM trash_items WHERE id=?", (trash_id,)).fetchone() is None
+
+
+def test_resident_by_year_template_prefills_selected_year(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.post("/templates", data={
+        "form_type": "residents_by_year", "extension": ".xlsx", "year": "3"
+    })
+    assert response.status_code == 200
+    from openpyxl import load_workbook
+    import io
+    book = load_workbook(io.BytesIO(response.data), data_only=True)
+    assert book["Formulaire"]["C1"].value == "year"
+    assert str(book["Formulaire"]["C2"].value) == "3"
+    book.close()
