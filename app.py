@@ -705,8 +705,9 @@ def residents():
    firstname=request.form.get("firstname","").strip()
    phone=request.form.get("phone","").strip()
    resident_type=request.form.get("resident_type","local")
-   origin_hospital=request.form.get("origin_hospital","").strip()
-   if origin_hospital.casefold() in ("autre","other"):
+   origin_choice=request.form.get("origin_hospital","").strip()
+   origin_hospital=origin_choice
+   if origin_choice.casefold() in ("autre","other"):
     origin_hospital=request.form.get("origin_hospital_other","").strip()
    external_start=request.form.get("external_start_date","").strip()
    external_end=request.form.get("external_end_date","").strip()
@@ -725,6 +726,8 @@ def residents():
     flash(L("Le téléphone doit contenir au maximum 40 caractères et le champ redoublement doit valoir 0 ou 1.","Phone must be at most 40 characters and repeat flag must be 0 or 1.","يجب ألا يتجاوز الهاتف 40 حرفًا، ويجب أن تكون قيمة الإعادة 0 أو 1."))
    elif resident_type=="external" and (not origin_hospital or not external_start or not external_end):
     flash(L("Pour un résident externe, l’établissement d’origine et les dates de début et de fin sont obligatoires.","For an external resident, the home institution and start/end dates are required.","بالنسبة للمقيم الخارجي، المؤسسة الأصلية وتاريخا البداية والنهاية إجبارية."))
+   elif resident_type=="external" and origin_choice.casefold() not in ("ehs cardio dbk","cac dbk","autre","other"):
+    flash(L("Choisissez EHS Cardio DBK, CAC DBK ou « Autre » et précisez l’établissement d’origine.","Choose EHS Cardio DBK, CAC DBK, or “Other” and specify the home institution.","اختر EHS Cardio DBK أو CAC DBK أو «أخرى» وحدد المؤسسة الأصلية."))
    elif resident_type=="external" and not external_dates_valid:
     flash(L("La date de fin du stage doit être égale ou postérieure à la date de début.","Rotation end date must be on or after the start date.","يجب أن يكون تاريخ نهاية التربص بعد تاريخ بدايته أو مساويًا له."))
    elif c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=? AND COALESCE(resident_type,'local')=? AND COALESCE(origin_hospital,'')=?",(surname,firstname,year,resident_type,origin_hospital)).fetchone():
