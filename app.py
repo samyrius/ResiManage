@@ -2440,14 +2440,18 @@ def trash():
   elif action=="restore":
    try:
     snap=json.loads(item["snapshot_json"])
-    if item["entity_type"]!="resident": raise ValueError("Unsupported trash type")
-    resident=snap["resident"]; cols=[x[1] for x in c.execute("PRAGMA table_info(residents)") if x[1] in resident]
-    c.execute("INSERT INTO residents("+",".join(cols)+") VALUES("+",".join("?" for _ in cols)+")",[resident[x] for x in cols])
-    for table,records in snap.get("related",{}).items():
-     allowed={x[1] for x in c.execute("PRAGMA table_info("+table+")")}
-     for record in records:
-      cols=[k for k in record if k in allowed]
-      c.execute("INSERT INTO "+table+"("+",".join(cols)+") VALUES("+",".join("?" for _ in cols)+")",[record[k] for k in cols])
+    if item["entity_type"]=="resident":
+     resident=snap["resident"]; cols=[x[1] for x in c.execute("PRAGMA table_info(residents)") if x[1] in resident]
+     c.execute("INSERT INTO residents("+",".join(cols)+") VALUES("+",".join("?" for _ in cols)+")",[resident[x] for x in cols])
+     for table,records in snap.get("related",{}).items():
+      allowed={x[1] for x in c.execute("PRAGMA table_info("+table+")")}
+      for record in records:
+       cols=[k for k in record if k in allowed]
+       c.execute("INSERT INTO "+table+"("+",".join(cols)+") VALUES("+",".join("?" for _ in cols)+")",[record[k] for k in cols])
+    elif item["entity_type"]=="exam_record":
+     record=snap["record"]; cols=[x[1] for x in c.execute("PRAGMA table_info(exam_records)") if x[1] in record]
+     c.execute("INSERT INTO exam_records("+",".join(cols)+") VALUES("+",".join("?" for _ in cols)+")",[record[x] for x in cols])
+    else: raise ValueError("Unsupported trash type")
     c.execute("DELETE FROM trash_items WHERE id=?",(tid,))
     audit_event(c,"trash.restored",f"trash_id={tid}; resident_id={item['entity_id']}")
     c.commit(); flash(L("Dossier et données associées restaurés.","Resident record and related data restored.","تمت استعادة ملف المقيم والبيانات المرتبطة."))
