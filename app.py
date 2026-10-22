@@ -881,6 +881,14 @@ def check(c,rid,tid,pid,y):
  r=c.execute("SELECT * FROM residents WHERE id=? AND status='active'",(rid,)).fetchone(); t=c.execute("SELECT * FROM terrains WHERE id=?",(tid,)).fetchone(); p=c.execute("SELECT * FROM periods WHERE id=? AND year_label=?",(pid,y)).fetchone()
  if not r or not t or not t["active"] or not p: return False,tr("none"),None
  start_day, end_day = rotation_period_bounds(p["year_label"], p["name"], p["start_date"], p["end_date"])
+ if r["resident_type"]=="external":
+  try:
+   ext_start=date.fromisoformat(r["external_start_date"] or "")
+   ext_end=date.fromisoformat(r["external_end_date"] or "")
+  except ValueError:
+   return False,L("Les dates du résident externe doivent être renseignées avant l’affectation.","External resident dates must be completed before assignment.","يجب إدخال تواريخ المقيم الخارجي قبل التعيين."),None
+  if ext_start>end_day or ext_end<start_day:
+   return False,L("Cette période est en dehors des dates du stage du résident externe.","This period falls outside the external resident's rotation dates.","هذه الفترة خارج تواريخ تربص المقيم الخارجي."),None
  external = c.execute("SELECT hospital,country,start_date,end_date FROM external_rotations WHERE resident_id=? AND request_status='approved' AND status<>'cancelled' AND start_date<=? AND end_date>=? LIMIT 1",(rid,end_day.isoformat(),start_day.isoformat())).fetchone()
  if external: return False,("External rotation blocks local assignment: "+external["hospital"]+", "+external["country"]+" ("+external["start_date"]+" to "+external["end_date"]+")"),None
  dup=c.execute("SELECT t.name FROM assignments a JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=? AND a.period_id=? AND a.status IN ('confirmed','pending')",(rid,pid)).fetchone()
