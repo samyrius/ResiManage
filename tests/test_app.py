@@ -3511,3 +3511,47 @@ def test_postgraduate_year_options_include_exam_and_decision_history(tmp_path, m
         assert "2029-2030" in years
     finally:
         conn.close()
+
+def test_rotation_board_updates_occupancy_after_assignment_and_uses_readable_contrast(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname, firstname, year) VALUES(?,?,?)",
+            ("BoardCount", "Resident", 3),
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='BoardCount'"
+        ).fetchone()["id"]
+        terrain_id = conn.execute(
+            "SELECT id FROM terrains WHERE name='Réanimation chirurgicale'"
+        ).fetchone()["id"]
+        period = conn.execute("SELECT id, year_label FROM periods ORDER BY id LIMIT 1").fetchone()
+        conn.execute(
+            "INSERT INTO capacities(year_label, terrain_id, period_id, places) VALUES(?,?,?,4)",
+            (period["year_label"], terrain_id, period["id"]),
+        )
+
+    response = client.get("/rotation-board")
+    assert response.status_code == 200
+    assert b"Occup\xc3\xa9es : <strong>0</strong> / 4" in response.data
+
+    assigned = client.post(
+        "/rotation-board",
+        data={
+            "action": "assign",
+            "year": period["year_label"],
+            "terrain_id": str(terrain_id),
+            "period_id": str(period["id"]),
+            "resident_id": str(rid),
+            "force_rules": "1",
+        },
+        follow_redirects=True,
+    )
+    assert assigned.status_code == 200
+    assert b"BoardCount Resident" in assigned.data
+    assert b"Occup\xc3\xa9es : <strong>1</strong> / 4" in assigned.data
+    assert b".rt-board-table td{color:#10263a!important;background-color:#f8fbff}" in assigned.data
+    assert b".rt-board-cell-form input,.rt-board-cell-form select{color:#10263a!important;background:#fff!important" in assigned.data
+
