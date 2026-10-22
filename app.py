@@ -1590,7 +1590,7 @@ def import_residents():
    if confirmation_errors:
     c.execute("UPDATE import_previews SET errors_json=? WHERE id=?",(json.dumps(confirmation_errors,ensure_ascii=False),preview_id))
     c.commit(); c.close()
-    flash("The resident list changed after preview. Nothing was imported; upload the file again to review the current data.")
+    flash(L("La liste des résidents a changé après l’aperçu. Rien n’a été importé ; renvoyez le fichier pour vérifier les données actuelles.","The resident list changed after preview. Nothing was imported; upload the file again to review the current data.","تغيرت قائمة المقيمين بعد المعاينة. لم يتم استيراد أي شيء؛ ارفع الملف مجددًا لمراجعة البيانات الحالية."))
     return redirect("/import")
    inserted=0
    try:
@@ -1600,11 +1600,11 @@ def import_residents():
      inserted+=1
    except sqlite3.IntegrityError:
     c.rollback(); c.close()
-    flash("Import cancelled because the resident data changed during confirmation. Nothing was imported; upload a fresh preview.")
+    flash(L("Importation annulée car les données des résidents ont changé pendant la confirmation. Rien n’a été importé ; créez un nouvel aperçu.","Import cancelled because the resident data changed during confirmation. Nothing was imported; upload a fresh preview.","تم إلغاء الاستيراد لأن بيانات المقيمين تغيرت أثناء التأكيد. لم يتم استيراد أي شيء؛ أنشئ معاينة جديدة."))
     return redirect("/import")
    audit_event(c,"residents.imported",f"filename={preview['filename']}; imported={inserted}; history_not_imported=true")
    c.execute("DELETE FROM import_previews WHERE id=?",(preview_id,)); c.commit(); c.close()
-   flash(f"Imported {inserted} residents. No past rotations were invented or imported.")
+   flash(L(f"{inserted} résidents ont été importés. Aucun stage antérieur n’a été inventé ni importé.",f"Imported {inserted} residents. No past rotations were invented or imported.",f"تم استيراد {inserted} مقيمين. لم يتم اختلاق أو استيراد أي تربص سابق."))
    return redirect("/residents")
   upload=request.files.get("file")
   if not upload or not upload.filename:
@@ -1622,20 +1622,20 @@ def import_residents():
    for row in rows:
     row_errors=[]
     surname=row.get("surname","").strip(); firstname=row.get("firstname","").strip()
-    if not surname or not firstname: row_errors.append("Surname and first name are required.")
+    if not surname or not firstname: row_errors.append(L("Le nom et le prénom sont obligatoires.","Surname and first name are required.","اللقب والاسم إجباريان."))
     try:
      numeric_year=float(row.get("year",""))
      if not numeric_year.is_integer(): raise ValueError()
      year=int(numeric_year)
      if year not in (1,2,3,4): raise ValueError()
      row["year"]=year
-    except (ValueError,TypeError): row_errors.append("Year must be 1, 2, 3 or 4.")
+    except (ValueError,TypeError): row_errors.append(L("L’année doit être 1, 2, 3 ou 4.","Year must be 1, 2, 3 or 4.","يجب أن تكون السنة 1 أو 2 أو 3 أو 4."))
     row["surname"]=surname; row["firstname"]=firstname
     key=(surname.casefold(),firstname.casefold(),row.get("year"))
-    if key in seen: row_errors.append("Duplicate resident row in this file.")
+    if key in seen: row_errors.append(L("Cette ligne de résident est dupliquée dans le fichier.","Duplicate resident row in this file.","سطر المقيم هذا مكرر في الملف."))
     seen.add(key)
     exists=c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=?",(surname,firstname,row.get("year",0))).fetchone()
-    if exists: row_errors.append("Resident with same name and year already exists.")
+    if exists: row_errors.append(L("Un résident portant le même nom et la même année existe déjà.","Resident with same name and year already exists.","يوجد مقيم بالاسم والسنة نفسيهما."))
     if row_errors: errors.append({"row":row.get("row_number"),"message":" ".join(row_errors)})
    rows.sort(key=lambda row:(row.get("year",99),row.get("surname","").casefold(),row.get("firstname","").casefold()))
    c.execute("DELETE FROM import_previews WHERE created_at < datetime('now','-1 day')")
