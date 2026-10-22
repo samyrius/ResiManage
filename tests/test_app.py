@@ -832,7 +832,7 @@ def test_user_deactivation_is_audited_and_blocks_login(tmp_path, monkeypatch):
 def test_email_registration_requires_verification_code(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     sent = {}
-    monkeypatch.setattr(rotation_app, "send_verification_email", lambda recipient, code: sent.update(email=recipient, code=code))
+    monkeypatch.setattr(rotation_app, "send_verification_email", lambda recipient, code, lang="fr": sent.update(email=recipient, code=code, lang=lang))
     response = client.get("/register")
     assert response.status_code == 200
     assert b'type="email"' in response.data
@@ -2013,7 +2013,7 @@ def test_documented_history_import_requires_preview_and_rejects_future_dates(tmp
     )
     assert preview.status_code == 200
     assert b"HistoryImport Resident" in preview.data
-    assert b"Confirm import" in preview.data
+    assert "Confirmer l’importation".encode() in preview.data
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM history").fetchone()[0] == 0
     match = re.search(rb'name="preview_id" value="(\d+)"', preview.data)
@@ -2037,7 +2037,7 @@ def test_documented_history_import_requires_preview_and_rejects_future_dates(tmp
         follow_redirects=True,
     )
     assert future_preview.status_code == 200
-    assert b"A historical rotation date cannot be in the future" in future_preview.data
+    assert "Une date de stage historique ne peut pas être dans le futur".encode() in future_preview.data
     assert b"disabled" in future_preview.data
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM history h JOIN residents r ON r.id=h.resident_id WHERE r.surname='HistoryImport'").fetchone()[0] == 1
