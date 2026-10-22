@@ -3923,3 +3923,30 @@ def test_resident_by_year_template_prefills_selected_year(tmp_path, monkeypatch)
     assert book["Formulaire"]["C1"].value == "year"
     assert str(book["Formulaire"]["C2"].value) == "3"
     book.close()
+
+
+
+def test_inline_capacity_cannot_be_lower_than_active_assignments(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        year = conn.execute("SELECT value FROM settings WHERE key='year'").fetchone()[0]
+        period_id = conn.execute("SELECT id FROM periods WHERE year_label=? ORDER BY id LIMIT 1", (year,)).fetchone()[0]
+        terrain_id = conn.execute("SELECT id FROM terrains WHERE name='Réanimation chirurgicale'").fetchone()[0]
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,1,'active')",
+                     ("Capacity", "Resident"))
+        resident_id = conn.execute("SELECT id FROM residents WHERE surname='Capacity'").fetchone()[0]
+        conn.execute("INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",
+                     (resident_id, terrain_id, period_id))
+        conn.execute("INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,1)",
+                     (year, terrain_id, period_id))
+    response = client.post("/rotation-board", data={
+        "action": "capacity", "year": year, "terrain_id": str(terrain_id),
+        "period_id": str(period_id), "places": "0",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert "La capacité ne peut pas être inférieure aux affectations actives déjà enregistrées".encode() in response.data
+    with rotation_app.db() as conn:
+        capacity = conn.execute("SELECT places FROM capacities WHERE year_label=? AND terrain_id=? AND period_id=?",
+                                (year, terrain_id, period_id)).fetchone()
+        assert capacity["places"] == 1
