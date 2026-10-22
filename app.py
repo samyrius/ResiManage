@@ -2327,8 +2327,7 @@ def reject_external_overlap_with_local_assignment(c, resident_id, start, end):
         )
         if start <= local_end and end >= local_start:
             raise ValueError(
-                "External rotation overlaps an existing local assignment: "
-                + assignment["terrain"] + " / " + assignment["period"] + "."
+                L("Le stage à l’étranger chevauche une affectation locale existante : ","External rotation overlaps an existing local assignment: ","يتداخل التربص بالخارج مع تعيين محلي موجود: ") + assignment["terrain"] + " / " + assignment["period"] + "."
             )
 
 
