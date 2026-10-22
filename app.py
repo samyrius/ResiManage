@@ -1986,7 +1986,7 @@ def exams():
      audit_event(c,"exam.recorded",f"resident_id={rid}; postgraduate_year={postgrad_year}; study_year={sy}; module={module}; session={exam_type}; attempt={attempt}")
     c.commit(); flash(tr("done"))
   elif action=="evaluate_first_year" and request.form.get("all_modules_confirmed")!="yes":
-   flash(L("Confirmez que toutes نتائج مواد السنة الأولى أُدخلت قبل تقييم الترقية.","Confirm that all first-year module results have been entered before evaluating progression.","أكد إدخال نتائج جميع مواد السنة الأولى قبل تقييم الترقية."))
+   flash(L("Confirmez que les résultats de tous les modules de première année ont été saisis avant d’évaluer la promotion.","Confirm that all first-year module results have been entered before evaluating progression.","أكد إدخال نتائج جميع مواد السنة الأولى قبل تقييم الترقية."))
   elif action=="evaluate_first_year":
    if session.get("role")!="super_admin": c.close(); return ("Forbidden — Super Admin only",403)
    if resident["year"]!=1:
