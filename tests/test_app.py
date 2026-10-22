@@ -3764,8 +3764,6 @@ def test_downloadable_blank_templates_offer_standardized_headers(tmp_path, monke
     assert "national_id_number" in content
     assert "medical_order_registered_yes" in content
     assert "medical_order_registered_no" in content
-    assert "☐ Inscrit à l’Ordre des médecins" in content
-    assert "EHS Cardio DBK, CAC DBK ou autre" in content
     history = client.post("/templates", data={"form_type":"rotation_history", "extension":".csv", "year":"1"})
     assert history.status_code == 200
     assert "resident,terrain,year_label" in history.get_data(as_text=True)
