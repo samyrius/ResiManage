@@ -3736,3 +3736,28 @@ def test_downloadable_blank_templates_offer_standardized_headers(tmp_path, monke
     history = client.post("/templates", data={"form_type":"rotation_history", "extension":".csv", "year":"1"})
     assert history.status_code == 200
     assert "resident,terrain,year_label" in history.get_data(as_text=True)
+
+
+def test_deleted_exam_result_stays_in_trash_and_can_be_restored(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
+                     ("Trash", "Exam", 1, "active"))
+        resident_id = conn.execute("SELECT id FROM residents WHERE surname='Trash' AND firstname='Exam'").fetchone()[0]
+        conn.execute("INSERT INTO exam_records(resident_id,study_year,module,theory,practical) VALUES(?,?,?,?,?)",
+                     (resident_id, 1, "Test module", 12, 13))
+        exam_id = conn.execute("SELECT id FROM exam_records WHERE resident_id=? AND module='Test module'", (resident_id,)).fetchone()[0]
+    response = client.post("/exams", data={"action":"delete_record","exam_id":str(exam_id)}, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT 1 FROM exam_records WHERE id=?", (exam_id,)).fetchone() is None
+        trash = conn.execute("SELECT id,entity_type FROM trash_items WHERE entity_type='exam_record' AND entity_id=?", (str(exam_id),)).fetchone()
+        assert trash is not None
+        trash_id = trash["id"]
+    restored = client.post("/trash", data={"action":"restore","trash_id":str(trash_id)}, follow_redirects=True)
+    assert restored.status_code == 200
+    with rotation_app.db() as conn:
+        record = conn.execute("SELECT module,theory,practical FROM exam_records WHERE id=?", (exam_id,)).fetchone()
+        assert record is not None
+        assert tuple(record) == ("Test module", 12.0, 13.0)
