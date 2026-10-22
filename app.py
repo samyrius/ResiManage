@@ -955,7 +955,7 @@ def history():
    if date_done:
     parsed_date=date.fromisoformat(date_done)
     if parsed_date>date.today():
-     raise ValueError("A historical rotation date cannot be in the future.")
+     raise ValueError(L("Une date de stage historique ne peut pas être dans le futur.","A historical rotation date cannot be in the future.","لا يمكن أن يكون تاريخ التربص السابق في المستقبل."))
    if not c.execute("SELECT 1 FROM residents WHERE id=?",(rid,)).fetchone():
     raise ValueError("Resident does not exist.")
    if not c.execute("SELECT 1 FROM terrains WHERE id=?",(tid,)).fetchone():
@@ -1608,11 +1608,11 @@ def import_residents():
    return redirect("/residents")
   upload=request.files.get("file")
   if not upload or not upload.filename:
-   c.close(); flash("Choose a file first."); return redirect("/import")
+   c.close(); flash(L("Choisissez d’abord un fichier.","Choose a file first.","اختر ملفًا أولًا.")); return redirect("/import")
   filename=os.path.basename(upload.filename); extension=os.path.splitext(filename)[1].lower()
   allowed={".csv",".xlsx",".xls",".docx",".doc",".pdf"}
   if extension not in allowed:
-   c.close(); flash("Supported formats: CSV, XLS/XLSX, DOC/DOCX and text-based PDF."); return redirect("/import")
+   c.close(); flash(L("Formats acceptés : CSV, XLS/XLSX, DOC/DOCX et PDF contenant du texte.","Supported formats: CSV, XLS/XLSX, DOC/DOCX and text-based PDF.","الصيغ المدعومة: CSV وXLS/XLSX وDOC/DOCX وPDF النصي.")); return redirect("/import")
   staged=None
   try:
    with tempfile.NamedTemporaryFile(prefix="rotation_import_",suffix=extension,dir=os.path.dirname(os.path.abspath(DB)),delete=False) as temp:
@@ -1644,7 +1644,7 @@ def import_residents():
    preview=c.execute("SELECT * FROM import_previews WHERE id=?",(preview_id,)).fetchone(); c.close()
    return page("""<section><h3>{{t('import')}} — {{t('preview')}}</h3><p>{{L('Fichier :','File:','الملف:')}} {{filename}} — {{rows|length}} {{L('lignes. Aucun stage passé ne sera inventé.','rows. Past stages/history will not be fabricated.','صفوف. لن يتم اختلاق أي تربص سابق.')}}</p>{% if errors %}<p class="bad">{{L('Erreurs de validation :','Validation errors:','أخطاء التحقق:')}} {{errors|length}}. {{L('Corrigez le fichier source puis importez-le à nouveau ; aucune ligne ne sera importée tant que des erreurs subsistent.','Correct the source file and upload again; no rows can be imported while errors remain.','صحح الملف المصدر وأعد رفعه؛ لا يمكن استيراد أي صف ما دامت الأخطاء موجودة.')}}</p>{% endif %}<div class="wrap"><table><tr><th>{{L('Ligne','Row','السطر')}}</th><th>{{L('Nom','Surname','اللقب')}}</th><th>{{L('Prénom','First name','الاسم')}}</th><th>{{L('Année','Year','السنة')}}</th><th>{{L('Téléphone','Phone','الهاتف')}}</th><th>{{L('Validation','Validation','التحقق')}}</th></tr>{% for row in rows %}<tr><td>{{row.row_number}}</td><td>{{row.surname}}</td><td>{{row.firstname}}</td><td>{{row.year}}</td><td>{{row.phone or ''}}</td><td>{% for e in errors if e.row==row.row_number %}<span class="bad">{{e.message}}</span>{% else %}<span class="good">{{L('Valide','Valid','صالح')}}</span>{% endfor %}</td></tr>{% endfor %}</table></div><form method="post"><input type="hidden" name="preview_id" value="{{preview_id}}"><button name="action" value="confirm" {% if errors %}disabled{% endif %}>{{t('confirm_import')}}</button> <button name="action" value="cancel">{{t('cancel')}}</button></form></section>""",filename=filename,rows=rows,errors=errors,preview_id=preview_id)
   except Exception as exc:
-   c.close(); flash("Could not read/validate the file: "+str(exc)[:250]); return redirect("/import")
+   c.close(); app.logger.warning("Resident import validation failed: %s",exc); flash(L("Impossible de lire ou valider le fichier. Vérifiez le format et les colonnes.","Could not read or validate the file. Check the format and columns.","تعذرت قراءة الملف أو التحقق منه. تحقق من الصيغة والأعمدة.")); return redirect("/import")
   finally:
    if staged and os.path.exists(staged): os.remove(staged)
  c.close()
@@ -1677,14 +1677,14 @@ def import_history():
     if len(matches)!=1: validation.append({"row":row.get("row_number"),"message":"Resident no longer matches exactly one existing resident."}); continue
     if len(terrains)!=1: validation.append({"row":row.get("row_number"),"message":"Terrain no longer matches exactly one existing terrain."}); continue
     try:
-     if not re.fullmatch(r"\d{4}-\d{4}",year_label) or int(year_label.split("-")[1])!=int(year_label.split("-")[0])+1: raise ValueError("Academic year must use YYYY-YYYY with consecutive years.")
+     if not re.fullmatch(r"\d{4}-\d{4}",year_label) or int(year_label.split("-")[1])!=int(year_label.split("-")[0])+1: raise ValueError(L("L’année de post-graduation doit suivre le format AAAA-AAAA avec deux années consécutives.","Postgraduate year must use YYYY-YYYY with consecutive years.","يجب أن تكون سنة ما بعد التدرج بالتنسيق YYYY-YYYY مع سنتين متتاليتين."))
      period=str(row.get("period","")).strip()
      valid_periods={"01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"}
-     if period and period not in valid_periods: raise ValueError("Choose one of the four official periods or leave period blank.")
+     if period and period not in valid_periods: raise ValueError(L("Choisissez l’une des quatre périodes ou laissez ce champ vide.","Choose one of the four official periods or leave period blank.","اختر إحدى الفترات الأربع أو اترك الحقل فارغًا."))
      date_done=str(row.get("date_done","")).strip()
      if date_done:
       parsed=date.fromisoformat(date_done)
-      if parsed>date.today(): raise ValueError("A historical rotation date cannot be in the future.")
+      if parsed>date.today(): raise ValueError(L("Une date de stage historique ne peut pas être dans le futur.","A historical rotation date cannot be in the future.","لا يمكن أن يكون تاريخ التربص السابق في المستقبل."))
     except ValueError as exc:
      validation.append({"row":row.get("row_number"),"message":str(exc)}); continue
     rid=matches[0]["id"]; tid=terrains[0]["id"]
@@ -1695,7 +1695,7 @@ def import_history():
     seen.add(key)
    if validation:
     c.execute("UPDATE import_previews SET errors_json=? WHERE id=?",(json.dumps(validation,ensure_ascii=False),preview_id)); c.commit(); c.close()
-    flash("History changed after preview. Nothing was imported; upload the file again.")
+    flash(L("L’historique a changé après l’aperçu. Rien n’a été importé ; veuillez renvoyer le fichier.","History changed after preview. Nothing was imported; upload the file again.","تغير السجل بعد المعاينة. لم يتم استيراد أي شيء؛ يرجى رفع الملف مجددًا."))
     return redirect("/import-history")
    inserted=0
    try:
@@ -1706,17 +1706,17 @@ def import_history():
      c.execute("INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",(match["id"],terrain["id"],row["year_label"],row.get("period",""),row.get("date_done","")))
      inserted+=1
    except sqlite3.IntegrityError:
-    c.rollback(); c.close(); flash("Import cancelled because history changed during confirmation. Nothing was imported; upload a fresh preview."); return redirect("/import-history")
+    c.rollback(); c.close(); flash(L("Importation annulée car l’historique a changé pendant la confirmation. Rien n’a été importé ; créez un nouvel aperçu.","Import cancelled because history changed during confirmation. Nothing was imported; upload a fresh preview.","تم إلغاء الاستيراد لأن السجل تغير أثناء التأكيد. لم يتم استيراد أي شيء؛ أنشئ معاينة جديدة.")); return redirect("/import-history")
    audit_event(c,"history.imported",f"filename={preview['filename']}; imported={inserted}; documented_rows_only=true")
    c.execute("DELETE FROM import_previews WHERE id=?",(preview_id,)); c.commit(); c.close()
-   flash(f"Imported {inserted} documented past-stage records. No history was invented.")
+   flash(L(f"{inserted} stages antérieurs documentés ont été importés. Aucun historique n’a été inventé.",f"Imported {inserted} documented past-stage records. No history was invented.",f"تم استيراد {inserted} من سجلات التربصات السابقة الموثقة. لم يتم اختلاق أي سجل."))
    return redirect("/history")
   upload=request.files.get("file")
   if not upload or not upload.filename:
-   c.close(); flash("Choose a file first."); return redirect("/import-history")
+   c.close(); flash(L("Choisissez d’abord un fichier.","Choose a file first.","اختر ملفًا أولًا.")); return redirect("/import-history")
   filename=os.path.basename(upload.filename); extension=os.path.splitext(filename)[1].lower()
   if extension not in {".csv",".xlsx",".xls",".docx",".doc",".pdf"}:
-   c.close(); flash("Supported formats: CSV, XLS/XLSX, DOC/DOCX and text-based PDF."); return redirect("/import-history")
+   c.close(); flash(L("Formats acceptés : CSV, XLS/XLSX, DOC/DOCX et PDF contenant du texte.","Supported formats: CSV, XLS/XLSX, DOC/DOCX and text-based PDF.","الصيغ المدعومة: CSV وXLS/XLSX وDOC/DOCX وPDF النصي.")); return redirect("/import-history")
   staged=None
   try:
    with tempfile.NamedTemporaryFile(prefix="rotation_history_import_",suffix=extension,dir=os.path.dirname(os.path.abspath(DB)),delete=False) as temp:
@@ -1729,36 +1729,36 @@ def import_history():
     row_errors=[]
     resident_name=str(row.get("resident","")).strip(); terrain_name=str(row.get("terrain","")).strip(); year_label=str(row.get("year_label","")).strip()
     row["resident"]=resident_name; row["terrain"]=terrain_name; row["year_label"]=year_label
-    if not resident_name: row_errors.append("Resident name is required.")
-    if not terrain_name: row_errors.append("Terrain name is required.")
+    if not resident_name: row_errors.append(L("Le nom du résident est obligatoire.","Resident name is required.","اسم المقيم إجباري."))
+    if not terrain_name: row_errors.append(L("Le nom du service de stage est obligatoire.","Rotation department name is required.","اسم مصلحة التربص إجباري."))
     if not re.fullmatch(r"\d{4}-\d{4}",year_label) or int(year_label.split("-")[1])!=int(year_label.split("-")[0])+1:
-     row_errors.append("Academic year must use YYYY-YYYY with consecutive years.")
+     row_errors.append(L("L’année de post-graduation doit suivre le format AAAA-AAAA avec deux années consécutives.","Postgraduate year must use YYYY-YYYY with consecutive years.","يجب أن تكون سنة ما بعد التدرج بالتنسيق YYYY-YYYY مع سنتين متتاليتين."))
     resident_matches=[r for r in residents_pool if resident_name.casefold() in {(r["surname"]+" "+r["firstname"]).casefold().strip(),(r["firstname"]+" "+r["surname"]).casefold().strip(),(r["surname"]+", "+r["firstname"]).casefold().strip()}]
     terrain_matches=[t for t in terrain_pool if t["name"].casefold().strip()==terrain_name.casefold().strip()]
-    if len(resident_matches)!=1: row_errors.append("Resident must match exactly one existing resident; use 'Surname Firstname'.")
+    if len(resident_matches)!=1: row_errors.append(L("Le résident doit correspondre exactement à un dossier existant ; utilisez « Nom Prénom ».","Resident must match exactly one existing resident; use 'Surname Firstname'.","يجب أن يطابق المقيم ملفًا موجودًا واحدًا بالضبط؛ استعمل «اللقب الاسم»."))
     else: row["resident_id"]=resident_matches[0]["id"]
-    if len(terrain_matches)!=1: row_errors.append("Terrain must match exactly one existing terrain.")
+    if len(terrain_matches)!=1: row_errors.append(L("Le service de stage doit correspondre exactement à un service existant.","Rotation department must match exactly one existing department.","يجب أن تطابق مصلحة التربص مصلحة موجودة واحدة بالضبط."))
     else: row["terrain_id"]=terrain_matches[0]["id"]
     period=str(row.get("period","")).strip(); date_done=str(row.get("date_done","")).strip()
-    if period and period not in valid_periods: row_errors.append("Choose one of the four official periods or leave period blank.")
+    if period and period not in valid_periods: row_errors.append(L("Choisissez l’une des quatre périodes ou laissez ce champ vide.","Choose one of the four official periods or leave period blank.","اختر إحدى الفترات الأربع أو اترك الحقل فارغًا."))
     if date_done:
      try:
       parsed=date.fromisoformat(date_done)
-      if parsed>date.today(): row_errors.append("A historical rotation date cannot be in the future.")
-     except ValueError: row_errors.append("Date must be a real calendar date in YYYY-MM-DD format.")
+      if parsed>date.today(): row_errors.append(L("Une date de stage historique ne peut pas être dans le futur.","A historical rotation date cannot be in the future.","لا يمكن أن يكون تاريخ التربص السابق في المستقبل."))
+     except ValueError: row_errors.append(L("La date doit être une date réelle au format AAAA-MM-JJ.","Date must be a real calendar date in YYYY-MM-DD format.","يجب أن يكون التاريخ صحيحًا بالتنسيق YYYY-MM-DD."))
     row["period"]=period; row["date_done"]=date_done
     key=(row.get("resident_id"),row.get("terrain_id"),year_label,period,date_done)
-    if key in seen: row_errors.append("Duplicate history row in this file.")
+    if key in seen: row_errors.append(L("Cette ligne d’historique est présente plusieurs fois dans le fichier.","Duplicate history row in this file.","هذا السطر من السجل مكرر في الملف."))
     seen.add(key)
     if row.get("resident_id") and row.get("terrain_id") and c.execute("SELECT 1 FROM history WHERE resident_id=? AND terrain_id=? AND year_label=? AND COALESCE(period,'')=? AND COALESCE(date_done,'')=?",(row["resident_id"],row["terrain_id"],year_label,period,date_done)).fetchone():
-     row_errors.append("This exact history record already exists.")
+     row_errors.append(L("Cet enregistrement historique existe déjà.","This exact history record already exists.","سجل التاريخ هذا موجود مسبقًا."))
     if row_errors: errors.append({"row":row.get("row_number"),"message":" ".join(row_errors)})
    rows.sort(key=lambda row:(row.get("year_label",""),row.get("resident","").casefold(),row.get("terrain","").casefold()))
    c.execute("INSERT INTO import_previews(owner,rows_json,errors_json,filename,import_type) VALUES(?,?,?,?,?)",(session["user"],json.dumps(rows,ensure_ascii=False),json.dumps(errors,ensure_ascii=False),filename,"history"))
    preview_id=c.execute("SELECT last_insert_rowid()").fetchone()[0]; c.commit(); c.close()
    return page("""<section><h3>{{L('Importer l’historique des stages documentés','Import documented stage history','استيراد سجل التربصات السابقة الموثق')}}</h3><p>{{L('Fichier :','File:','الملف:')}} {{filename}} — {{rows|length}} {{L('lignes. Seuls les stages explicitement documentés sont importés ; aucun stage n’est déduit.','rows. Only explicitly documented stages are imported; no stages are inferred.','صفوف. يتم استيراد التربصات الموثقة صراحة فقط؛ ولا يتم استنتاج أي تربص.')}}</p>{% if errors %}<p class="bad">{{L('Erreurs de validation :','Validation errors:','أخطاء التحقق:')}} {{errors|length}}. {{L('Aucune donnée ne peut être importée avant de corriger le fichier source.','Nothing can be imported until the source is corrected.','لا يمكن استيراد أي بيانات قبل تصحيح الملف المصدر.')}}</p>{% endif %}<div class="wrap"><table><tr><th>{{L('Ligne','Row','السطر')}}</th><th>{{L('Résident','Resident','المقيم')}}</th><th>{{L('Service de stage','Terrain','مصلحة التربص')}}</th><th>{{L('Année de post-graduation','Postgraduate year','سنة ما بعد التدرج')}}</th><th>{{L('Période','Period','الفترة')}}</th><th>{{L('Date de fin','Completion date','تاريخ الإتمام')}}</th><th>{{L('Validation','Validation','التحقق')}}</th></tr>{% for row in rows %}<tr><td>{{row.row_number}}</td><td>{{row.resident}}</td><td>{{row.terrain}}</td><td>{{row.year_label}}</td><td>{{row.period}}</td><td>{{row.date_done}}</td><td>{% for e in errors if e.row==row.row_number %}<span class="bad">{{e.message}}</span>{% else %}<span class="good">{{L('Valide','Valid','صالح')}}</span>{% endfor %}</td></tr>{% endfor %}</table></div><form method="post"><input type="hidden" name="preview_id" value="{{preview_id}}"><button name="action" value="confirm" {% if errors %}disabled{% endif %}>{{L('Confirmer l’importation','Confirm import','تأكيد الاستيراد')}}</button> <button name="action" value="cancel">{{L('Annuler','Cancel','إلغاء')}}</button></form></section>""",filename=filename,rows=rows,errors=errors,preview_id=preview_id)
   except Exception as exc:
-   c.close(); flash("Could not read/validate history file: "+str(exc)[:220]); return redirect("/import-history")
+   c.close(); app.logger.warning("History import validation failed: %s",exc); flash(L("Impossible de lire ou valider le fichier d’historique. Vérifiez le format et les colonnes.","Could not read or validate the history file. Check the format and columns.","تعذرت قراءة ملف السجل أو التحقق منه. تحقق من الصيغة والأعمدة.")); return redirect("/import-history")
   finally:
    if staged and os.path.exists(staged): os.remove(staged)
  c.close()
