@@ -605,9 +605,20 @@ def residents():
   elif action=="delete":
    rid=int(request.form.get("rid","0")); reason=request.form.get("delete_reason","").strip(); target=c.execute("SELECT surname,firstname,status FROM residents WHERE id=?",(rid,)).fetchone()
    if not target or not reason: flash(L("Dossier introuvable ou motif de suppression manquant.","Record not found or deletion reason missing.","الملف غير موجود أو سبب الحذف مفقود."))
-   elif any(c.execute("SELECT 1 FROM "+table+" WHERE resident_id=? LIMIT 1",(rid,)).fetchone() for table in ("assignments","history","exam_records","objectives","leave_years","leave_entries","external_rotations","promotion_votes","dems_votes")): flash(L("Ce dossier possède un historique lié. Pour préserver les données, archivez-le au lieu de le supprimer.","This record has linked history. Archive it instead to preserve data.","هذا الملف مرتبط بسجل سابق. حفاظًا على البيانات، أرشفه بدل حذفه."))
+   elif target["status"]=="graduated": flash(L("Un diplômé archivé par le processus DEMS ne peut pas être supprimé depuis cet écran.","A DEMS graduate cannot be deleted from this screen.","لا يمكن حذف خريج مؤرشف عبر مسار DEMS من هذه الشاشة."))
    else:
-    c.execute("DELETE FROM residents WHERE id=?",(rid,)); audit_event(c,"resident.deleted",f"resident_id={rid}; name={target['surname']} {target['firstname']}; reason={reason}"); c.commit(); flash(L("Dossier supprimé et opération consignée dans le journal.","Record deleted and action logged.","تم حذف الملف وتسجيل العملية في سجل التدقيق."))
+    audit_event(c,"resident.deleted",f"resident_id={rid}; name={target['surname']} {target['firstname']}; reason={reason}; linked_history_removed=1")
+    for table in ("assignments","history","exam_records","leave_years","leave_entries","external_rotations","promotion_votes","dems_votes","dems_archive"):
+     columns={row[1] for row in c.execute("PRAGMA table_info("+table+")")}
+     if "resident_id" in columns: c.execute("DELETE FROM "+table+" WHERE resident_id=?",(rid,))
+    photo=c.execute("SELECT photo_path FROM residents WHERE id=?",(rid,)).fetchone()
+    c.execute("DELETE FROM residents WHERE id=?",(rid,)); c.commit()
+    if photo and photo["photo_path"]:
+     try:
+      photo_path=os.path.join(BASE,photo["photo_path"])
+      if os.path.isfile(photo_path) and os.path.commonpath([BASE,os.path.abspath(photo_path)])==BASE: os.remove(photo_path)
+     except (OSError,ValueError): pass
+    flash(L("Dossier et données associées supprimés ; opération consignée dans le journal.","Record and linked data deleted; action logged.","تم حذف الملف والبيانات المرتبطة به وتسجيل العملية في سجل التدقيق."))
   elif action=="edit":
    try:
     rid=int(request.form["rid"])
