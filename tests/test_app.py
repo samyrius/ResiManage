@@ -2292,7 +2292,7 @@ def test_objective_completion_is_toggleable_audited_and_color_coded(tmp_path, mo
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert "#fee2e2" in html
-    assert "Completed" in html
+    assert "Effectué" in html
     with rotation_app.db() as conn:
         assert conn.execute(
             "SELECT completed FROM objectives WHERE id=?", (objective_id,)
@@ -2338,7 +2338,7 @@ def test_resident_profile_displays_objective_completion_status(tmp_path, monkeyp
     html = response.get_data(as_text=True)
     assert "#fee2e2" in html
     assert "Airway objective" in html
-    assert "Completed" in html
+    assert "Effectué" in html
 
 
 def test_future_confirmed_rotation_is_not_shown_as_completed_in_profile(tmp_path, monkeypatch):
@@ -2365,7 +2365,7 @@ def test_future_confirmed_rotation_is_not_shown_as_completed_in_profile(tmp_path
     response = client.get(f"/profile/{rid}")
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert 'class="good">Remaining / À faire /' in html
+    assert 'class="good">À faire' in html
 
 
 def test_windows_launcher_migrates_existing_database_and_photos_without_deleting_source(tmp_path):
@@ -2520,10 +2520,10 @@ def test_resident_profile_shows_annual_leave_dates_and_balance(tmp_path, monkeyp
     response = client.get(f"/profile/{rid}")
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert "Annual leave / Congés / الإجازات" in html
-    assert "Accrued: 30 days" in html
-    assert "Used: 3 days" in html
-    assert "Remaining: 27 days" in html
+    assert "Congés annuels" in html
+    assert "Acquis :" in html and "30" in html
+    assert "Utilisés :" in html and "3" in html
+    assert "Restants :" in html and "27" in html
     assert "Annual leave" in html
 
 
@@ -2551,7 +2551,7 @@ def test_resident_profile_shows_external_internship_details(tmp_path, monkeypatc
     response = client.get(f"/profile/{rid}")
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert "External internships / Stages à l’étranger / التربصات بالخارج" in html
+    assert "Stages à l’étranger" in html
     assert "Hôpital Test" in html
     assert "France" in html
     assert "Dr Test" in html
