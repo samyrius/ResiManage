@@ -1,9 +1,11 @@
 name: Android APK + emulator smoke tests
 
-# Paused by user request until all ResiManage 2 directives are implemented.
+# APK and emulator validation on the active ResiManage 2 branch; manual dispatch remains available.
 on:
-  # APK/emulator builds must be explicitly requested by the user.
   workflow_dispatch:
+  push:
+    branches:
+      - resimanage-2-work
 
 permissions:
   contents: read
