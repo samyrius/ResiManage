@@ -3750,6 +3750,24 @@ def test_downloadable_blank_templates_offer_standardized_headers(tmp_path, monke
     assert "resident,terrain,year_label" in history.get_data(as_text=True)
 
 
+def test_expired_trash_is_purged_on_normal_app_request(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    expired = (datetime.now() - timedelta(days=220)).replace(microsecond=0).isoformat()
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO trash_items(entity_type,entity_id,label,reason,snapshot_json,deleted_at,deleted_by) VALUES(?,?,?,?,?,?,?)",
+            ("resident", "99999", "Expired test record", "test retention", json.dumps({"resident": {}}), expired, "admin"),
+        )
+        trash_id = conn.execute("SELECT id FROM trash_items WHERE label='Expired test record'").fetchone()[0]
+    rotation_app.app._trash_cleanup_date = ""
+    response = client.get("/")
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT 1 FROM trash_items WHERE id=?", (trash_id,)).fetchone() is None
+        assert conn.execute("SELECT 1 FROM audit WHERE action='trash.expired' AND details LIKE ?", (f"%trash_id={trash_id}%",)).fetchone() is not None
+
+
 def test_deleted_exam_result_stays_in_trash_and_can_be_restored(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
