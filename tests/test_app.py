@@ -2330,7 +2330,7 @@ def test_future_confirmed_rotation_is_not_shown_as_completed_in_profile(tmp_path
             "SELECT id FROM terrains WHERE name='Réanimation chirurgicale'"
         ).fetchone()[0]
         period = conn.execute(
-            "SELECT id,year_label,name FROM periods WHERE name='01 Nov - 30 Jan' ORDER BY year_label DESC LIMIT 1"
+            "SELECT id,year_label,name FROM periods WHERE name='Période 4' ORDER BY year_label DESC LIMIT 1"
         ).fetchone()
         conn.execute(
             "INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",
