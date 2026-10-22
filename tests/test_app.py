@@ -2968,7 +2968,7 @@ def test_external_internship_request_requires_admin_approval_before_blocking_ass
         with rotation_app.app.test_request_context("/"):
             allowed, message, _ = rotation_app.check(conn, rid, tid, period["id"], period["year_label"])
         assert allowed is False
-        assert "External rotation blocks local assignment" in message
+        assert "Un stage à l’étranger approuvé bloque l’affectation locale" in message
         assert conn.execute(
             "SELECT COUNT(*) FROM audit WHERE action='external_rotation.request_approved'"
         ).fetchone()[0] == 1
