@@ -1747,14 +1747,18 @@ def blank_templates():
   try:
    if extension==".csv":
     text_output=io.StringIO(newline="")
-    writer=csv.writer(text_output); writer.writerow(headers); writer.writerow([""]*len(headers))
+    writer=csv.writer(text_output); writer.writerow(headers); blank_row=[""]*len(headers)
+    if form_type=="residents_by_year": blank_row[headers.index("year")]=year
+    writer.writerow(blank_row)
     output.write(("\\ufeff"+text_output.getvalue()).encode("utf-8")); output.seek(0)
     mimetype="text/csv"
    elif extension==".xlsx":
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
     wb=Workbook(); ws=wb.active; ws.title="Formulaire"
-    ws.append(headers); ws.append([""]*len(headers))
+    ws.append(headers); blank_row=[""]*len(headers)
+    if form_type=="residents_by_year": blank_row[headers.index("year")]=year
+    ws.append(blank_row)
     for cell in ws[1]:
      cell.font=Font(bold=True,color="FFFFFF"); cell.fill=PatternFill("solid",fgColor="174B68"); cell.alignment=Alignment(wrap_text=True)
     ws.freeze_panes="A2"; ws.auto_filter.ref=ws.dimensions
@@ -1795,7 +1799,7 @@ def blank_templates():
     for i,label in enumerate(labels): table.rows[0].cells[i].text=label
     for _ in range(8):
      cells=table.add_row().cells
-     for cell in cells: cell.text=" "
+     for i,cell in enumerate(cells): cell.text=(year if form_type=="residents_by_year" and headers[i]=="year" else " ")
     doc.add_paragraph("Ordre des médecins : ☐ Inscrit ☐ Non inscrit. À l’importation, inscrire « oui » ou « non » dans la colonne correspondante ; si inscrit, renseigner le numéro. Ne pas inventer les stages antérieurs : utiliser uniquement des données documentées.")
     doc.save(output); output.seek(0); mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
    else:
@@ -1807,7 +1811,9 @@ def blank_templates():
     from xml.sax.saxutils import escape
     doc=SimpleDocTemplate(output,pagesize=landscape(A4),rightMargin=10*mm,leftMargin=10*mm,topMargin=10*mm,bottomMargin=10*mm)
     styles=getSampleStyleSheet(); title=Paragraph("ResiManage — Formulaire vierge",styles["Title"])
-    data=[[Paragraph(escape(label),styles["BodyText"]) for label in labels]]+[[ "" for _ in labels] for _ in range(8)]
+    data=[[Paragraph(escape(label),styles["BodyText"]) for label in labels]]
+    for _ in range(8):
+     data.append([escape(year) if form_type=="residents_by_year" and headers[i]=="year" else "" for i in range(len(headers))])
     table=Table(data,repeatRows=1)
     table.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.HexColor("#174B68")),("TEXTCOLOR",(0,0),(-1,0),colors.white),("GRID",(0,0),(-1,-1),0.4,colors.grey),("VALIGN",(0,0),(-1,-1),"TOP"),("ROWHEIGHT",(0,1),(-1,-1),22)]))
     doc.build([title,Spacer(1,5*mm),table]); output.seek(0); mimetype="application/pdf"
