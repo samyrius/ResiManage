@@ -1614,7 +1614,7 @@ def normalize_header(value):
   "year":"year","study year":"year","study_year":"year","année":"year","annee":"year","niveau":"year","السنة":"year",
   "phone":"phone","phone 1":"phone","telephone":"phone","téléphone":"phone","mobile":"phone","الهاتف":"phone","phone 2":"phone2","telephone 2":"phone2","téléphone 2":"phone2",
   "birth place":"birth_place","lieu de naissance":"birth_place","مكان الميلاد":"birth_place",
-  "birth date":"birth_date","date de naissance":"birth_date","تاريخ الميلاد":"birth_date","postal address":"address","adresse postale":"address","email address":"email","adresse e mail":"email","email":"email","resident card number":"resident_card_number","numéro de carte de résident":"resident_card_number","nin":"national_id_number","national id number":"national_id_number","medical order registered":"medical_order_registered","medical order number":"medical_order_number","social security number":"social_security_number","registration date":"registration_date","date de première inscription":"registration_date","resident type":"resident_type","catégorie":"resident_type","origin hospital":"origin_hospital","external start date":"external_start_date","external end date":"external_end_date","additional info":"additional_info",
+  "birth date":"birth_date","date de naissance":"birth_date","تاريخ الميلاد":"birth_date","postal address":"address","adresse postale":"address","email address":"email","adresse e mail":"email","email":"email","resident card number":"resident_card_number","numéro de carte de résident":"resident_card_number","nin":"national_id_number","national id number":"national_id_number","medical order registered":"medical_order_registered","medical order registered yes":"medical_order_registered_yes","registered at medical order":"medical_order_registered_yes","inscrit ordre des médecins":"medical_order_registered_yes","inscrit à l ordre des médecins":"medical_order_registered_yes","medical order registered no":"medical_order_registered_no","not registered at medical order":"medical_order_registered_no","non inscrit ordre des médecins":"medical_order_registered_no","non inscrit à l ordre des médecins":"medical_order_registered_no","medical order number":"medical_order_number","social security number":"social_security_number","registration date":"registration_date","date de première inscription":"registration_date","resident type":"resident_type","catégorie":"resident_type","origin hospital":"origin_hospital","external start date":"external_start_date","external end date":"external_end_date","additional info":"additional_info",
   "resident":"resident","resident name":"resident","resident full name":"resident","nom du résident":"resident","nom resident":"resident","المقيم":"resident",
   "terrain":"terrain","service":"terrain","stage":"terrain","rotation":"terrain","service de stage":"terrain","المصلحة":"terrain","التربص":"terrain",
   "academic year":"year_label","year label":"year_label","academic year label":"year_label","année de post-graduation":"year_label","annee universitaire":"year_label","سنة ما بعد التدرج":"year_label",
@@ -1683,6 +1683,14 @@ def parse_import_file(path, extension, import_type='residents'):
   item={}
   for i,key in enumerate(header):
    if key and i<len(values): item[key]=str(values[i] if values[i] is not None else "").strip()
+  yes_value=str(item.pop("medical_order_registered_yes","") or "").strip().lower()
+  no_value=str(item.pop("medical_order_registered_no","") or "").strip().lower()
+  checked_yes=yes_value in ("1","x","yes","oui","true","✓","☑")
+  checked_no=no_value in ("1","x","yes","oui","true","✓","☑")
+  if checked_yes and checked_no:
+   raise ValueError("Choose only one medical-order registration checkbox (registered or not registered).")
+  if checked_yes: item["medical_order_registered"]="yes"
+  elif checked_no: item["medical_order_registered"]="no"
   item["row_number"]=line_number
   parsed.append(item)
  if not parsed: raise ValueError("The file contains headers but no resident rows.")
@@ -1699,8 +1707,8 @@ def blank_templates():
   if extension not in (".csv",".xlsx",".docx",".pdf"):
    flash(L("Choisissez CSV, Excel (.xlsx), Word (.docx) ou PDF.","Choose CSV, Excel (.xlsx), Word (.docx), or PDF.","اختر CSV أو Excel (.xlsx) أو Word (.docx) أو PDF.")); return redirect("/templates")
   if form_type=="residents_full" or form_type=="residents_by_year":
-   headers=["surname","firstname","birth_date","birth_place","address","email","phone","phone2","resident_card_number","national_id_number","medical_order_registered","medical_order_number","social_security_number","registration_date","year","resident_type","origin_hospital","external_start_date","external_end_date","additional_info"]
-   labels=["Nom","Prénom","Date de naissance (AAAA-MM-JJ)","Lieu de naissance","Adresse postale","Adresse e-mail","Téléphone 1","Téléphone 2","Numéro de carte de résident","NIN / numéro d’identification nationale","Inscrit à l’Ordre des médecins (oui/non)","Numéro de l’Ordre des médecins","Numéro de sécurité sociale","Date de première inscription","Année de post-graduation (1-4)","Catégorie (local/external)","Établissement d’origine (si externe)","Début du stage au CHU","Fin du stage au CHU","Autres informations utiles"]
+   headers=["surname","firstname","birth_date","birth_place","address","email","phone","phone2","resident_card_number","national_id_number","medical_order_registered_yes","medical_order_registered_no","medical_order_number","social_security_number","registration_date","year","resident_type","origin_hospital","external_start_date","external_end_date","additional_info"]
+   labels=["Nom","Prénom","Date de naissance (AAAA-MM-JJ)","Lieu de naissance","Adresse postale","Adresse e-mail","Téléphone 1","Téléphone 2","Numéro de carte de résident","NIN / numéro d’identification nationale","☐ Inscrit à l’Ordre des médecins (cocher 1 ou X)","☐ Non inscrit à l’Ordre des médecins (cocher 1 ou X)","Numéro de l’Ordre des médecins (si inscrit)","Numéro de sécurité sociale","Date de première inscription","Année de post-graduation (1-4)","Catégorie (local/external)","Établissement d’origine (EHS Cardio DBK, CAC DBK ou autre)","Début du stage au CHU","Fin du stage au CHU","Autres informations utiles"]
    if form_type=="residents_by_year":
     headers=["surname","firstname","year"]+[h for h in headers if h not in ("surname","firstname","year")]
     labels=["Nom","Prénom","Année de post-graduation (1-4)"]+[h for h in labels if h not in ("Nom","Prénom","Année de post-graduation (1-4)")]
@@ -1790,12 +1798,14 @@ def import_residents():
     except (ValueError,TypeError):
      confirmation_errors.append({"row":row.get("row_number"),"message":"Year must be 1, 2, 3 or 4."})
      continue
-    key=(surname.casefold(),firstname.casefold(),year)
+    row_type_for_key=str(row.get("resident_type","local") or "local").strip().lower()
+    origin_for_key=str(row.get("origin_hospital","") or "").strip().casefold() if row_type_for_key=="external" else ""
+    key=(surname.casefold(),firstname.casefold(),year,row_type_for_key,origin_for_key)
     if not surname or not firstname:
      confirmation_errors.append({"row":row.get("row_number"),"message":"Surname and first name are required."})
     elif key in seen:
      confirmation_errors.append({"row":row.get("row_number"),"message":"Duplicate resident row in this file."})
-    elif c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=?",(surname,firstname,year)).fetchone():
+    elif c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=? AND COALESCE(resident_type,'local')=? AND lower(COALESCE(origin_hospital,''))=?",(surname,firstname,year,row_type_for_key,origin_for_key)).fetchone():
      confirmation_errors.append({"row":row.get("row_number"),"message":"Resident with same name and year already exists; upload a fresh preview."})
     seen.add(key)
    if confirmation_errors:
