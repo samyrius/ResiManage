@@ -89,7 +89,7 @@ def test_registration_screen_uses_selected_french_without_arabic_form_labels(tmp
     response = client.get("/register")
     assert response.status_code == 200
     assert b'<html lang="fr" dir="ltr">' in response.data
-    assert b'Nom d’utilisateur' in response.data
+    assert 'Nom d’utilisateur'.encode('utf-8') in response.data
     assert "اسم المستخدم".encode() not in response.data
     client.get("/lang/en", headers={"Referer": "http://localhost/register"})
     english = client.get("/register")
