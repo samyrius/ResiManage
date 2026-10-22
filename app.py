@@ -1639,6 +1639,7 @@ def normalize_header(value):
  if value.startswith("catégorie"): return "resident_type"
  if value.startswith("téléphone 1"): return "phone"
  if value.startswith("téléphone 2"): return "phone2"
+ if value.startswith("autres informations utiles"): return "additional_info"
  return aliases.get(value,value.replace(" ","_"))
 def parse_import_file(path, extension, import_type='residents'):
  rows=[]
