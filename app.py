@@ -833,7 +833,10 @@ def rotation_board():
     c.commit(); flash(L("Affectation retirée du tableau et conservée dans la corbeille pendant six mois. Vous pouvez la restaurer avant l’échéance.","Assignment removed from the board and kept in the trash for six months. You can restore it before expiry.","تمت إزالة التعيين من الجدول وحفظه في سلة المهملات لمدة ستة أشهر. يمكنك استعادته قبل انتهاء المدة."))
    elif action=="capacity":
     places=int(request.form.get("places",""))
-    if places<0: raise ValueError("Capacity cannot be negative")
+    if places<0: raise ValueError(L("La capacité ne peut pas être négative.","Capacity cannot be negative.","لا يمكن أن تكون السعة سالبة."))
+    used=c.execute("SELECT COUNT(*) FROM assignments WHERE terrain_id=? AND period_id=? AND status IN ('confirmed','pending')",(tid,pid)).fetchone()[0]
+    if places<used:
+     raise ValueError(L("La capacité ne peut pas être inférieure aux affectations actives déjà enregistrées ("+str(used)+").","Capacity cannot be lower than the active assignments already recorded ("+str(used)+").","لا يمكن أن تكون السعة أقل من التعيينات النشطة المسجلة بالفعل ("+str(used)+")."))
     c.execute("INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,?) ON CONFLICT(year_label,terrain_id,period_id) DO UPDATE SET places=excluded.places",(y,tid,pid,places))
     audit_event(c,"capacity.updated","year="+y+"; terrain_id="+str(tid)+"; period_id="+str(pid)+"; places="+str(places))
     c.commit(); flash(L("Capacité enregistrée.","Capacity saved.","تم حفظ السعة."))
