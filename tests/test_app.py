@@ -1959,7 +1959,7 @@ def test_resident_creation_validates_repeat_flag_lengths_and_duplicate_names(tmp
     assert first.status_code == 200
     second = client.post("/residents", data={**payload,"surname":" test "}, follow_redirects=True)
     assert second.status_code == 200
-    assert "Un résident portant le même nom et la même année d’étude existe déjà".encode() in second.data
+    assert "Un résident portant le même nom, la même année et le même établissement existe déjà".encode() in second.data
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM residents WHERE lower(surname)='test' AND lower(firstname)='resident' AND year=2").fetchone()[0] == 1
 
@@ -3685,5 +3685,5 @@ def test_audited_delete_removes_duplicate_resident_and_linked_history(tmp_path, 
     with sqlite3.connect(rotation_app.DB) as conn:
         assert conn.execute("SELECT 1 FROM residents WHERE id=?", (rid,)).fetchone() is None
         assert conn.execute("SELECT 1 FROM history WHERE resident_id=?", (rid,)).fetchone() is None
-        event = conn.execute("SELECT details FROM audit WHERE action='resident.deleted' ORDER BY id DESC LIMIT 1").fetchone()
+        event = conn.execute("SELECT details FROM audit WHERE action='resident.trashed' ORDER BY id DESC LIMIT 1").fetchone()
         assert event and "Dossier ajouté en double" in event[0]
