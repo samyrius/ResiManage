@@ -1621,6 +1621,79 @@ def parse_import_file(path, extension, import_type='residents'):
   parsed.append(item)
  if not parsed: raise ValueError("The file contains headers but no resident rows.")
  return parsed
+@app.route("/templates",methods=["GET","POST"])
+def blank_templates():
+ if guard(): return redirect("/login")
+ if request.method=="POST":
+  form_type=request.form.get("form_type","residents_full")
+  extension=request.form.get("extension",".xlsx").lower()
+  year=request.form.get("year","")
+  if form_type not in ("residents_full","residents_by_year","rotation_history","rotation_plan"):
+   flash(L("Type de formulaire invalide.","Invalid template type.","نوع الاستمارة غير صالح.")); return redirect("/templates")
+  if extension not in (".csv",".xlsx",".docx",".pdf"):
+   flash(L("Choisissez CSV, Excel (.xlsx), Word (.docx) ou PDF.","Choose CSV, Excel (.xlsx), Word (.docx), or PDF.","اختر CSV أو Excel (.xlsx) أو Word (.docx) أو PDF.")); return redirect("/templates")
+  if form_type=="residents_full" or form_type=="residents_by_year":
+   headers=["surname","firstname","birth_date","birth_place","postal_address","email","phone1","phone2","resident_card_number","national_id_number","medical_order_registered","medical_order_number","social_security_number","registration_date","study_year","resident_type","origin_hospital","external_start_date","external_end_date","additional_info"]
+   labels=["Nom","Prénom","Date de naissance (AAAA-MM-JJ)","Lieu de naissance","Adresse postale","Adresse e-mail","Téléphone 1","Téléphone 2","Numéro de carte de résident","NIN / numéro d’identification nationale","Inscrit à l’Ordre des médecins (oui/non)","Numéro de l’Ordre des médecins","Numéro de sécurité sociale","Date de première inscription","Année de post-graduation (1-4)","Catégorie (local/external)","Établissement d’origine (si externe)","Début du stage au CHU","Fin du stage au CHU","Autres informations utiles"]
+   if form_type=="residents_by_year":
+    headers=["surname","firstname","study_year"]+[h for h in headers if h not in ("surname","firstname","study_year")]
+    labels=["Nom","Prénom","Année de post-graduation (1-4)"]+[h for h in labels if h not in ("Nom","Prénom","Année de post-graduation (1-4)")]
+    if year not in ("1","2","3","4"): year="1"
+  elif form_type=="rotation_history":
+   headers=["resident_surname","resident_firstname","resident_type","origin_hospital","terrain_name","postgrad_year","period","start_date","end_date","date_done","notes"]
+   labels=["Nom du résident","Prénom du résident","Catégorie (local/external)","Établissement d’origine","Service de stage","Année de post-graduation (AAAA-AAAA)","Période (1-4 ou nom de période)","Date de début","Date de fin","Date d’achèvement","Notes / référence du document justificatif"]
+  else:
+   headers=["postgrad_year","period","period_start_date","period_end_date","terrain_name","capacity","resident_surname","resident_firstname","resident_type","origin_hospital","assignment_status","decision_reason"]
+   labels=["Année de post-graduation (AAAA-AAAA)","Période","Début de période","Fin de période","Service","Capacité / nombre de postes","Nom du résident","Prénom du résident","Catégorie (local/external)","Établissement d’origine","État (confirmé/en attente)","Motif / décision"]
+  filename={"residents_full":"residents_modele_complet","residents_by_year":"residents_modele_annee_"+year,"rotation_history":"modele_historique_stages","rotation_plan":"modele_planification_affectations"}[form_type]+extension
+  output=io.BytesIO()
+  try:
+   if extension==".csv":
+    stream=io.TextIOWrapper(output,encoding="utf-8-sig",newline="",write_through=True)
+    writer=csv.writer(stream); writer.writerow(headers); writer.writerow([""]*len(headers)); stream.flush(); output.seek(0)
+    mimetype="text/csv"
+   elif extension==".xlsx":
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    wb=Workbook(); ws=wb.active; ws.title="Formulaire"
+    ws.append(headers); ws.append([""]*len(headers))
+    for cell in ws[1]:
+     cell.font=Font(bold=True,color="FFFFFF"); cell.fill=PatternFill("solid",fgColor="174B68"); cell.alignment=Alignment(wrap_text=True)
+    ws.freeze_panes="A2"; ws.auto_filter.ref=ws.dimensions
+    for col in ws.columns:
+     letter=col[0].column_letter; ws.column_dimensions[letter].width=min(32,max(16,max(len(str(x.value or "")) for x in col)+2))
+    wb.save(output); output.seek(0); mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+   elif extension==".docx":
+    from docx import Document
+    from docx.shared import Inches, Pt
+    doc=Document(); doc.add_heading("ResiManage — "+({"residents_full":"Fiche complète des résidents","residents_by_year":"Liste des résidents par année","rotation_history":"Historique des stages documentés","rotation_plan":"Planification et répartition des stages"}[form_type]),0)
+    doc.add_paragraph("Formulaire vierge — remplir les champs puis importer le fichier après saisie structurée.")
+    table=doc.add_table(rows=1,cols=len(labels)); table.style="Table Grid"
+    for i,label in enumerate(labels): table.rows[0].cells[i].text=label
+    for _ in range(8):
+     cells=table.add_row().cells
+     for cell in cells: cell.text=" "
+    doc.add_paragraph("Pour une inscription à l’Ordre des médecins, renseigner « oui » ou « non » et le numéro si inscrit. Ne pas inventer les stages antérieurs : utiliser uniquement des données documentées.")
+    doc.save(output); output.seek(0); mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+   else:
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from xml.sax.saxutils import escape
+    doc=SimpleDocTemplate(output,pagesize=landscape(A4),rightMargin=10*mm,leftMargin=10*mm,topMargin=10*mm,bottomMargin=10*mm)
+    styles=getSampleStyleSheet(); title=Paragraph("ResiManage — Formulaire vierge",styles["Title"])
+    data=[[Paragraph(escape(label),styles["BodyText"]) for label in labels]]+[[ "" for _ in labels] for _ in range(8)]
+    table=Table(data,repeatRows=1)
+    table.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.HexColor("#174B68")),("TEXTCOLOR",(0,0),(-1,0),colors.white),("GRID",(0,0),(-1,-1),0.4,colors.grey),("VALIGN",(0,0),(-1,-1),"TOP"),("ROWHEIGHT",(0,1),(-1,-1),22)]))
+    doc.build([title,Spacer(1,5*mm),table]); output.seek(0); mimetype="application/pdf"
+  except ImportError as exc:
+   app.logger.warning("Template format unavailable: %s",exc)
+   flash(L("Le module nécessaire à ce format n’est pas installé. Essayez CSV ou installez les dépendances de l’application.","The module required for this format is not installed. Try CSV or install the app dependencies.","الوحدة المطلوبة لهذه الصيغة غير مثبتة. جرّب CSV أو ثبّت تبعيات التطبيق.")); return redirect("/templates")
+  return send_file(output,mimetype=mimetype,as_attachment=True,download_name=filename)
+ return page("""<section><h3>{{L('Formulaires vierges téléchargeables','Downloadable blank forms','استمارات فارغة قابلة للتنزيل')}}</h3><p>{{L('Téléchargez un modèle structuré, remplissez-le puis importez-le dans la rubrique correspondante. Les colonnes sont normalisées pour réduire les erreurs.','Download a structured template, fill it in, then import it in the matching section. Standardized columns help prevent errors.','نزّل نموذجًا منظمًا واملأه ثم استورده في القسم المناسب. الأعمدة الموحدة تقلل الأخطاء.')}}</p><form method="post"><label>{{L('Formulaire','Template','الاستمارة')}}</label><select name="form_type"><option value="residents_full">{{L('Liste complète des résidents — toutes les informations','Complete resident list — all information','قائمة المقيمين الكاملة — جميع المعلومات')}}</option><option value="residents_by_year">{{L('Liste des résidents par année de post-graduation','Residents by postgraduate year','قائمة المقيمين حسب سنة ما بعد التدرج')}}</option><option value="rotation_history">{{L('Historique documenté des stages antérieurs','Documented past rotation history','السجل الموثق للتربصات السابقة')}}</option><option value="rotation_plan">{{L('Planification des capacités et répartition','Capacity and rotation planning','تخطيط المقاعد والتوزيع')}}</option></select><label>{{L('Année de post-graduation (pour la liste par année)','Postgraduate year (for year-specific list)','سنة ما بعد التدرج (للقائمة حسب السنة)')}}</label><select name="year"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select><label>{{L('Format de téléchargement','Download format','صيغة التنزيل')}}</label><select name="extension"><option value=".xlsx">Excel (.xlsx)</option><option value=".docx">Word (.docx)</option><option value=".csv">CSV</option><option value=".pdf">PDF</option></select><button>{{L('Télécharger le formulaire vierge','Download blank template','تنزيل الاستمارة الفارغة')}}</button></form><p><strong>{{L('Conseil :','Tip:','نصيحة:')}}</strong> {{L('Utilisez CSV ou Excel pour l’importation des données. Le modèle Word/PDF convient surtout à la collecte et à la saisie manuelle.','Use CSV or Excel to import data. Word/PDF templates are best for collecting information and manual entry.','استخدم CSV أو Excel لاستيراد البيانات. نماذج Word/PDF مناسبة أكثر لجمع المعلومات والتعبئة اليدوية.')}}</p></section>""")
+
 @app.route("/import",methods=["GET","POST"])
 def import_residents():
  if super_guard(): return super_guard()
