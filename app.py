@@ -1953,15 +1953,15 @@ def exams():
    rid=int(request.form.get("resident",""))
    sy=int(request.form.get("study_year",""))
   except (TypeError,ValueError):
-   c.close(); flash("Choose a valid resident and study year."); return redirect("/exams")
+   c.close(); flash(L("Choisissez un résident et une année d’étude valides.","Choose a valid resident and study year.","اختر مقيمًا وسنة دراسية صالحين.")); return redirect("/exams")
   resident=c.execute("SELECT * FROM residents WHERE id=?",(rid,)).fetchone()
   if not resident:
-   flash("Resident not found")
+   flash(L("Résident introuvable.","Resident not found.","لم يتم العثور على المقيم."))
   elif action=="record":
    if session.get("role")!="super_admin":
     c.close(); return ("Forbidden — Super Admin only",403)
    if resident["status"]=="graduated" or sy>int(resident["year"]):
-    flash("Cannot record marks for a future study year or for an archived DEMS graduate.")
+    flash(L("Impossible d’enregistrer des notes pour une année future ou pour un diplômé archivé du DEMS.","Cannot record marks for a future study year or for an archived DEMS graduate.","لا يمكن تسجيل علامات لسنة دراسية مستقبلية أو لخريج DEMS مؤرشف."))
     c.close(); return redirect("/exams")
    try:
     module=request.form.get("module","").strip()
@@ -1970,11 +1970,11 @@ def exams():
     theory=float(request.form.get("theory",""))
     practical=float(request.form.get("practical",""))
    except (TypeError,ValueError):
-    c.close(); flash("Module and numeric marks from 0 to 20 are required; choose a valid exam session and attempt."); return redirect("/exams")
+    c.close(); flash(L("Le module et les notes numériques de 0 à 20 sont obligatoires ; choisissez une session et une tentative valides.","Module and numeric marks from 0 to 20 are required; choose a valid exam session and attempt.","المادة والعلامات الرقمية من 0 إلى 20 إجبارية؛ اختر دورة ومحاولة صحيحتين.")); return redirect("/exams")
    allowed_exam_types=("virtual","actual","remedial","dems_virtual","dems_actual","dems_remedial","dems_insertion")
    dems_types=("dems_virtual","dems_actual","dems_remedial","dems_insertion")
    if sy not in (1,2,3,4) or not module or exam_type not in allowed_exam_types or (exam_type in dems_types and sy!=4) or attempt not in (1,2,3) or not (0<=theory<=20 and 0<=practical<=20):
-    flash("Choose a valid session/year, attempt 1–3 and marks from 0 to 20. DEMS sessions are for year 4.")
+    flash(L("Choisissez une session et une année valides, une tentative de 1 à 3 et des notes de 0 à 20. Les sessions DEMS concernent la 4e année.","Choose a valid session/year, attempt 1–3 and marks from 0 to 20. DEMS sessions are for year 4.","اختر دورة وسنة صحيحتين ومحاولة من 1 إلى 3 وعلامات من 0 إلى 20. دورات DEMS تخص السنة الرابعة."))
    else:
     postgrad_year=active_postgrad_year(c)
     existing=c.execute("SELECT id FROM exam_records WHERE resident_id=? AND study_year=? AND lower(module)=lower(?) AND exam_type=? AND attempt=? AND postgrad_year=?",(rid,sy,module,exam_type,attempt,postgrad_year)).fetchone()
@@ -1986,13 +1986,13 @@ def exams():
      audit_event(c,"exam.recorded",f"resident_id={rid}; postgraduate_year={postgrad_year}; study_year={sy}; module={module}; session={exam_type}; attempt={attempt}")
     c.commit(); flash(tr("done"))
   elif action=="evaluate_first_year" and request.form.get("all_modules_confirmed")!="yes":
-   flash("Confirm that all first-year module results have been entered before evaluating progression.")
+   flash(L("Confirmez que toutes نتائج مواد السنة الأولى أُدخلت قبل تقييم الترقية.","Confirm that all first-year module results have been entered before evaluating progression.","أكد إدخال نتائج جميع مواد السنة الأولى قبل تقييم الترقية."))
   elif action=="evaluate_first_year":
    if session.get("role")!="super_admin": c.close(); return ("Forbidden — Super Admin only",403)
    if resident["year"]!=1:
-    flash("Only current first-year residents can be evaluated for first-year progression.")
+    flash(L("Seuls les résidents actuellement en première année peuvent être évalués pour le passage en deuxième année.","Only current first-year residents can be evaluated for first-year progression.","يمكن تقييم المقيمين في السنة الأولى حاليًا فقط للانتقال إلى السنة الثانية."))
    elif resident["status"]!="active":
-    flash("The resident is inactive; progression is not available.")
+    flash(L("Le résident est inactif ; la promotion n’est pas disponible.","The resident is inactive; progression is not available.","المقيم غير نشط؛ الترقية غير متاحة."))
    else:
     postgrad_year=active_postgrad_year(c)
     raw_records=c.execute("SELECT id,module,theory,practical,exam_type,attempt FROM exam_records WHERE resident_id=? AND study_year=1 AND postgrad_year=? AND exam_type IN ('actual','remedial') ORDER BY id",(rid,postgrad_year)).fetchall()
@@ -2009,7 +2009,7 @@ def exams():
     all_modules={row["module"].strip().casefold() for row in c.execute("SELECT DISTINCT module FROM exam_records WHERE resident_id=? AND study_year=1 AND postgrad_year=?",(rid,postgrad_year)).fetchall()}
     missing_actual_or_remedial=all_modules-set(chosen.keys())
     if not records or missing_actual_or_remedial:
-     flash("Enter actual or remedial marks for every first-year module before evaluation; virtual marks alone do not count.")
+     flash(L("Saisissez les notes réelles ou de rattrapage de chaque module de première année avant l’évaluation ; les notes virtuelles seules ne comptent pas.","Enter actual or remedial marks for every first-year module before evaluation; virtual marks alone do not count.","أدخل العلامات الفعلية أو الاستدراكية لكل مادة في السنة الأولى قبل التقييم؛ العلامات الافتراضية وحدها لا تُحتسب."))
     else:
      average=sum((x["theory"]+x["practical"])/2 for x in records)/len(records)
      passed=average>=10 and all(x["theory"]>=10 and x["practical"]>=10 for x in records)
@@ -2023,15 +2023,15 @@ def exams():
        audit_event(c,"resident.year_advanced",f"resident_id={rid}; from=1; to=2")
      c.commit()
      if not passed:
-      flash("Failed: average must be at least 10/20 and every theory/practical mark must be at least 10/20")
+      flash(L("Échec : la moyenne doit être d’au moins 10/20 et chaque note théorique/pratique doit être d’au moins 10/20.","Failed: average must be at least 10/20 and every theory/practical mark must be at least 10/20.","رسوب: يجب أن يكون المعدل 10/20 على الأقل وكل علامة نظرية/تطبيقية 10/20 على الأقل."))
      elif resident["year"]!=1:
-      flash("Exam criteria passed; no year change because the resident is not currently in year 1.")
+      flash(L("Critères d’examen validés ; aucune année modifiée car le résident n’est plus en première année.","Exam criteria passed; no year change because the resident is not currently in year 1.","تم استيفاء شروط الامتحان؛ لم تتغير السنة لأن المقيم ليس في السنة الأولى حاليًا."))
      elif resident["status"]!="active":
-      flash("Exam criteria passed, but the resident is inactive; no progression was applied.")
+      flash(L("Critères validés, mais le résident est inactif ; aucune promotion n’a été appliquée.","Exam criteria passed, but the resident is inactive; no progression was applied.","تم استيفاء الشروط، لكن المقيم غير نشط؛ لم تُطبق الترقية."))
      elif advanced:
-      flash("Passed; resident advanced to year 2.")
+      flash(L("Réussite ; le résident est passé en deuxième année.","Passed; resident advanced to year 2.","نجاح؛ انتقل المقيم إلى السنة الثانية."))
      else:
-      flash("Exam criteria passed, but progression was not applied; review the resident record.")
+      flash(L("Critères validés, mais la promotion n’a pas été appliquée ; vérifiez le dossier du résident.","Exam criteria passed, but progression was not applied; review the resident record.","تم استيفاء الشروط لكن لم تُطبق الترقية؛ راجع ملف المقيم."))
   elif action=="approve_advance":
    actor=session.get("user","").lower()
    outcome=request.form.get("outcome","approve")
@@ -2039,17 +2039,17 @@ def exams():
    if session.get("role")!="super_admin" or actor not in ("benhocine","drdris"):
     c.close(); return ("Only the official Super Admins Dr Dris and Pr Benhocine may vote on progression.",403)
    if outcome not in ("approve","reject") or not reason:
-    flash("Choose approve/reject and enter the decision reason.")
+    flash(L("Choisissez approuver ou refuser et indiquez le motif de la décision.","Choose approve/reject and enter the decision reason.","اختر الموافقة أو الرفض وأدخل سبب القرار."))
    elif resident["status"]!="active":
-    flash("Inactive residents cannot be advanced; no progression vote was recorded.")
+    flash(L("Un résident inactif ne peut pas être promu ; aucun vote de progression n’a été enregistré.","Inactive residents cannot be advanced; no progression vote was recorded.","لا يمكن ترقية مقيم غير نشط؛ لم يتم تسجيل تصويت الترقية."))
    elif sy not in (2,3) or resident["year"]!=sy:
-    flash("Only active year 2 or 3 residents can use the dual-official progression vote.")
+    flash(L("Seuls les résidents actifs de deuxième ou troisième année peuvent faire l’objet du vote conjoint des deux responsables.","Only active year 2 or 3 residents can use the dual-official progression vote.","يمكن فقط للمقيمين النشطين في السنة الثانية أو الثالثة الخضوع لتصويت المسؤولين الاثنين."))
    else:
     c.execute("INSERT INTO promotion_votes(resident_id,from_year,decision,reason,actor) VALUES(?,?,?,?,?) ON CONFLICT(resident_id,from_year,actor) DO UPDATE SET decision=excluded.decision,reason=excluded.reason,created_at=CURRENT_TIMESTAMP",(rid,sy,outcome,reason,actor))
     audit_event(c,"promotion.vote_recorded",f"resident_id={rid}; from_year={sy}; decision={outcome}; reason={reason}")
     votes=c.execute("SELECT actor,decision,reason FROM promotion_votes WHERE resident_id=? AND from_year=? AND actor IN ('benhocine','drdris')",(rid,sy)).fetchall()
     if len(votes)<2:
-     c.commit(); flash("Vote recorded. Waiting for the other official administrator.")
+     c.commit(); flash(L("Vote enregistré. En attente du vote de l’autre responsable officiel.","Vote recorded. Waiting for the other official administrator.","تم تسجيل التصويت. في انتظار تصويت المسؤول الرسمي الآخر."))
     else:
      combined_reason=" | ".join(v["actor"]+": "+v["decision"]+" — "+v["reason"] for v in votes)
      actor_names="+".join(sorted(v["actor"] for v in votes))
@@ -2059,13 +2059,13 @@ def exams():
       if c.execute("SELECT changes()").fetchone()[0]:
        c.execute("INSERT INTO decisions(details,decision,reason,actor,postgrad_year) VALUES(?,?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — year {sy}","Approved by both official administrators",combined_reason,actor_names,active_postgrad_year(c)))
        audit_event(c,"resident.year_advanced",f"resident_id={rid}; from={sy}; to={sy+1}; officials={actor_names}")
-       flash("Approved by both official administrators; resident advanced.")
+       flash(L("Approuvé par les deux responsables officiels ; le résident a été promu.","Approved by both official administrators; resident advanced.","وافق المسؤولان الرسميان؛ تمت ترقية المقيم."))
       else:
-       flash("Resident status changed before the vote was finalized; no progression was applied.")
+       flash(L("Le statut du résident a changé avant la finalisation du vote ; aucune promotion n’a été appliquée.","Resident status changed before the vote was finalized; no progression was applied.","تغيرت حالة المقيم قبل إتمام التصويت؛ لم تُطبق الترقية."))
      else:
       c.execute("INSERT INTO decisions(details,decision,reason,actor,postgrad_year) VALUES(?,?,?,?,?)",(f"{resident['surname']} {resident['firstname']} — year {sy}","Rejected by official vote",combined_reason,actor_names,active_postgrad_year(c)))
       audit_event(c,"promotion.vote_rejected",f"resident_id={rid}; from_year={sy}; officials={actor_names}")
-      flash("Progression not approved; both official votes are recorded.")
+      flash(L("Promotion refusée ; les deux votes officiels ont été enregistrés.","Progression not approved; both official votes are recorded.","لم تتم الموافقة على الترقية؛ تم تسجيل التصويتين الرسميين."))
      c.execute("DELETE FROM promotion_votes WHERE resident_id=? AND from_year=?",(rid,sy))
      c.commit()
  selected_year=active_postgrad_year(c)
@@ -2105,18 +2105,18 @@ def dems():
   reason=request.form.get("reason","").strip()
   try: success_date=date.fromisoformat(request.form.get("success_date","").strip()).isoformat()
   except ValueError:
-   c.close(); flash("Enter a valid DEMS exam date."); return redirect("/dems")
+   c.close(); flash(L("Saisissez une date d’examen DEMS valide.","Enter a valid DEMS exam date.","أدخل تاريخ امتحان DEMS صالحًا.")); return redirect("/dems")
   if date.fromisoformat(success_date)>date.today():
-   c.close(); flash("The DEMS exam date cannot be in the future."); return redirect("/dems")
+   c.close(); flash(L("La date de l’examen DEMS ne peut pas être dans le futur.","The DEMS exam date cannot be in the future.","لا يمكن أن يكون تاريخ امتحان DEMS في المستقبل.")); return redirect("/dems")
   r=c.execute("SELECT * FROM residents WHERE id=? AND year=4 AND status='active'",(rid,)).fetchone()
   if not r or outcome not in ("approve","reject") or not reason:
-   flash("Choose an active year-4 resident, a valid vote, a date and a reason.")
+   flash(L("Choisissez un résident actif de quatrième année, un vote valide, une date et un motif.","Choose an active year-4 resident, a valid vote, a date and a reason.","اختر مقيمًا نشطًا في السنة الرابعة وتصويتًا صالحًا وتاريخًا وسببًا."))
   else:
    c.execute("INSERT INTO dems_votes(resident_id,success_date,decision,reason,actor) VALUES(?,?,?,?,?) ON CONFLICT(resident_id,success_date,actor) DO UPDATE SET decision=excluded.decision,reason=excluded.reason,created_at=CURRENT_TIMESTAMP",(rid,success_date,outcome,reason,actor))
    audit_event(c,"dems.vote_recorded",f"resident_id={rid}; success_date={success_date}; decision={outcome}; reason={reason}")
    votes=c.execute("SELECT actor,decision,reason FROM dems_votes WHERE resident_id=? AND success_date=? AND actor IN ('benhocine','drdris')",(rid,success_date)).fetchall()
    if len(votes)<2:
-    c.commit(); flash("DEMS vote recorded. Waiting for the other official administrator.")
+    c.commit(); flash(L("Vote DEMS enregistré. En attente du vote de l’autre responsable officiel.","DEMS vote recorded. Waiting for the other official administrator.","تم تسجيل تصويت DEMS. في انتظار تصويت المسؤول الرسمي الآخر."))
    else:
     combined_reason=" | ".join(v["actor"]+": "+v["decision"]+" — "+v["reason"] for v in votes)
     actor_names="+".join(sorted(v["actor"] for v in votes))
@@ -2130,11 +2130,11 @@ def dems():
      c.execute("UPDATE residents SET status='graduated',dems_status='success' WHERE id=?",(rid,))
      c.execute("INSERT INTO decisions(details,decision,reason,actor,postgrad_year) VALUES(?,?,?,?,?)",(f"{r['surname']} {r['firstname']} — DEMS","Success approved by both official administrators",combined_reason,actor_names,active_postgrad_year(c)))
      audit_event(c,"dems.archived",f"resident_id={rid}; success_date={success_date}; officials={actor_names}")
-     flash("DEMS success approved by both officials; profile and history archived.")
+     flash(L("Réussite au DEMS approuvée par les deux responsables ; le dossier et l’historique sont archivés.","DEMS success approved by both officials; profile and history archived.","وافق المسؤولان على نجاح DEMS؛ تمت أرشفة الملف والسجل."))
     else:
      c.execute("INSERT INTO decisions(details,decision,reason,actor,postgrad_year) VALUES(?,?,?,?,?)",(f"{r['surname']} {r['firstname']} — DEMS","Not approved by official vote",combined_reason,actor_names,active_postgrad_year(c)))
      audit_event(c,"dems.vote_rejected",f"resident_id={rid}; success_date={success_date}; officials={actor_names}")
-     flash("DEMS success was not approved; both official votes are recorded.")
+     flash(L("Réussite au DEMS refusée ; les deux votes officiels sont enregistrés.","DEMS success was not approved; both official votes are recorded.","لم تتم الموافقة على نجاح DEMS؛ تم تسجيل التصويتين الرسميين."))
     c.execute("DELETE FROM dems_votes WHERE resident_id=? AND success_date=?",(rid,success_date))
     c.commit()
  residentsrow_numbers=c.execute("SELECT * FROM residents WHERE year=4 AND status='active' ORDER BY surname").fetchall()
