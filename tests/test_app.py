@@ -3581,3 +3581,39 @@ def test_rotation_board_updates_occupancy_after_assignment_and_uses_readable_con
     assert b".rt-board-table td{color:#10263a!important;background-color:#f8fbff}" in assigned.data
     assert b".rt-board-cell-form input,.rt-board-cell-form select{color:#10263a!important;background:#fff!important" in assigned.data
 
+
+
+def test_language_selection_is_consistent_across_core_screens(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    first_login = client.get("/login")
+    assert first_login.status_code == 200
+    assert b'<html lang="fr"' in first_login.data
+
+    login(client)
+    with rotation_app.db() as conn:
+        rid = conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,2,'active') RETURNING id",
+            ("Locale", "Resident"),
+        ).fetchone()[0]
+        conn.commit()
+
+    routes = ["/", "/profile/" + str(rid), "/assign", "/leave", "/external-rotations",
+              "/exams", "/dems", "/import", "/import-history"]
+    expected = {
+        "fr": ["Congés annuels", "Stages à l’étranger", "Résident de 4e année", "Session d’examen"],
+        "en": ["Annual leave", "External rotations", "Year-4 resident", "Exam session"],
+        "ar": ["الإجازات السنوية", "التربصات بالخارج", "مقيم السنة الرابعة", "دورة الامتحان"],
+    }
+    for language in ("fr", "en", "ar"):
+        client.get("/lang/" + language, headers={"Referer": "http://localhost/"})
+        rendered = {}
+        for route in routes:
+            response = client.get(route)
+            assert response.status_code == 200, (language, route)
+            assert ('<html lang="' + language + '"').encode() in response.data, (language, route)
+            rendered[route] = response.get_data(as_text=True)
+        combined = "\\n".join(rendered.values())
+        for phrase in expected[language]:
+            assert phrase in combined, (language, phrase)
+        assert "الإجازات / Congés / Annual leave" not in combined
+        assert "التربصات الخارجية / Stages à l’étranger / External rotations" not in combined
