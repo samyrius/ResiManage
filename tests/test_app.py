@@ -126,7 +126,6 @@ def test_login_branding_uses_resimanage_and_navy_cyan_identity(tmp_path, monkeyp
     assert b"All rights reserved" not in response.data
     assert "جميع الحقوق محفوظة".encode() not in response.data
     assert "ResiManage · Dr Dris".encode() in response.data
-    assert "جميع الحقوق محفوظة".encode() in response.data
     assert "✚".encode() not in response.data
 
 
@@ -1238,7 +1237,7 @@ def test_inactive_core_terrain_does_not_block_repeat_eligibility(tmp_path, monke
 
     assert allowed is True
     assert status == "confirmed"
-    assert "يمكن التكرار" in message
+    assert "Répétition autorisée" in message
 
 def test_pending_assignment_cannot_be_approved_after_terrain_deactivation(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
@@ -1668,7 +1667,7 @@ def test_future_confirmed_rotations_do_not_count_as_completed_for_repeat_eligibi
                 conn,rid,target,current_period["id"],current_period["year_label"]
             )
     assert allowed is False
-    assert "التربص منجز سابقاً" in message
+    assert "Stage déjà effectué" in message
 
 def test_capacity_rejects_negative_and_cross_academic_year_periods(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
