@@ -964,7 +964,7 @@ def test_assignment_resident_options_mark_external_period_conflicts(tmp_path, mo
     with rotation_app.db() as conn:
         conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)", ("Blocked", "Resident", 2, "active"))
         rid = conn.execute("SELECT id FROM residents WHERE surname='Blocked'").fetchone()[0]
-        period = conn.execute("SELECT id FROM periods WHERE name LIKE '%Août%' OR name LIKE '%Aout%'").fetchone()
+        period = conn.execute("SELECT id FROM periods WHERE name='Période 3'").fetchone()
         assert period is not None
         conn.execute("INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,status) VALUES(?,?,?,?,?,?,?,?,?)",
                      (rid, "Dr Test", "Paris", "CHU Test", "France", "Observation", "2026-08-01", "2026-10-30", "returned"))
