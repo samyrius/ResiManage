@@ -1859,7 +1859,9 @@ def import_residents():
      row["year"]=year
     except (ValueError,TypeError): row_errors.append(L("L’année doit être 1, 2, 3 ou 4.","Year must be 1, 2, 3 or 4.","يجب أن تكون السنة 1 أو 2 أو 3 أو 4."))
     row["surname"]=surname; row["firstname"]=firstname
-    key=(surname.casefold(),firstname.casefold(),row.get("year"))
+    row_type_for_key=str(row.get("resident_type","local") or "local").strip().lower()
+    origin_for_key=str(row.get("origin_hospital","") or "").strip().casefold() if row_type_for_key=="external" else ""
+    key=(surname.casefold(),firstname.casefold(),row.get("year"),row_type_for_key,origin_for_key)
     if key in seen: row_errors.append(L("Cette ligne de résident est dupliquée dans le fichier.","Duplicate resident row in this file.","سطر المقيم هذا مكرر في الملف."))
     seen.add(key)
     row_type=str(row.get("resident_type","local") or "local").strip().lower()
