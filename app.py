@@ -2296,7 +2296,7 @@ def exams():
  selected_year=active_postgrad_year(c)
  rows=c.execute("SELECT e.*,r.surname,r.firstname FROM exam_records e JOIN residents r ON r.id=e.resident_id WHERE e.postgrad_year=? ORDER BY e.created_at DESC,e.id DESC",(selected_year,)).fetchall()
  unassigned_rows=c.execute("SELECT e.*,r.surname,r.firstname FROM exam_records e JOIN residents r ON r.id=e.resident_id WHERE COALESCE(e.postgrad_year,'')='' ORDER BY e.created_at DESC,e.id DESC").fetchall()
- rs=c.execute("SELECT * FROM residents WHERE status='active' ORDER BY year DESC,surname").fetchall()
+ rs=c.execute("SELECT * FROM residents WHERE status='active' AND COALESCE(resident_type,'local')<>'external' ORDER BY year DESC,surname").fetchall()
  grade_table_rows=[]
  for resident_row in rs:
   for study_year in range(1,5):
