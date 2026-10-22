@@ -1687,13 +1687,13 @@ def test_capacity_rejects_negative_and_cross_academic_year_periods(tmp_path, mon
         "terrain":str(terrain_id),"period":str(current["id"]),"places":"-1"
     }, follow_redirects=True)
     assert negative.status_code == 200
-    assert b"Invalid capacity input" in negative.data
+    assert "Saisie de capacité invalide".encode() in negative.data
 
     wrong_year = client.post("/capacities", data={
         "terrain":str(terrain_id),"period":str(other_period_id),"places":"3"
     }, follow_redirects=True)
     assert wrong_year.status_code == 200
-    assert b"Invalid capacity input" in wrong_year.data
+    assert "Saisie de capacité invalide".encode() in wrong_year.data
 
     with rotation_app.db() as conn:
         assert conn.execute(
@@ -1982,7 +1982,7 @@ def test_objectives_reject_invalid_year_inactive_terrain_and_duplicates(tmp_path
         "terrain":str(inactive),"study_year":"1","objective":"Objective"
     }, follow_redirects=True)
     assert inactive_terrain.status_code == 200
-    assert b"Choose an active terrain" in inactive_terrain.data
+    assert "Choisissez un service actif".encode() in inactive_terrain.data
 
     payload = {"terrain":str(terrain),"study_year":"1","objective":"Clinical skills"}
     first = client.post("/objectives", data=payload, follow_redirects=True)
@@ -2860,7 +2860,7 @@ def test_resident_profile_displays_exam_session_and_attempt(tmp_path, monkeypatc
     response = client.get(f"/profile/{rid}")
     assert response.status_code == 200
     assert b"DEMS insertion" in response.data
-    assert b"dems_insertion" in response.data
+    assert "Insertion DEMS (deux parties)".encode() in response.data
     assert b"<td>2</td>" in response.data
     assert b"14.0/20" in response.data
     assert b"16.0/20" in response.data
