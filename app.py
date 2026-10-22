@@ -250,6 +250,29 @@ def init():
 @app.before_request
 def boot():
  if not getattr(app,"_ready",False): init(); app._ready=True
+ # Enforce six-calendar-month trash retention automatically, not only when a
+ # Super Admin opens the trash page. Run once per process-local calendar day.
+ today_key=date.today().isoformat()
+ if getattr(app,"_trash_cleanup_date","") != today_key:
+  c=db()
+  try:
+   now=datetime.now()
+   for item in c.execute("SELECT id,deleted_at FROM trash_items").fetchall():
+    try:
+     deleted=datetime.fromisoformat(item["deleted_at"])
+     month=deleted.month+6
+     year=deleted.year+(month-1)//12
+     month=(month-1)%12+1
+     day=min(deleted.day,__import__("calendar").monthrange(year,month)[1])
+     if now>=deleted.replace(year=year,month=month,day=day):
+      c.execute("DELETE FROM trash_items WHERE id=?",(item["id"],))
+      audit_event(c,"trash.expired",f"trash_id={item['id']}; purged_after_six_calendar_months")
+    except (ValueError,TypeError):
+     continue
+   c.commit()
+   app._trash_cleanup_date=today_key
+  finally:
+   c.close()
 
 @app.before_request
 def verify_csrf():
