@@ -3687,3 +3687,52 @@ def test_audited_delete_removes_duplicate_resident_and_linked_history(tmp_path, 
         assert conn.execute("SELECT 1 FROM history WHERE resident_id=?", (rid,)).fetchone() is None
         event = conn.execute("SELECT details FROM audit WHERE action='resident.trashed' ORDER BY id DESC LIMIT 1").fetchone()
         assert event and "Dossier ajouté en double" in event[0]
+
+
+def test_external_resident_is_saved_with_origin_and_rotation_dates(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.post("/residents", data={
+        "action": "create", "surname": "Visiting", "firstname": "Resident",
+        "year": "2", "phone": "0550000000", "resident_type": "external",
+        "origin_hospital": "Hôpital périphérique", "external_start_date": "2026-11-01",
+        "external_end_date": "2027-01-30", "repeat_year": "0"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        row = conn.execute(
+            "SELECT resident_type,origin_hospital,external_start_date,external_end_date FROM residents WHERE surname='Visiting' AND firstname='Resident'"
+        ).fetchone()
+        assert row is not None
+        assert tuple(row) == ("external", "Hôpital périphérique", "2026-11-01", "2027-01-30")
+
+
+def test_external_resident_requires_home_institution_and_valid_dates(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.post("/residents", data={
+        "action": "create", "surname": "Visiting", "firstname": "Invalid",
+        "year": "2", "resident_type": "external", "origin_hospital": "",
+        "external_start_date": "2027-02-01", "external_end_date": "2027-01-01",
+        "repeat_year": "0"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT 1 FROM residents WHERE surname='Visiting' AND firstname='Invalid'").fetchone() is None
+
+
+def test_downloadable_blank_templates_offer_standardized_headers(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    page = client.get("/templates")
+    assert page.status_code == 200
+    assert "Formulaires vierges téléchargeables".encode() in page.data
+    full = client.post("/templates", data={"form_type":"residents_full", "extension":".csv", "year":"1"})
+    assert full.status_code == 200
+    assert full.headers.get("Content-Disposition", "").endswith("residents_modele_complet.csv")
+    content = full.get_data(as_text=True)
+    assert "national_id_number" in content
+    assert "medical_order_registered" in content
+    history = client.post("/templates", data={"form_type":"rotation_history", "extension":".csv", "year":"1"})
+    assert history.status_code == 200
+    assert "resident,terrain,year_label" in history.get_data(as_text=True)
