@@ -1491,7 +1491,7 @@ def test_import_rejects_fractional_study_year_instead_of_truncating(tmp_path, mo
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b"Year must be 1, 2, 3 or 4." in response.data
+    assert "L’année doit être 1, 2, 3 ou 4".encode() in response.data
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM residents WHERE surname='Fractional'").fetchone()[0] == 0
 
@@ -1569,21 +1569,21 @@ def test_history_rejects_invalid_year_period_and_duplicate_records(tmp_path, mon
         "period":"01 Fév - 30 Avr","date_done":"2026-03-01"
     }, follow_redirects=True)
     assert invalid_year.status_code == 200
-    assert b"Academic year must be YYYY-YYYY" in invalid_year.data
+    assert "L’année de post-graduation doit suivre le format".encode() in invalid_year.data
 
     invalid_period = client.post("/history", data={
         "resident":str(rid),"terrain":str(tid),"year_label":"2025-2026",
         "period":"invented period","date_done":"2026-03-01"
     }, follow_redirects=True)
     assert invalid_period.status_code == 200
-    assert b"Choose one of the four official rotation periods" in invalid_period.data
+    assert "Choisissez l’une des quatre périodes officielles".encode() in invalid_period.data
 
     future_date = client.post("/history", data={
         "resident":str(rid),"terrain":str(tid),"year_label":"2098-2099",
         "period":"01 Fév - 30 Avr","date_done":"2098-03-01"
     }, follow_redirects=True)
     assert future_date.status_code == 200
-    assert b"A historical rotation date cannot be in the future" in future_date.data
+    assert "Une date de stage historique ne peut pas être dans le futur".encode() in future_date.data
 
     payload = {
         "resident":str(rid),"terrain":str(tid),"year_label":"2025-2026",
@@ -1593,7 +1593,7 @@ def test_history_rejects_invalid_year_period_and_duplicate_records(tmp_path, mon
     assert first.status_code == 200
     second = client.post("/history", data=payload, follow_redirects=True)
     assert second.status_code == 200
-    assert b"This historical rotation already exists" in second.data
+    assert "Ce stage historique existe déjà".encode() in second.data
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM history WHERE resident_id=? AND terrain_id=?", (rid,tid)).fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='history.created'").fetchone()[0] == 1
@@ -1732,7 +1732,7 @@ def test_import_confirmation_rechecks_duplicates_and_imports_nothing_on_stale_pr
         "action":"confirm", "preview_id":match.group(1).decode()
     }, follow_redirects=True)
     assert confirmed.status_code == 200
-    assert b"Nothing was imported" in confirmed.data
+    assert "Rien n’a été importé".encode() in confirmed.data
     with rotation_app.db() as conn:
         assert conn.execute(
             "SELECT COUNT(*) FROM residents WHERE surname='Fresh' AND firstname='Resident'"
