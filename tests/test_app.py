@@ -3793,6 +3793,33 @@ def test_import_template_rejects_both_registration_checkboxes(tmp_path):
         rotation_app.parse_import_file(str(source), ".csv")
 
 
+def test_human_readable_blank_form_headers_map_to_import_columns(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    assert rotation_app.normalize_header("Nom") == "surname"
+    assert rotation_app.normalize_header("Prénom") == "firstname"
+    assert rotation_app.normalize_header("Date de naissance (AAAA-MM-JJ)") == "birth_date"
+    assert rotation_app.normalize_header("Numéro de la carte de résident") == "resident_card_number"
+    assert rotation_app.normalize_header("NIN / numéro d’identification nationale") == "national_id_number"
+    assert rotation_app.normalize_header("☐ Inscrit à l’Ordre des médecins (cocher 1 ou X)") == "medical_order_registered_yes"
+    assert rotation_app.normalize_header("☐ Non inscrit à l’Ordre des médecins (cocher 1 ou X)") == "medical_order_registered_no"
+    assert rotation_app.normalize_header("Année d’étude (1-4)") == "year"
+    assert rotation_app.normalize_header("Nom et prénom du résident (Nom Prénom)") == "resident"
+    assert rotation_app.normalize_header("Année de post-graduation (AAAA-AAAA)") == "year_label"
+    word_template = client.post("/templates", data={"form_type":"residents_full", "extension":".docx", "year":"1"})
+    assert word_template.status_code == 200
+    assert "application/vnd.openxmlformats-officedocument.wordprocessingml.document" in word_template.content_type
+    xlsx_template = client.post("/templates", data={"form_type":"residents_full", "extension":".xlsx", "year":"1"})
+    assert xlsx_template.status_code == 200
+    from openpyxl import load_workbook
+    import io
+    book = load_workbook(io.BytesIO(xlsx_template.data), data_only=True)
+    assert book.sheetnames == ["Formulaire", "Guide"]
+    assert book["Formulaire"]["A1"].value == "surname"
+    assert book["Guide"]["A1"].value == "Colonne à remplir"
+    book.close()
+
+
 def test_expired_trash_is_purged_on_normal_app_request(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
