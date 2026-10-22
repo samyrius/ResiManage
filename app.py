@@ -787,7 +787,7 @@ def rotation_board():
 def check(c,rid,tid,pid,y):
  r=c.execute("SELECT * FROM residents WHERE id=? AND status='active'",(rid,)).fetchone(); t=c.execute("SELECT * FROM terrains WHERE id=?",(tid,)).fetchone(); p=c.execute("SELECT * FROM periods WHERE id=? AND year_label=?",(pid,y)).fetchone()
  if not r or not t or not t["active"] or not p: return False,tr("none"),None
- start_day, end_day = rotation_period_bounds(p["year_label"], p["name"])
+ start_day, end_day = rotation_period_bounds(p["year_label"], p["name"], p["start_date"], p["end_date"])
  external = c.execute("SELECT hospital,country,start_date,end_date FROM external_rotations WHERE resident_id=? AND request_status='approved' AND status<>'cancelled' AND start_date<=? AND end_date>=? LIMIT 1",(rid,end_day.isoformat(),start_day.isoformat())).fetchone()
  if external: return False,("External rotation blocks local assignment: "+external["hospital"]+", "+external["country"]+" ("+external["start_date"]+" to "+external["end_date"]+")"),None
  dup=c.execute("SELECT t.name FROM assignments a JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=? AND a.period_id=? AND a.status IN ('confirmed','pending')",(rid,pid)).fetchone()
@@ -2248,17 +2248,32 @@ def restore():
    if workdir and os.path.exists(workdir): shutil.rmtree(workdir,ignore_errors=True)
   return redirect("/restore")
  return page("""<section><h3>{{t('restore')}}</h3><p>{{t('restore_help')}} Upload a full .zip backup (database and resident photos) or a legacy .db/.sqlite database backup.</p><form method="post" enctype="multipart/form-data"><label>{{t('file')}} (.zip/.db/.sqlite)</label><input type="file" name="backup_file" accept=".zip,.db,.sqlite,.sqlite3" required><button>{{t('restore')}}</button></form></section>""")
-def rotation_period_bounds(year_label, period_name):
+def rotation_period_bounds(year_label, period_name, start_date="", end_date=""):
     try:
         y = int(str(year_label).split("-")[0])
     except (ValueError, IndexError):
         y = date.today().year
     n = str(period_name).lower()
-    if any(x in n for x in ("fév", "fev", "feb")): return date(y,2,1), date(y,4,30)
-    if any(x in n for x in ("mai", "may")): return date(y,5,1), date(y,7,30)
-    if any(x in n for x in ("août", "aout", "aug")): return date(y,8,1), date(y,10,30)
-    if "nov" in n: return date(y,11,1), date(y+1,1,30)
-    return date(y,2,1), date(y+1,1,30)
+    defaults = {
+        "période 1": (date(y,2,1), date(y,4,30)),
+        "periode 1": (date(y,2,1), date(y,4,30)),
+        "période 2": (date(y,5,1), date(y,7,30)),
+        "periode 2": (date(y,5,1), date(y,7,30)),
+        "période 3": (date(y,8,1), date(y,10,30)),
+        "periode 3": (date(y,8,1), date(y,10,30)),
+        "période 4": (date(y,11,1), date(y+1,1,30)),
+        "periode 4": (date(y,11,1), date(y+1,1,30)),
+    }
+    if any(x in n for x in ("fév", "fev", "feb")): fallback=(date(y,2,1), date(y,4,30))
+    elif any(x in n for x in ("mai", "may")): fallback=(date(y,5,1), date(y,7,30))
+    elif any(x in n for x in ("août", "aout", "aug")): fallback=(date(y,8,1), date(y,10,30))
+    elif "nov" in n: fallback=(date(y,11,1), date(y+1,1,30))
+    else: fallback=defaults.get(n,(date(y,2,1), date(y+1,1,30)))
+    try: start=date.fromisoformat(start_date) if start_date else fallback[0]
+    except (ValueError,TypeError): start=fallback[0]
+    try: end=date.fromisoformat(end_date) if end_date else fallback[1]
+    except (ValueError,TypeError): end=fallback[1]
+    return start,end
 
 def reject_external_overlap_with_local_assignment(c, resident_id, start, end):
     local_rows = c.execute(
