@@ -100,7 +100,7 @@ def audit_event(c, action, details):
 # Transactional change journal groundwork for future authenticated device sync.
 # Authentication/transport endpoints and offline client queues are intentionally separate phases.
 _SYNC_ENTITY_FIELDS={
- "residents":("id","surname","firstname","year","phone","repeat_year","status","birth_place","birth_date","photo_path","dems_status"),
+ "residents":("id","surname","firstname","year","phone","phone2","repeat_year","status","birth_place","birth_date","address","email","resident_card_number","national_id_number","medical_order_registered","medical_order_number","social_security_number","registration_date","additional_info","resident_type","origin_hospital","external_start_date","external_end_date","archive_type","archive_reason","archive_return_date","archived_at","photo_path","dems_status"),
  "terrains":("id","name","kind","mandatory_year","active"),
  "periods":("id","year_label","name"),
  "capacities":("id","year_label","terrain_id","period_id","places"),
