@@ -2180,6 +2180,9 @@ def exams():
   if not resident:
    flash(L("Résident introuvable.","Resident not found.","لم يتم العثور على المقيم."))
   elif action=="record":
+   if resident["resident_type"]=="external":
+    flash(L("Les résidents externes ne relèvent pas du processus interne d’examens et de promotion du CHU.","External residents are not part of the hospital's internal exam and progression process.","المقيمون الخارجيون لا يخضعون لمسار الامتحانات والترقية الداخلي للمستشفى."))
+    c.close(); return redirect("/exams")
    if session.get("role")!="super_admin":
     c.close(); return ("Forbidden — Super Admin only",403)
    if resident["status"]=="graduated" or sy>int(resident["year"]):
@@ -2330,7 +2333,7 @@ def dems():
    c.close(); flash(L("Saisissez une date d’examen DEMS valide.","Enter a valid DEMS exam date.","أدخل تاريخ امتحان DEMS صالحًا.")); return redirect("/dems")
   if date.fromisoformat(success_date)>date.today():
    c.close(); flash(L("La date de l’examen DEMS ne peut pas être dans le futur.","The DEMS exam date cannot be in the future.","لا يمكن أن يكون تاريخ امتحان DEMS في المستقبل.")); return redirect("/dems")
-  r=c.execute("SELECT * FROM residents WHERE id=? AND year=4 AND status='active'",(rid,)).fetchone()
+  r=c.execute("SELECT * FROM residents WHERE id=? AND year=4 AND status='active' AND COALESCE(resident_type,'local')<>'external'",(rid,)).fetchone()
   if not r or outcome not in ("approve","reject") or not reason:
    flash(L("Choisissez un résident actif de quatrième année, un vote valide, une date et un motif.","Choose an active year-4 resident, a valid vote, a date and a reason.","اختر مقيمًا نشطًا في السنة الرابعة وتصويتًا صالحًا وتاريخًا وسببًا."))
   else:
@@ -2359,7 +2362,7 @@ def dems():
      flash(L("Réussite au DEMS refusée ; les deux votes officiels sont enregistrés.","DEMS success was not approved; both official votes are recorded.","لم تتم الموافقة على نجاح DEMS؛ تم تسجيل التصويتين الرسميين."))
     c.execute("DELETE FROM dems_votes WHERE resident_id=? AND success_date=?",(rid,success_date))
     c.commit()
- residentsrow_numbers=c.execute("SELECT * FROM residents WHERE year=4 AND status='active' ORDER BY surname").fetchall()
+ residentsrow_numbers=c.execute("SELECT * FROM residents WHERE year=4 AND status='active' AND COALESCE(resident_type,'local')<>'external' ORDER BY surname").fetchall()
  archiverow_numbers=c.execute("SELECT d.*,r.surname,r.firstname FROM dems_archive d JOIN residents r ON r.id=d.resident_id ORDER BY d.id DESC").fetchall()
  pending_votes=c.execute("SELECT v.*,r.surname,r.firstname FROM dems_votes v JOIN residents r ON r.id=v.resident_id ORDER BY v.created_at DESC").fetchall()
  c.close()
