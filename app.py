@@ -2149,9 +2149,12 @@ def exams():
     exam_id=int(request.form.get("exam_id","0"))
     old_record=c.execute("SELECT * FROM exam_records WHERE id=?",(exam_id,)).fetchone()
     if not old_record: raise ValueError("Exam record not found.")
-    audit_event(c,"exam.deleted",f"exam_id={exam_id}; resident_id={old_record['resident_id']}; postgraduate_year={old_record['postgrad_year']}; study_year={old_record['study_year']}; module={old_record['module']}; session={old_record['exam_type']}; attempt={old_record['attempt']}; theory={old_record['theory']}; practical={old_record['practical']}")
+    reason=L("Suppression demandée par le Super Admin","Deletion requested by Super Admin","طلب المسؤول العام الحذف")
+    c.execute("INSERT INTO trash_items(entity_type,entity_id,label,reason,snapshot_json,deleted_at,deleted_by) VALUES(?,?,?,?,?,?,?)",
+      ("exam_record",str(exam_id),str(old_record["module"])+" — "+str(old_record["theory"])+"/"+str(old_record["practical"]),reason,json.dumps({"record":dict(old_record)},ensure_ascii=False),datetime.now().replace(microsecond=0).isoformat(),session.get("username","")))
+    audit_event(c,"exam.deleted",f"exam_id={exam_id}; resident_id={old_record['resident_id']}; postgraduate_year={old_record['postgrad_year']}; study_year={old_record['study_year']}; module={old_record['module']}; session={old_record['exam_type']}; attempt={old_record['attempt']}; theory={old_record['theory']}; practical={old_record['practical']}; moved_to_trash_for_six_months=true")
     c.execute("DELETE FROM exam_records WHERE id=?",(exam_id,))
-    c.commit(); flash("Résultat supprimé et opération inscrite au journal d’audit.")
+    c.commit(); flash(L("Résultat déplacé dans la corbeille pour six mois.","Result moved to the trash for six months.","تم نقل النتيجة إلى سلة المهملات لمدة ستة أشهر."))
    except Exception as exc:
     c.rollback(); flash("Suppression impossible : "+str(exc)[:200])
    c.close(); return redirect("/exams")
