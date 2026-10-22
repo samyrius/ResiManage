@@ -659,6 +659,10 @@ def residents():
    repeat_year=request.form.get("repeat_year","0")
    try: year=int(request.form.get("year","0"))
    except (TypeError,ValueError): year=0
+   external_dates_valid=True
+   if resident_type=="external":
+    try: external_dates_valid=bool(external_start and external_end and date.fromisoformat(external_end)>=date.fromisoformat(external_start))
+    except ValueError: external_dates_valid=False
    if resident_type not in ("local","external"):
     flash(L("Type de résident invalide.","Invalid resident type.","نوع المقيم غير صالح."))
    elif not surname or not firstname or len(surname)>100 or len(firstname)>100 or year not in (1,2,3,4):
@@ -667,7 +671,7 @@ def residents():
     flash(L("Le téléphone doit contenir au maximum 40 caractères et le champ redoublement doit valoir 0 ou 1.","Phone must be at most 40 characters and repeat flag must be 0 or 1.","يجب ألا يتجاوز الهاتف 40 حرفًا، ويجب أن تكون قيمة الإعادة 0 أو 1."))
    elif resident_type=="external" and (not origin_hospital or not external_start or not external_end):
     flash(L("Pour un résident externe, l’établissement d’origine et les dates de début et de fin sont obligatoires.","For an external resident, the home institution and start/end dates are required.","بالنسبة للمقيم الخارجي، المؤسسة الأصلية وتاريخا البداية والنهاية إجبارية."))
-   elif resident_type=="external" and (date.fromisoformat(external_end)<date.fromisoformat(external_start)):
+   elif resident_type=="external" and not external_dates_valid:
     flash(L("La date de fin du stage doit être égale ou postérieure à la date de début.","Rotation end date must be on or after the start date.","يجب أن يكون تاريخ نهاية التربص بعد تاريخ بدايته أو مساويًا له."))
    elif c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=? AND COALESCE(resident_type,'local')=? AND COALESCE(origin_hospital,'')=?",(surname,firstname,year,resident_type,origin_hospital)).fetchone():
     flash(L("Un résident portant le même nom, la même année et le même établissement existe déjà.","A resident with the same name, year and institution already exists.","يوجد مقيم بالاسم والسنة والمؤسسة نفسها."))
