@@ -3707,6 +3707,18 @@ def test_external_resident_is_saved_with_origin_and_rotation_dates(tmp_path, mon
         assert tuple(row) == ("external", "Hôpital périphérique", "2026-11-01", "2027-01-30")
 
 
+def test_external_resident_form_suggests_common_hospitals_and_shared_rules(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.get("/residents")
+    assert response.status_code == 200
+    assert b'list="external-hospital-options"' in response.data
+    assert b'value="EHS Cardio DBK"' in response.data
+    assert b'value="CAC DBK"' in response.data
+    assert "Autre".encode() in response.data
+    assert "Les mêmes règles de rotation".encode() in response.data
+
+
 def test_external_resident_requires_home_institution_and_valid_dates(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
