@@ -77,9 +77,29 @@ def test_login_page_and_language_selector(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     response = client.get("/login")
     assert response.status_code == 200
+    assert b'<html lang="fr" dir="ltr">' in response.data
     assert "Français".encode() in response.data
     assert "English".encode() in response.data
+    assert b'Identifiant ou e-mail' in response.data
+    assert "اسم المستخدم أو البريد الإلكتروني".encode() not in response.data
     assert b'name="_csrf_token"' in response.data
+
+def test_registration_screen_uses_selected_french_without_arabic_form_labels(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    response = client.get("/register")
+    assert response.status_code == 200
+    assert b'<html lang="fr" dir="ltr">' in response.data
+    assert b'Nom d’utilisateur' in response.data
+    assert "اسم المستخدم".encode() not in response.data
+    client.get("/lang/en", headers={"Referer": "http://localhost/register"})
+    english = client.get("/register")
+    assert b'<html lang="en" dir="ltr">' in english.data
+    assert b'Username' in english.data
+    assert "اسم المستخدم".encode() not in english.data
+    client.get("/lang/ar", headers={"Referer": "http://localhost/register"})
+    arabic = client.get("/register")
+    assert b'<html lang="ar" dir="rtl">' in arabic.data
+    assert "اسم المستخدم".encode() in arabic.data
 
 
 
