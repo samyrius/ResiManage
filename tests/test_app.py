@@ -1354,7 +1354,7 @@ def test_external_rotation_creation_rejects_overlap_with_existing_local_assignme
         "start_date":start_day.isoformat(),"end_date":end_day.isoformat(),"notes":"overlap"
     }, follow_redirects=True)
     assert response.status_code == 200
-    assert b"overlaps an existing local assignment" in response.data
+    assert "Le stage à l’étranger chevauche une affectation locale existante".encode() in response.data
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM external_rotations WHERE resident_id=?", (rid,)).fetchone()[0] == 0
 
@@ -2828,7 +2828,7 @@ def test_leave_rejects_unknown_resident_without_creating_leave_years(tmp_path, m
         "end_date": "2026-11-05",
     }, follow_redirects=True)
     assert response.status_code == 200
-    assert b"Resident does not exist." in response.data
+    assert "Ce résident n’existe pas".encode() in response.data
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM leave_entries").fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM leave_years WHERE resident_id=987654321").fetchone()[0] == 0
