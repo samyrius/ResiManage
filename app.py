@@ -412,14 +412,6 @@ def super_guard():
  denied=guard()
  if denied: return denied
  if session.get("role")!="super_admin": return ("Forbidden — Super Admin only",403)
-@app.route("/select-year",methods=["POST"])
-def select_postgrad_year():
- if guard(): return redirect("/login")
- c=db(); requested=str(request.form.get("year","")).strip(); valid=available_postgrad_years(c); current=setting(c,"year"); c.close()
- if requested==current or requested in valid: session["selected_postgrad_year"]=requested
- else: flash(L("Année de post-graduation invalide.","Invalid postgraduate year.","سنة ما بعد التدرج غير صالحة."))
- return redirect(request.referrer or "/")
-
 @app.get("/lang/<lang>")
 def lang(lang):
  if lang in LANGS: session["lang"]=lang
