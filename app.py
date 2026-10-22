@@ -214,6 +214,7 @@ def init():
  CREATE TABLE IF NOT EXISTS leave_years(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL,year INTEGER NOT NULL,earned_days INTEGER NOT NULL DEFAULT 30,created_by TEXT DEFAULT '',UNIQUE(resident_id,year));
  CREATE TABLE IF NOT EXISTS leave_entries(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL,start_date TEXT NOT NULL,end_date TEXT NOT NULL,days INTEGER NOT NULL,notes TEXT DEFAULT '',created_by TEXT DEFAULT '',created_at TEXT DEFAULT CURRENT_TIMESTAMP);
  CREATE TABLE IF NOT EXISTS external_rotations(id INTEGER PRIMARY KEY,resident_id INTEGER NOT NULL,supervisor TEXT NOT NULL,destination TEXT NOT NULL,hospital TEXT NOT NULL,country TEXT NOT NULL,rotation_type TEXT NOT NULL,start_date TEXT NOT NULL,end_date TEXT NOT NULL,notes TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'active',request_status TEXT NOT NULL DEFAULT 'approved',created_by TEXT DEFAULT '',created_at TEXT DEFAULT CURRENT_TIMESTAMP,updated_at TEXT DEFAULT CURRENT_TIMESTAMP);
+ CREATE TABLE IF NOT EXISTS trash_items(id INTEGER PRIMARY KEY,entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,label TEXT NOT NULL,reason TEXT NOT NULL,snapshot_json TEXT NOT NULL,deleted_at TEXT NOT NULL,deleted_by TEXT NOT NULL,UNIQUE(entity_type,entity_id));
  """)
  ensure_column(c,"exam_records","exam_type","TEXT NOT NULL DEFAULT 'actual'")
  ensure_column(c,"exam_records","attempt","INTEGER NOT NULL DEFAULT 1")
@@ -607,18 +608,21 @@ def residents():
    if not target or not reason: flash(L("Dossier introuvable ou motif de suppression manquant.","Record not found or deletion reason missing.","الملف غير موجود أو سبب الحذف مفقود."))
    elif target["status"]=="graduated": flash(L("Un diplômé archivé par le processus DEMS ne peut pas être supprimé depuis cet écran.","A DEMS graduate cannot be deleted from this screen.","لا يمكن حذف خريج مؤرشف عبر مسار DEMS من هذه الشاشة."))
    else:
-    audit_event(c,"resident.deleted",f"resident_id={rid}; name={target['surname']} {target['firstname']}; reason={reason}; linked_history_removed=1")
-    for table in ("assignments","history","exam_records","leave_years","leave_entries","external_rotations","promotion_votes","dems_votes","dems_archive"):
+    tables=("assignments","history","exam_records","leave_years","leave_entries","external_rotations","promotion_votes","dems_votes","dems_archive")
+    snapshot={"resident":dict(c.execute("SELECT * FROM residents WHERE id=?",(rid,)).fetchone()),"related":{}}
+    for table in tables:
+     columns={row[1] for row in c.execute("PRAGMA table_info("+table+")")}
+     if "resident_id" in columns:
+      snapshot["related"][table]=[dict(x) for x in c.execute("SELECT * FROM "+table+" WHERE resident_id=?",(rid,)).fetchall()]
+    deleted_at=datetime.now().replace(microsecond=0)
+    c.execute("INSERT INTO trash_items(entity_type,entity_id,label,reason,snapshot_json,deleted_at,deleted_by) VALUES(?,?,?,?,?,?,?)",("resident",str(rid),target["surname"]+" "+target["firstname"],reason,json.dumps(snapshot,ensure_ascii=False),deleted_at.isoformat(),session.get("username","")))
+    for table in tables:
      columns={row[1] for row in c.execute("PRAGMA table_info("+table+")")}
      if "resident_id" in columns: c.execute("DELETE FROM "+table+" WHERE resident_id=?",(rid,))
-    photo=c.execute("SELECT photo_path FROM residents WHERE id=?",(rid,)).fetchone()
-    c.execute("DELETE FROM residents WHERE id=?",(rid,)); c.commit()
-    if photo and photo["photo_path"]:
-     try:
-      photo_path=os.path.join(BASE,photo["photo_path"])
-      if os.path.isfile(photo_path) and os.path.commonpath([BASE,os.path.abspath(photo_path)])==BASE: os.remove(photo_path)
-     except (OSError,ValueError): pass
-    flash(L("Dossier et données associées supprimés ; opération consignée dans le journal.","Record and linked data deleted; action logged.","تم حذف الملف والبيانات المرتبطة به وتسجيل العملية في سجل التدقيق."))
+    c.execute("DELETE FROM residents WHERE id=?",(rid,))
+    audit_event(c,"resident.trashed",f"resident_id={rid}; name={target['surname']} {target['firstname']}; reason={reason}; retained_for_six_months")
+    c.commit()
+    flash(L("Dossier déplacé dans la corbeille pour six mois. Les données associées sont conservées.","Record moved to the trash for six months. Associated data is retained.","تم نقل الملف إلى سلة المهملات لمدة ستة أشهر مع الاحتفاظ بالبيانات المرتبطة."))
   elif action=="edit":
    try:
     rid=int(request.form["rid"])
