@@ -2,17 +2,7 @@ name: Android APK + emulator smoke tests
 
 # Paused by user request until all ResiManage 2 directives are implemented.
 on:
-  push:
-    branches:
-      - "resimanage-2-work"
-    paths:
-      - ".github/workflows/android-apk.yml"
-      - ".github/workflows/build-resimanage-windows.yml"
-      - "android/**"
-      - "app.py"
-      - "requirements.txt"
-      - "static/**"
-      - "tests/**"
+  # APK/emulator builds must be explicitly requested by the user.
   workflow_dispatch:
 
 permissions:
