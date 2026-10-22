@@ -824,11 +824,13 @@ def rotation_board():
    if not period or not terrain: raise ValueError("Terrain or period not found")
    if action=="unassign":
     rid=int(request.form.get("resident_id","0"))
-    assignment=c.execute("SELECT id,status FROM assignments WHERE resident_id=? AND terrain_id=? AND period_id=? AND status IN ('confirmed','pending')",(rid,tid,pid)).fetchone()
-    if not assignment: raise ValueError("Aucune affectation active à supprimer pour ce résident")
+    assignment=c.execute("SELECT a.*,r.surname,r.firstname,t.name terrain,p.name period FROM assignments a JOIN residents r ON r.id=a.resident_id JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id WHERE a.resident_id=? AND a.terrain_id=? AND a.period_id=? AND a.status IN ('confirmed','pending')",(rid,tid,pid)).fetchone()
+    if not assignment: raise ValueError("Aucune affectation active à retirer pour ce résident")
+    reason=L("Affectation retirée du tableau par le Super Admin","Assignment removed from the board by Super Admin","أزال المسؤول العام التعيين من الجدول")
+    c.execute("INSERT INTO trash_items(entity_type,entity_id,label,reason,snapshot_json,deleted_at,deleted_by) VALUES(?,?,?,?,?,?,?)",("assignment",str(assignment["id"]),assignment["surname"]+" "+assignment["firstname"]+" — "+assignment["terrain"]+" / "+assignment["period"],reason,json.dumps({"record":{k:assignment[k] for k in ("id","resident_id","terrain_id","period_id","status")}},ensure_ascii=False),datetime.now().replace(microsecond=0).isoformat(),session.get("username","")))
     c.execute("UPDATE assignments SET status='cancelled' WHERE id=?",(assignment["id"],))
-    audit_event(c,"assignment.cancelled","assignment_id="+str(assignment["id"])+"; resident_id="+str(rid)+"; terrain_id="+str(tid)+"; period_id="+str(pid)+"; year="+y+"; reason=user_removed_from_board")
-    c.commit(); flash(L("Choix supprimé du tableau. L’opération reste inscrite dans le journal.","Assignment removed from the board. The action remains in the audit log.","تم حذف الاختيار من الجدول. تبقى العملية مسجلة في سجل التدقيق."))
+    audit_event(c,"assignment.cancelled","assignment_id="+str(assignment["id"])+"; resident_id="+str(rid)+"; terrain_id="+str(tid)+"; period_id="+str(pid)+"; year="+y+"; reason=user_removed_from_board; retained_in_trash_for_six_months=true")
+    c.commit(); flash(L("Affectation retirée du tableau et conservée dans la corbeille pendant six mois. Vous pouvez la restaurer avant l’échéance.","Assignment removed from the board and kept in the trash for six months. You can restore it before expiry.","تمت إزالة التعيين من الجدول وحفظه في سلة المهملات لمدة ستة أشهر. يمكنك استعادته قبل انتهاء المدة."))
    elif action=="capacity":
     places=int(request.form.get("places",""))
     if places<0: raise ValueError("Capacity cannot be negative")
@@ -2551,6 +2553,14 @@ def trash():
     elif item["entity_type"]=="leave_entry":
      record=snap["record"]; cols=[x[1] for x in c.execute("PRAGMA table_info(leave_entries)") if x[1] in record]
      c.execute("INSERT INTO leave_entries("+",".join(cols)+") VALUES("+",".join("?" for _ in cols)+")",[record[x] for x in cols])
+    elif item["entity_type"]=="assignment":
+     record=snap["record"]
+     current=c.execute("SELECT id,status,terrain_id,period_id FROM assignments WHERE id=?",(record["id"],)).fetchone()
+     if not current or current["status"]!="cancelled" or current["terrain_id"]!=record["terrain_id"] or current["period_id"]!=record["period_id"]:
+      raise ValueError("Assignment changed after it was removed; cannot safely restore the old version.")
+     conflict=c.execute("SELECT id FROM assignments WHERE resident_id=? AND period_id=? AND id<>? AND status IN ('confirmed','pending')",(record["resident_id"],record["period_id"],record["id"])).fetchone()
+     if conflict: raise ValueError("Resident already has another active assignment in this period.")
+     c.execute("UPDATE assignments SET status=? WHERE id=?",(record["status"],record["id"]))
     else: raise ValueError("Unsupported trash type")
     c.execute("DELETE FROM trash_items WHERE id=?",(tid,))
     audit_event(c,"trash.restored",f"trash_id={tid}; resident_id={item['entity_id']}")
