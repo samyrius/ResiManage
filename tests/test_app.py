@@ -3803,9 +3803,9 @@ def test_external_resident_form_suggests_common_hospitals_and_shared_rules(tmp_p
     login(client)
     response = client.get("/residents")
     assert response.status_code == 200
-    assert b'list="external-hospital-options"' in response.data
-    assert b'value="EHS Cardio DBK"' in response.data
-    assert b'value="CAC DBK"' in response.data
+    assert b'<select name="origin_hospital" id="origin-hospital" required>' in response.data
+    assert b'<option value="EHS Cardio DBK">' in response.data
+    assert b'<option value="CAC DBK">' in response.data
     assert "Autre".encode() in response.data
     assert "Les mêmes règles de rotation".encode() in response.data
 
