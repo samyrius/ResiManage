@@ -3719,6 +3719,24 @@ def test_external_resident_form_suggests_common_hospitals_and_shared_rules(tmp_p
     assert "Les mêmes règles de rotation".encode() in response.data
 
 
+def test_external_resident_other_hospital_uses_specified_origin(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.post("/residents", data={
+        "action": "create", "surname": "Other", "firstname": "Hospital",
+        "year": "1", "resident_type": "external", "origin_hospital": "Autre",
+        "origin_hospital_other": "Etablissement Hospitalier de Draâ El Mizan",
+        "external_start_date": "2026-11-01", "external_end_date": "2027-01-30",
+        "repeat_year": "0"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        row = conn.execute(
+            "SELECT origin_hospital FROM residents WHERE surname='Other' AND firstname='Hospital'"
+        ).fetchone()
+        assert row and row["origin_hospital"] == "Etablissement Hospitalier de Draâ El Mizan"
+
+
 def test_external_resident_requires_home_institution_and_valid_dates(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
