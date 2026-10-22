@@ -3671,6 +3671,35 @@ def test_language_selection_is_consistent_across_core_screens(tmp_path, monkeypa
 
 
 
+def test_language_is_applied_to_planning_admin_and_import_templates(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    routes = [
+        "/terrains", "/rotation-board", "/residents", "/templates", "/trash",
+        "/objectives", "/history", "/summary", "/decisions", "/settings",
+        "/users", "/audit", "/backup", "/export", "/restore",
+        "/sync-devices", "/sync",
+    ]
+    expected = {
+        "fr": ["Ajouter un service", "Nombre de places", "Formulaires vierges téléchargeables", "Corbeille"],
+        "en": ["Add a department", "Number of places", "Downloadable blank forms", "Trash"],
+        "ar": ["إضافة مصلحة", "عدد المقاعد", "استمارات فارغة", "سلة المهملات"],
+    }
+    for language in ("fr", "en", "ar"):
+        client.get("/lang/" + language, headers={"Referer": "http://localhost/"})
+        pages = []
+        for route in routes:
+            response = client.get(route)
+            assert response.status_code == 200, (language, route)
+            assert ('<html lang="' + language + '"').encode() in response.data, (language, route)
+            pages.append(response.get_data(as_text=True))
+        combined = "\\n".join(pages)
+        for phrase in expected[language]:
+            assert phrase in combined, (language, phrase)
+        assert "Ajouter un service / Add a department / إضافة مصلحة" not in combined
+        assert "Nombre de places / Number of places / عدد المقاعد" not in combined
+
+
 def test_services_add_form_is_collapsed_and_capacity_is_inline_on_board(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
