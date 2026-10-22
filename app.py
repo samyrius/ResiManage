@@ -414,6 +414,35 @@ def super_guard():
  denied=guard()
  if denied: return denied
  if session.get("role")!="super_admin": return ("Forbidden — Super Admin only",403)
+
+@app.before_request
+def purge_expired_trash_automatically():
+ # Expired trash is purged on normal app traffic, not only when an admin opens /trash.
+ try:
+  c=db()
+  if not c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='trash_items'").fetchone():
+   c.close(); return
+  for item in c.execute("SELECT id,deleted_at,snapshot_json FROM trash_items").fetchall():
+   try:
+    deleted=datetime.fromisoformat(item["deleted_at"])
+    month=deleted.month+6; year=deleted.year+(month-1)//12; month=(month-1)%12+1
+    day=min(deleted.day,__import__("calendar").monthrange(year,month)[1])
+    if datetime.now()<deleted.replace(year=year,month=month,day=day): continue
+    snapshot=json.loads(item["snapshot_json"] or "{}")
+    photo_path=(snapshot.get("resident") or {}).get("photo_path","")
+    if photo_path:
+     photo_name=os.path.basename(photo_path)
+     photo_file=os.path.join(os.path.dirname(os.path.abspath(DB)),"resident_photos",photo_name)
+     if photo_name.startswith("resident_") and os.path.isfile(photo_file):
+      try: os.remove(photo_file)
+      except OSError: app.logger.warning("Could not purge expired resident photo: %s",photo_file)
+    c.execute("DELETE FROM trash_items WHERE id=?",(item["id"],))
+    audit_event(c,"trash.expired",f"trash_id={item['id']}; purged_after_six_calendar_months")
+   except (ValueError,TypeError,KeyError): continue
+  c.commit(); c.close()
+ except sqlite3.Error:
+  try: c.close()
+  except Exception: pass
 @app.get("/lang/<lang>")
 def lang(lang):
  if lang in LANGS: session["lang"]=lang
