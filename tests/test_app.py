@@ -410,7 +410,7 @@ def test_first_year_progression_does_not_advance_inactive_resident(tmp_path, mon
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert "resident is inactive".encode() in response.data
+    assert "Le résident est inactif".encode() in response.data
     with rotation_app.db() as conn:
         resident = conn.execute(
             "SELECT year,status FROM residents WHERE id=?", (rid,)
@@ -1183,7 +1183,7 @@ def test_assignment_page_has_priority_filters_and_clear_conflict_feedback(tmp_pa
     assert "تخطيط التربصات وتعيين المقيمين".encode() in response.data or b'Rotation planning &amp; resident assignment' in response.data or b'Rotation planning & resident assignment' in response.data
     assert b'rt-assignment-stats' in response.data
     assert b'rt-assignment-notice' in response.data
-    assert b'External rotation conflict' in response.data
+    assert 'تعارض تربص خارجي'.encode() in response.data
     assert b'rt-assignment-table' in response.data
 
 def test_inactive_core_terrain_does_not_block_repeat_eligibility(tmp_path, monkeypatch):
@@ -1384,7 +1384,7 @@ def test_external_rotation_edit_rejects_overlap_with_existing_local_assignment(t
         "start_date":start_day.isoformat(),"end_date":end_day.isoformat(),"notes":"overlap"
     }, follow_redirects=True)
     assert response.status_code == 200
-    assert b"overlaps an existing local assignment" in response.data
+    assert "Le stage à l’étranger chevauche une affectation locale existante".encode() in response.data
     with rotation_app.db() as conn:
         row = conn.execute("SELECT start_date,end_date FROM external_rotations WHERE id=?", (xid,)).fetchone()
         assert tuple(row) == (nonoverlap_start.isoformat(), nonoverlap_end.isoformat())
@@ -1450,7 +1450,7 @@ def test_first_year_evaluation_does_not_record_decision_for_resident_in_later_ye
         "all_modules_confirmed":"yes"
     }, follow_redirects=True)
     assert response.status_code == 200
-    assert b"Only current first-year residents" in response.data
+    assert "Seuls les résidents actuellement en première année".encode() in response.data
     with rotation_app.db() as conn:
         assert conn.execute("SELECT year FROM residents WHERE id=?", (rid,)).fetchone()[0] == 2
         assert conn.execute("SELECT COUNT(*) FROM decisions WHERE details LIKE ?", (f"%LaterYear Resident — first-year exams%",)).fetchone()[0] == 0
@@ -1619,7 +1619,7 @@ def test_inactive_resident_cannot_receive_promotion_votes(tmp_path, monkeypatch)
         "outcome":"approve","reason":"Should not count"
     }, follow_redirects=True)
     assert first.status_code == 200
-    assert b"Inactive residents cannot be advanced" in first.data
+    assert "Un résident inactif ne peut pas être promu".encode() in first.data
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM promotion_votes WHERE resident_id=?", (rid,)).fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='promotion.vote_recorded'").fetchone()[0] == 0
@@ -1865,14 +1865,14 @@ def test_exam_recording_rejects_future_year_and_graduated_resident(tmp_path, mon
         "module":"Future Module","theory":"15","practical":"15"
     }, follow_redirects=True)
     assert future.status_code == 200
-    assert b"Cannot record marks for a future study year" in future.data
+    assert "Impossible d’enregistrer des notes pour une année future".encode() in future.data
 
     graduated = client.post("/exams", data={
         "action":"record","resident":str(graduated_id),"study_year":"4",
         "module":"Late Module","theory":"15","practical":"15"
     }, follow_redirects=True)
     assert graduated.status_code == 200
-    assert b"Cannot record marks for a future study year" in graduated.data
+    assert "Impossible d’enregistrer des notes pour une année future".encode() in graduated.data
 
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM exam_records WHERE resident_id IN (?,?)", (future_id,graduated_id)).fetchone()[0] == 0
@@ -2057,7 +2057,7 @@ def test_exam_route_rejects_malformed_ids_and_scores_without_server_error(tmp_pa
         "module":"Module A","theory":"12","practical":"13",
     }, follow_redirects=True)
     assert bad_year.status_code == 200
-    assert b"Choose a valid resident and study year" in bad_year.data
+    assert "Choisissez un résident et une année d’étude valides".encode() in bad_year.data
 
     bad_score = client.post("/exams", data={
         "action":"record","resident":str(rid),"study_year":"1",
@@ -2107,7 +2107,7 @@ def test_dems_rejects_future_exam_date_without_vote_or_audit(tmp_path, monkeypat
     }, follow_redirects=True)
 
     assert response.status_code == 200
-    assert b"DEMS exam date cannot be in the future" in response.data
+    assert "La date de l’examen DEMS ne peut pas être dans le futur".encode() in response.data
     with rotation_app.db() as conn:
         assert conn.execute(
             "SELECT COUNT(*) FROM dems_votes WHERE resident_id=?", (rid,)
@@ -2813,7 +2813,7 @@ def test_first_year_evaluation_blocks_modules_with_only_virtual_marks(tmp_path, 
         "all_modules_confirmed": "yes",
     }, follow_redirects=True)
     assert response.status_code == 200
-    assert b"virtual marks alone do not count" in response.data
+    assert "les notes virtuelles seules ne comptent pas".encode() in response.data
     with rotation_app.db() as conn:
         assert conn.execute("SELECT year FROM residents WHERE id=?", (rid,)).fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM decisions WHERE details LIKE '%Incomplete Sessions%'").fetchone()[0] == 0
@@ -2946,7 +2946,7 @@ def test_external_internship_request_requires_admin_approval_before_blocking_ass
         follow_redirects=True,
     )
     assert denied_approval.status_code == 200
-    assert b"overlaps an existing local assignment" in denied_approval.data
+    assert "Le stage à l’étranger chevauche une affectation locale existante".encode() in denied_approval.data
     with rotation_app.db() as conn:
         assert conn.execute(
             "SELECT request_status FROM external_rotations WHERE id=?", (row["id"],)
@@ -3195,7 +3195,7 @@ def test_sync_external_rotation_request_rejects_overlap_with_local_assignment(tm
             "request_status": "pending", "created_by": "test",
             "created_at": "2026-10-20 00:00:00", "updated_at": "2026-10-20 00:00:00",
         }
-        with pytest.raises(ValueError, match="overlaps an existing local assignment"):
+        with pytest.raises(ValueError, match="Le stage à l’étranger chevauche une affectation locale existante"):
             rotation_app._validate_sync_push_row(conn, "external_rotations", payload)
 
 def test_sync_push_leave_validation_supports_cross_year_leave_and_rejects_overlap(tmp_path, monkeypatch):
