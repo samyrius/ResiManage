@@ -2493,7 +2493,7 @@ def decide_external_rotation(xid):
         audit_event(c,"external_rotation.request_approved" if decision=="approve" else "external_rotation.request_rejected",f"id={xid}; resident_id={row['resident_id']}; decision={decision}; reviewer={session.get('user','')}")
         c.commit(); flash(L("Demande de stage à l’étranger "+("approuvée." if decision=="approve" else "refusée."),"External internship request "+("approved." if decision=="approve" else "rejected."),"طلب التربص بالخارج "+("تمت الموافقة عليه." if decision=="approve" else "تم رفضه.")))
     except Exception as exc:
-        c.rollback(); app.logger.warning("External internship decision failed: %s",exc); flash(L("La décision concernant la demande n’a pas été enregistrée. Vérifiez les dates et les conflits.","Request decision was not saved. Check the dates and conflicts.","لم يتم حفظ القرار بشأن الطلب. تحقق من التواريخ والتعارضات."))
+        c.rollback(); app.logger.warning("External internship decision failed: %s",exc); flash(L("La décision n’a pas été enregistrée : ","Request decision was not saved: ","لم يتم حفظ القرار: ")+str(exc)[:220])
     c.close(); return redirect("/external-rotations")
 
 @app.route("/external-rotations/<int:xid>/edit", methods=["GET","POST"])
