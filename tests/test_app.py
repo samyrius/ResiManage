@@ -3561,7 +3561,7 @@ def test_rotation_board_updates_occupancy_after_assignment_and_uses_readable_con
 
     response = client.get("/rotation-board")
     assert response.status_code == 200
-    assert b"Occup\xc3\xa9es : <strong>0</strong> / 4" in response.data
+    assert "Places occupées : <strong>0</strong> / 4".encode("utf-8") in response.data
 
     assigned = client.post(
         "/rotation-board",
@@ -3577,7 +3577,7 @@ def test_rotation_board_updates_occupancy_after_assignment_and_uses_readable_con
     )
     assert assigned.status_code == 200
     assert b"BoardCount Resident" in assigned.data
-    assert b"Occup\xc3\xa9es : <strong>1</strong> / 4" in assigned.data
+    assert "Places occupées : <strong>1</strong> / 4".encode("utf-8") in assigned.data
     assert b".rt-board-table td{color:#10263a!important;background-color:#f8fbff}" in assigned.data
     assert b".rt-board-cell-form input,.rt-board-cell-form select{color:#10263a!important;background:#fff!important" in assigned.data
 
