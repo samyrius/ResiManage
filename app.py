@@ -1589,7 +1589,14 @@ def sync_api_push():
      c.execute(f"INSERT OR REPLACE INTO {entity} ({cols}) VALUES ({marks})",values)
     else:
      if entity not in _SYNC_PUSH_DELETE_ENTITIES: raise ValueError("delete is not allowed for this entity")
+     record=c.execute(f"SELECT * FROM {entity} WHERE id=?",(numeric_id,)).fetchone()
+     if not record: raise ValueError("record not found")
+     label=str(entity)+" #"+str(numeric_id)
+     reason="Deleted through authenticated device synchronization; retained for six months"
+     c.execute("INSERT INTO trash_items(entity_type,entity_id,label,reason,snapshot_json,deleted_at,deleted_by) VALUES(?,?,?,?,?,?,?)",
+       (entity,str(numeric_id),label,reason,json.dumps({"record":dict(record)},ensure_ascii=False),datetime.now().replace(microsecond=0).isoformat(),device["device_id"]))
      c.execute(f"DELETE FROM {entity} WHERE id=?",(numeric_id,))
+     audit_event(c,"sync.record_trashed",f"device_id={device['device_id']}; entity={entity}; entity_id={numeric_id}; retained_for_six_months=true")
     # Return the row's own version, not the later audit-log sequence, so
     # unrelated changes cannot mask a concurrent edit to this entity.
     server_seq=c.execute("SELECT COALESCE(MAX(seq),0) FROM sync_change_log WHERE entity=? AND entity_id=?",(entity,entity_id)).fetchone()[0]
@@ -2567,6 +2574,12 @@ def trash():
      conflict=c.execute("SELECT id FROM assignments WHERE resident_id=? AND period_id=? AND id<>? AND status IN ('confirmed','pending')",(record["resident_id"],record["period_id"],record["id"])).fetchone()
      if conflict: raise ValueError("Resident already has another active assignment in this period.")
      c.execute("UPDATE assignments SET status=? WHERE id=?",(record["status"],record["id"]))
+    elif item["entity_type"] in ("history","objectives","leave_entries"):
+     table={"history":"history","objectives":"objectives","leave_entries":"leave_entries"}[item["entity_type"]]
+     record=snap["record"]
+     columns={x[1] for x in c.execute("PRAGMA table_info("+table+")")}
+     cols=[key for key in record if key in columns]
+     c.execute("INSERT INTO "+table+"("+",".join(cols)+") VALUES("+",".join("?" for _ in cols)+")",[record[key] for key in cols])
     else: raise ValueError("Unsupported trash type")
     c.execute("DELETE FROM trash_items WHERE id=?",(tid,))
     audit_event(c,"trash.restored",f"trash_id={tid}; resident_id={item['entity_id']}")
