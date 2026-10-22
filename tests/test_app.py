@@ -3751,6 +3751,17 @@ def test_external_resident_requires_home_institution_and_valid_dates(tmp_path, m
         assert conn.execute("SELECT 1 FROM residents WHERE surname='Visiting' AND firstname='Invalid'").fetchone() is None
 
 
+def test_word_template_human_labels_normalize_to_import_fields():
+    assert rotation_app.normalize_header("☐ Inscrit à l’Ordre des médecins (cocher 1 ou X)") == "medical_order_registered_yes"
+    assert rotation_app.normalize_header("☐ Non inscrit à l’Ordre des médecins (cocher 1 ou X)") == "medical_order_registered_no"
+    assert rotation_app.normalize_header("NIN / numéro d’identification nationale") == "national_id_number"
+    assert rotation_app.normalize_header("Numéro de l’Ordre des médecins (si inscrit)") == "medical_order_number"
+    assert rotation_app.normalize_header("Numéro de sécurité sociale") == "social_security_number"
+    assert rotation_app.normalize_header("Établissement d’origine (EHS Cardio DBK, CAC DBK ou autre)") == "origin_hospital"
+    assert rotation_app.normalize_header("Début du stage au CHU") == "external_start_date"
+    assert rotation_app.normalize_header("Fin du stage au CHU") == "external_end_date"
+
+
 def test_downloadable_blank_templates_offer_standardized_headers(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
