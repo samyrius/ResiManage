@@ -3003,6 +3003,41 @@ def test_sync_change_journal_records_business_row_versions_and_tombstones(tmp_pa
     assert "users" not in entities
 
 
+def test_sync_journal_includes_full_resident_identity_and_archive_fields(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            """INSERT INTO residents(
+                surname,firstname,year,status,phone,phone2,birth_date,birth_place,address,email,
+                resident_card_number,national_id_number,medical_order_registered,medical_order_number,
+                social_security_number,registration_date,additional_info,resident_type,origin_hospital,
+                external_start_date,external_end_date,archive_type,archive_reason,archive_return_date,archived_at
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            ("Sync", "FullProfile", 2, "archived", "0550000000", "0660000000", "1990-01-02",
+             "Tizi Ouzou", "Address", "resident@example.test", "RC-1", "NIN-1", "yes", "OM-1",
+             "SS-1", "2018-09-01", "Extra notes", "external", "EHS Cardio DBK",
+             "2026-11-01", "2027-01-31", "temporary", "Leave", "2027-02-01", "2026-10-22"),
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Sync'").fetchone()[0]
+        payload = json.loads(conn.execute(
+            "SELECT payload_json FROM sync_change_log WHERE entity='residents' AND entity_id=? ORDER BY seq DESC LIMIT 1",
+            (str(rid),),
+        ).fetchone()["payload_json"])
+    for field, expected in {
+        "phone2": "0660000000", "birth_date": "1990-01-02", "address": "Address",
+        "email": "resident@example.test", "resident_card_number": "RC-1",
+        "national_id_number": "NIN-1", "medical_order_registered": "yes",
+        "medical_order_number": "OM-1", "social_security_number": "SS-1",
+        "registration_date": "2018-09-01", "additional_info": "Extra notes",
+        "resident_type": "external", "origin_hospital": "EHS Cardio DBK",
+        "external_start_date": "2026-11-01", "external_end_date": "2027-01-31",
+        "archive_type": "temporary", "archive_reason": "Leave",
+        "archive_return_date": "2027-02-01", "archived_at": "2026-10-22",
+    }.items():
+        assert payload[field] == expected
+
+
 def test_windows_sync_listener_requires_exact_vpn_ip_and_tls(monkeypatch, tmp_path):
     import windows_launcher as desktop_launcher
 
