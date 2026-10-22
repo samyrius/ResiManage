@@ -2359,33 +2359,33 @@ def leave_management():
                 if action=="delete_entry":
                     audit_event(c,"leave.entry_deleted",f"entry_id={entry_id}; resident_id={existing['resident_id']}; start={existing['start_date']}; end={existing['end_date']}; days={existing['days']}; notes={existing['notes']}")
                     c.execute("DELETE FROM leave_entries WHERE id=?",(entry_id,))
-                    c.commit(); flash("Congé supprimé par le Super Admin; opération inscrite au journal d’audit.")
+                    c.commit(); flash(L("Congé supprimé par le Super Admin ; opération inscrite au journal d’audit.","Leave deleted by Super Admin; action recorded in the audit log.","حذف المسؤول العام الإجازة؛ تم تسجيل العملية في سجل التدقيق."))
                 else:
                     start=date.fromisoformat(request.form["start_date"]); end=date.fromisoformat(request.form["end_date"])
-                    if end<start: raise ValueError("End date must not precede start date.")
+                    if end<start: raise ValueError(L("La date de fin ne peut pas précéder la date de début.","End date must not precede start date.","لا يمكن أن يسبق تاريخ النهاية تاريخ البداية."))
                     overlap=c.execute("SELECT id FROM leave_entries WHERE resident_id=? AND id<>? AND start_date<=? AND end_date>=?",(existing["resident_id"],entry_id,end.isoformat(),start.isoformat())).fetchone()
-                    if overlap: raise ValueError("Leave dates overlap another entry.")
+                    if overlap: raise ValueError(L("Les dates du congé chevauchent une autre entrée.","Leave dates overlap another entry.","تتداخل تواريخ الإجازة مع سجل آخر."))
                     days=(end-start).days+1
                     notes=request.form.get("notes","").strip()
                     c.execute("UPDATE leave_entries SET start_date=?,end_date=?,days=?,notes=? WHERE id=?",(start.isoformat(),end.isoformat(),days,notes,entry_id))
                     audit_event(c,"leave.entry_updated",f"entry_id={entry_id}; resident_id={existing['resident_id']}; before={existing['start_date']}..{existing['end_date']} ({existing['days']} days); after={start}..{end} ({days} days); notes={notes}")
-                    c.commit(); flash("Congé corrigé par le Super Admin; ancienne et nouvelle valeurs inscrites au journal.")
+                    c.commit(); flash(L("Congé corrigé par le Super Admin ; les anciennes et nouvelles valeurs sont consignées dans le journal.","Leave corrected by Super Admin; old and new values recorded in the audit log.","صحح المسؤول العام الإجازة؛ تم تسجيل القيم القديمة والجديدة في سجل التدقيق."))
             except Exception as exc:
-                c.rollback(); app.logger.warning("Leave update failed: %s",exc); flash(L("La correction du congé a échoué. Vérifiez les dates et les informations saisies.","Leave update failed. Check the dates and entered information.","فشل تصحيح الإجازة. تحقق من التواريخ والمعلومات المدخلة."))
+                c.rollback(); app.logger.warning("Leave update failed: %s",exc); flash(L("La correction du congé a échoué : ","Leave update failed: ","فشل تصحيح الإجازة: ")+str(exc)[:220])
             c.close(); return redirect("/leave")
         try:
             rid=int(request.form["resident_id"])
             if not c.execute("SELECT 1 FROM residents WHERE id=?",(rid,)).fetchone():
                 raise ValueError(L("Ce résident n’existe pas.","Resident does not exist.","هذا المقيم غير موجود."))
             start=date.fromisoformat(request.form["start_date"]); end=date.fromisoformat(request.form["end_date"])
-            if end<start: raise ValueError("End date must not precede start date.")
+            if end<start: raise ValueError(L("La date de fin ne peut pas précéder la date de début.","End date must not precede start date.","لا يمكن أن يسبق تاريخ النهاية تاريخ البداية."))
             days=(end-start).days+1
             overlap=c.execute("SELECT id FROM leave_entries WHERE resident_id=? AND start_date<=? AND end_date>=?",(rid,end.isoformat(),start.isoformat())).fetchone()
-            if overlap: raise ValueError("Leave dates overlap an existing entry")
+            if overlap: raise ValueError(L("Les dates du congé chevauchent une entrée existante.","Leave dates overlap an existing entry","تتداخل تواريخ الإجازة مع سجل موجود."))
             historical=request.form.get("historical_record")=="1"
             resident=c.execute("SELECT registration_date FROM residents WHERE id=?",(rid,)).fetchone()
             if historical and end>date.today():
-                raise ValueError("Historical leave entries must end today or earlier.")
+                raise ValueError(L("Un congé historique doit se terminer aujourd’hui ou avant.","Historical leave entries must end today or earlier.","يجب أن تنتهي الإجازة السابقة اليوم أو قبله."))
             if not historical:
                 # Maintain explicit annual quotas. If a legacy resident has no registration
                 # date yet, record the 30-day entitlement per calendar year being entered;
@@ -2408,11 +2408,11 @@ def leave_management():
                     earned=c.execute("SELECT COALESCE(SUM(earned_days),0) FROM leave_years WHERE resident_id=? AND year<=?",(rid,end.year)).fetchone()[0]
                 used=c.execute("SELECT COALESCE(SUM(days),0) FROM leave_entries WHERE resident_id=? AND end_date<=?",(rid,end.isoformat())).fetchone()[0]
                 if used+days>earned:
-                    raise ValueError(f"Insufficient accrued leave balance: {max(0,earned-used)} days available on {end.isoformat()}.")
+                    raise ValueError(L(f"Solde de congés acquis insuffisant : {max(0,earned-used)} jours disponibles au {end.isoformat()}.",f"Insufficient accrued leave balance: {max(0,earned-used)} days available on {end.isoformat()}.",f"رصيد الإجازات المكتسب غير كافٍ: المتاح {max(0,earned-used)} يومًا بتاريخ {end.isoformat()}."))
             c.execute("INSERT INTO leave_entries(resident_id,start_date,end_date,days,notes,created_by) VALUES(?,?,?,?,?,?)",(rid,start.isoformat(),end.isoformat(),days,request.form.get("notes","").strip(),session.get("user","")))
             audit_event(c,"leave.entry_created",f"resident_id={rid}; start={start}; end={end}; days={days}")
             c.commit(); flash(L(f"Congé enregistré : {days} jours calendaires. Les jours non utilisés sont reportés.",f"Leave recorded: {days} calendar days. Unused entitlement carries forward.",f"تم تسجيل الإجازة: {days} أيام تقويمية. تُرحّل الأيام غير المستعملة."))
-        except Exception as exc: c.rollback(); app.logger.warning("Leave save failed: %s",exc); flash(L("Le congé n’a pas été enregistré. Vérifiez le résident, les dates et le solde disponible.","Leave was not saved. Check the resident, dates and available balance.","لم يتم حفظ الإجازة. تحقق من المقيم والتواريخ والرصيد المتاح."))
+        except Exception as exc: c.rollback(); app.logger.warning("Leave save failed: %s",exc); flash(L("Le congé n’a pas été enregistré : ","Leave was not saved: ","لم يتم حفظ الإجازة: ")+str(exc)[:220])
         c.close(); return redirect("/leave")
     residents=c.execute("SELECT id,surname,firstname,registration_date FROM residents ORDER BY year DESC,surname").fetchall()
     selected_year=active_postgrad_year(c)
