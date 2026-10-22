@@ -923,7 +923,7 @@ def check(c,rid,tid,pid,y):
   if ext_start>end_day or ext_end<start_day:
    return False,L("Cette période est en dehors des dates du stage du résident externe.","This period falls outside the external resident's rotation dates.","هذه الفترة خارج تواريخ تربص المقيم الخارجي."),None
  external = c.execute("SELECT hospital,country,start_date,end_date FROM external_rotations WHERE resident_id=? AND request_status='approved' AND status<>'cancelled' AND start_date<=? AND end_date>=? LIMIT 1",(rid,end_day.isoformat(),start_day.isoformat())).fetchone()
- if external: return False,("External rotation blocks local assignment: "+external["hospital"]+", "+external["country"]+" ("+external["start_date"]+" to "+external["end_date"]+")"),None
+ if external: return False,(L("Un stage à l’étranger approuvé bloque l’affectation locale : ","An approved external rotation blocks the local assignment: ","يمنع تربص خارجي معتمد التعيين المحلي: ")+external["hospital"]+", "+external["country"]+" ("+external["start_date"]+" "+L("au","to","إلى")+" "+external["end_date"]+")"),None
  dup=c.execute("SELECT t.name FROM assignments a JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=? AND a.period_id=? AND a.status IN ('confirmed','pending')",(rid,pid)).fetchone()
  if dup:return False,tr("duplicate")+dup["name"],None
  repeat = c.execute(
