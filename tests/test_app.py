@@ -3762,10 +3762,39 @@ def test_downloadable_blank_templates_offer_standardized_headers(tmp_path, monke
     assert full.headers.get("Content-Disposition", "").endswith("residents_modele_complet.csv")
     content = full.get_data(as_text=True)
     assert "national_id_number" in content
-    assert "medical_order_registered" in content
+    assert "medical_order_registered_yes" in content
+    assert "medical_order_registered_no" in content
+    assert "☐ Inscrit à l’Ordre des médecins" in content
+    assert "EHS Cardio DBK, CAC DBK ou autre" in content
     history = client.post("/templates", data={"form_type":"rotation_history", "extension":".csv", "year":"1"})
     assert history.status_code == 200
     assert "resident,terrain,year_label" in history.get_data(as_text=True)
+
+
+def test_import_template_registration_checkboxes_map_to_registration_status(tmp_path):
+    source = tmp_path / "checkbox_residents.csv"
+    source.write_text(
+        "surname,firstname,year,medical_order_registered_yes,medical_order_registered_no\\n"
+        "Test,Inscrit,1,x,\\n"
+        "Test,NonInscrit,1,,1\\n",
+        encoding="utf-8",
+    )
+    parsed = rotation_app.parse_import_file(str(source), ".csv")
+    assert parsed[0]["medical_order_registered"] == "yes"
+    assert parsed[1]["medical_order_registered"] == "no"
+    assert "medical_order_registered_yes" not in parsed[0]
+    assert "medical_order_registered_no" not in parsed[1]
+
+
+def test_import_template_rejects_both_registration_checkboxes(tmp_path):
+    source = tmp_path / "checkbox_conflict.csv"
+    source.write_text(
+        "surname,firstname,year,medical_order_registered_yes,medical_order_registered_no\\n"
+        "Test,Conflit,1,x,1\\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="Choose only one"):
+        rotation_app.parse_import_file(str(source), ".csv")
 
 
 def test_expired_trash_is_purged_on_normal_app_request(tmp_path, monkeypatch):
