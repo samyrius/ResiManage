@@ -5,7 +5,7 @@ import pytest
 from flask.testing import FlaskClient
 import io
 import sqlite3
-from datetime import timedelta
+from datetime import datetime, timedelta
 import re
 import zipfile
 import sys
