@@ -3746,7 +3746,7 @@ def test_external_resident_is_saved_with_origin_and_rotation_dates(tmp_path, mon
     response = client.post("/residents", data={
         "action": "create", "surname": "Visiting", "firstname": "Resident",
         "year": "2", "phone": "0550000000", "resident_type": "external",
-        "origin_hospital": "Hôpital périphérique", "external_start_date": "2026-11-01",
+        "origin_hospital": "Autre", "origin_hospital_other": "Hôpital périphérique", "external_start_date": "2026-11-01",
         "external_end_date": "2027-01-30", "repeat_year": "0"
     }, follow_redirects=True)
     assert response.status_code == 200
@@ -3840,6 +3840,21 @@ def test_external_resident_requires_home_institution_and_valid_dates(tmp_path, m
     assert response.status_code == 200
     with rotation_app.db() as conn:
         assert conn.execute("SELECT 1 FROM residents WHERE surname='Visiting' AND firstname='Invalid'").fetchone() is None
+
+
+def test_external_resident_rejects_unlisted_home_institution_choice(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.post("/residents", data={
+        "action": "create", "surname": "Visiting", "firstname": "Unlisted",
+        "year": "2", "resident_type": "external", "origin_hospital": "Random Hospital",
+        "external_start_date": "2026-11-01", "external_end_date": "2027-01-30",
+        "repeat_year": "0"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert "Choisissez EHS Cardio DBK, CAC DBK ou « Autre »".encode() in response.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT 1 FROM residents WHERE surname='Visiting' AND firstname='Unlisted'").fetchone() is None
 
 
 def test_word_template_human_labels_normalize_to_import_fields():
