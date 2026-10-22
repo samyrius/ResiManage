@@ -61,10 +61,10 @@ def test_internal_navigation_is_grouped_responsive_and_marks_current_page(tmp_pa
     response = client.get("/")
     assert response.status_code == 200
     assert b'class="rt-app-shell"' in response.data
-    assert b'aria-label="Main navigation"' in response.data or b'aria-label="\xd8\xa7\xd9\x84\xd8\xaa\xd9\x86\xd9\x82\xd9\x84 \xd8\xa7\xd9\x84\xd8\xb1\xd8\xa6\xd9\x8a\xd8\xb3\xd9\x8a"' in response.data
+    assert 'aria-label="Navigation principale"'.encode() in response.data
     assert b'href="/leave"' in response.data
     assert b'href="/external-rotations"' in response.data
-    assert "التربصات والتخطيط".encode() in response.data or b'Rotations &amp; planning' in response.data or b'Rotations & planning' in response.data
+    assert "Stages et planification".encode() in response.data
     assert b'class="nav-home is-active"' in response.data
     assert b'grid-template-columns:260px minmax(0,1fr)' in response.data
     assert b'@media(max-width:680px)' in response.data
@@ -122,7 +122,9 @@ def test_login_branding_uses_resimanage_and_navy_cyan_identity(tmp_path, monkeyp
     assert b"ecg-trace" in response.data
     assert b'type="image/jpeg" href="/static/resimanage-3d-icon.jpg"' in response.data
     assert b'class="login-emblem"' in response.data
-    assert b"Tous droits r\xc3\xa9serv\xc3\xa9s" in response.data
+    assert "Tous droits réservés · ResiManage · Dr Dris".encode() in response.data
+    assert b"All rights reserved" not in response.data
+    assert "جميع الحقوق محفوظة".encode() not in response.data
     assert b"All rights reserved" in response.data
     assert "ResiManage · Dr Dris".encode() in response.data
     assert "جميع الحقوق محفوظة".encode() in response.data
@@ -146,7 +148,7 @@ def test_login_and_protected_dashboard(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     response = login(client)
     assert response.status_code == 200
-    assert "Resident".encode() in response.data or "المقيمون".encode() in response.data
+    assert "Résidents".encode() in response.data
     client.get("/logout")
     protected = client.get("/residents")
     assert protected.status_code == 302
@@ -184,6 +186,7 @@ def test_seed_has_nineteen_terrains_and_four_periods(tmp_path, monkeypatch):
 
 def test_assignment_requires_capacity_and_blocks_same_period_duplicate(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
+    client.get("/lang/ar", headers={"Referer": "http://localhost/"})
     login(client)
     with rotation_app.db() as conn:
         resident_id = conn.execute("SELECT id FROM residents WHERE surname='TestSurname'").fetchone()
@@ -243,6 +246,7 @@ def test_assignment_requires_capacity_and_blocks_same_period_duplicate(tmp_path,
 
 def test_capacity_limit_is_enforced_for_two_residents(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
+    client.get("/lang/ar", headers={"Referer": "http://localhost/"})
     login(client)
     with rotation_app.db() as conn:
         conn.execute(
@@ -288,6 +292,7 @@ def test_capacity_limit_is_enforced_for_two_residents(tmp_path, monkeypatch):
 
 def test_repeat_is_blocked_until_all_core_terrains_are_completed(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
+    client.get("/lang/ar", headers={"Referer": "http://localhost/"})
     login(client)
     with rotation_app.db() as conn:
         conn.execute(
@@ -1166,6 +1171,7 @@ def test_dems_archive_is_blocked_if_either_official_rejects(tmp_path, monkeypatc
 
 def test_assignment_page_has_priority_filters_and_clear_conflict_feedback(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
+    client.get("/lang/ar", headers={"Referer": "http://localhost/"})
     login(client)
     with rotation_app.db() as conn:
         conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)", ("Priority", "Four", 4, "active"))
@@ -1184,6 +1190,7 @@ def test_assignment_page_has_priority_filters_and_clear_conflict_feedback(tmp_pa
 
 def test_inactive_core_terrain_does_not_block_repeat_eligibility(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
+    client.get("/lang/ar", headers={"Referer": "http://localhost/"})
     login(client)
     with rotation_app.db() as conn:
         conn.execute(
@@ -1621,6 +1628,7 @@ def test_inactive_resident_cannot_receive_promotion_votes(tmp_path, monkeypatch)
 
 def test_future_confirmed_rotations_do_not_count_as_completed_for_repeat_eligibility(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
+    client.get("/lang/ar", headers={"Referer": "http://localhost/"})
     login(client)
     with rotation_app.db() as conn:
         rid = conn.execute(
