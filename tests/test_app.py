@@ -3900,7 +3900,7 @@ def test_removed_assignment_is_retained_in_trash_and_can_be_restored(tmp_path, m
         trash = conn.execute("SELECT id,reason FROM trash_items WHERE entity_type='assignment' AND entity_id=?",
                              (str(assignment_id),)).fetchone()
         assert trash is not None
-        assert "six" in trash["reason"].lower() or "six" in trash["reason"].lower() or "six" in str(trash["reason"]).lower() or "Super Admin" in trash["reason"]
+        assert "Super Admin" in trash["reason"]
         trash_id = trash["id"]
     restored = client.post("/trash", data={"action": "restore", "trash_id": str(trash_id)}, follow_redirects=True)
     assert restored.status_code == 200
