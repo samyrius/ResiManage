@@ -1689,6 +1689,7 @@ def parse_import_file(path, extension, import_type='residents'):
   item={}
   for i,key in enumerate(header):
    if key and i<len(values): item[key]=str(values[i] if values[i] is not None else "").strip()
+  registration_columns_present=any(key in header for key in ("medical_order_registered","medical_order_registered_yes","medical_order_registered_no"))
   yes_value=str(item.pop("medical_order_registered_yes","") or "").strip().lower()
   no_value=str(item.pop("medical_order_registered_no","") or "").strip().lower()
   checked_yes=yes_value in ("1","x","yes","oui","true","✓","☑")
@@ -1697,6 +1698,7 @@ def parse_import_file(path, extension, import_type='residents'):
    raise ValueError("Choose only one medical-order registration checkbox (registered or not registered).")
   if checked_yes: item["medical_order_registered"]="yes"
   elif checked_no: item["medical_order_registered"]="no"
+  item["_medical_order_choice_present"]=registration_columns_present
   item["row_number"]=line_number
   parsed.append(item)
  if not parsed: raise ValueError("The file contains headers but no resident rows.")
@@ -1895,9 +1897,9 @@ def import_residents():
     registered=str(row.get("medical_order_registered","") or "").strip().lower()
     if registered in ("1","x","✓","☑","true","inscrit"): registered="yes"
     if registered in ("0","false","non inscrit","not registered"): registered="no"
-    if registered not in ("yes","no","oui","non"): row_errors.append(L("Cochez exactement une option pour l’Ordre des médecins : inscrit ou non inscrit.","Select exactly one medical-order option: registered or not registered.","اختر خيارًا واحدًا فقط بخصوص التسجيل في هيئة الأطباء: مسجل أو غير مسجل."))
+    if row.get("_medical_order_choice_present") and registered not in ("yes","no","oui","non"): row_errors.append(L("Cochez exactement une option pour l’Ordre des médecins : inscrit ou non inscrit.","Select exactly one medical-order option: registered or not registered.","اختر خيارًا واحدًا فقط بخصوص التسجيل في هيئة الأطباء: مسجل أو غير مسجل."))
     elif registered in ("yes","oui") and not str(row.get("medical_order_number","") or "").strip(): row_errors.append(L("Le numéro de l’Ordre des médecins est obligatoire si le résident est inscrit.","The medical-order number is required when the resident is registered.","رقم هيئة الأطباء إجباري إذا كان المقيم مسجلًا."))
-    row["medical_order_registered"]="yes" if registered in ("yes","oui") else "no" if registered in ("no","non") else registered
+    row["medical_order_registered"]="yes" if registered in ("yes","oui") else "no" if registered in ("no","non") else "no"
     for date_field,date_label in (("birth_date",L("date de naissance","birth date","تاريخ الميلاد")),("registration_date",L("date de première inscription","first registration date","تاريخ أول تسجيل"))):
      raw_date=str(row.get(date_field,"") or "").strip()
      if raw_date:
