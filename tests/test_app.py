@@ -944,7 +944,7 @@ def test_leave_carries_unused_days_forward_and_blocks_overdraw(tmp_path, monkeyp
     assert used == 35
     rejected = client.post("/leave", data={"resident_id": rid, "start_date": "2025-02-01", "end_date": "2025-02-26"}, follow_redirects=True)
     assert rejected.status_code == 200
-    assert b"Insufficient accrued leave balance" in rejected.data
+    assert "Solde de congés acquis insuffisant".encode() in rejected.data
     with rotation_app.db() as conn:
         assert conn.execute("SELECT SUM(days) FROM leave_entries WHERE resident_id=?", (rid,)).fetchone()[0] == 35
 
@@ -959,7 +959,7 @@ def test_leave_rejects_overlapping_entries(tmp_path, monkeypatch):
     client.post("/leave", data={"resident_id": rid, "start_date": "2026-01-01", "end_date": "2026-01-10"}, follow_redirects=True)
     rejected = client.post("/leave", data={"resident_id": rid, "start_date": "2026-01-05", "end_date": "2026-01-12"}, follow_redirects=True)
     assert rejected.status_code == 200
-    assert b"Leave dates overlap an existing entry" in rejected.data
+    assert "Les dates du congé chevauchent une entrée existante".encode() in rejected.data
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM leave_entries WHERE resident_id=?", (rid,)).fetchone()[0] == 1
 
