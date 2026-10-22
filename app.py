@@ -1740,6 +1740,30 @@ def blank_templates():
     for cell in ws[1]:
      cell.font=Font(bold=True,color="FFFFFF"); cell.fill=PatternFill("solid",fgColor="174B68"); cell.alignment=Alignment(wrap_text=True)
     ws.freeze_panes="A2"; ws.auto_filter.ref=ws.dimensions
+    # Add a human-readable guide without changing the importable first-row keys.
+    guide=wb.create_sheet("Guide")
+    guide.append(["Colonne à remplir","Libellé / consigne"])
+    for key,label in zip(headers,labels):
+     guide.append([key,label])
+    guide.append(["medical_order_registered","Inscrit : saisir oui/non. Si oui, renseigner medical_order_number."])
+    guide.append(["resident_type","Saisir local ou external. Pour un résident externe, remplir origin_hospital, external_start_date et external_end_date."])
+    guide.append(["Dates","Utiliser le format AAAA-MM-JJ. Ne pas inventer d’historique de stage."])
+    for cell in guide[1]:
+     cell.font=Font(bold=True,color="FFFFFF"); cell.fill=PatternFill("solid",fgColor="174B68")
+    guide.freeze_panes="A2"; guide.column_dimensions["A"].width=34; guide.column_dimensions["B"].width=76
+    from openpyxl.worksheet.datavalidation import DataValidation
+    if "year" in headers:
+     year_col=headers.index("year")+1
+     dv=DataValidation(type="list",formula1='"1,2,3,4"',allow_blank=True)
+     ws.add_data_validation(dv); dv.add(f"{ws.cell(2,year_col).coordinate}:{ws.cell(501,year_col).coordinate}")
+    if "medical_order_registered" in headers:
+     reg_col=headers.index("medical_order_registered")+1
+     dv=DataValidation(type="list",formula1='"oui,non,yes,no"',allow_blank=True)
+     ws.add_data_validation(dv); dv.add(f"{ws.cell(2,reg_col).coordinate}:{ws.cell(501,reg_col).coordinate}")
+    if "resident_type" in headers:
+     type_col=headers.index("resident_type")+1
+     dv=DataValidation(type="list",formula1='"local,external"',allow_blank=True)
+     ws.add_data_validation(dv); dv.add(f"{ws.cell(2,type_col).coordinate}:{ws.cell(501,type_col).coordinate}")
     for col in ws.columns:
      letter=col[0].column_letter; ws.column_dimensions[letter].width=min(32,max(16,max(len(str(x.value or "")) for x in col)+2))
     wb.save(output); output.seek(0); mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -1753,7 +1777,7 @@ def blank_templates():
     for _ in range(8):
      cells=table.add_row().cells
      for cell in cells: cell.text=" "
-    doc.add_paragraph("Pour une inscription à l’Ordre des médecins, renseigner « oui » ou « non » et le numéro si inscrit. Ne pas inventer les stages antérieurs : utiliser uniquement des données documentées.")
+    doc.add_paragraph("Ordre des médecins : ☐ Inscrit ☐ Non inscrit. À l’importation, inscrire « oui » ou « non » dans la colonne correspondante ; si inscrit, renseigner le numéro. Ne pas inventer les stages antérieurs : utiliser uniquement des données documentées.")
     doc.save(output); output.seek(0); mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
    else:
     from reportlab.lib.pagesizes import A4, landscape
