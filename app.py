@@ -1892,6 +1892,20 @@ def import_residents():
     seen.add(key)
     row_type=str(row.get("resident_type","local") or "local").strip().lower()
     if row_type not in ("local","external"): row_errors.append(L("La catégorie doit être local ou external.","Category must be local or external.","يجب أن تكون الفئة local أو external."))
+    registered=str(row.get("medical_order_registered","") or "").strip().lower()
+    if registered in ("1","x","✓","☑","true","inscrit"): registered="yes"
+    if registered in ("0","false","non inscrit","not registered"): registered="no"
+    if registered not in ("yes","no","oui","non"): row_errors.append(L("Cochez exactement une option pour l’Ordre des médecins : inscrit ou non inscrit.","Select exactly one medical-order option: registered or not registered.","اختر خيارًا واحدًا فقط بخصوص التسجيل في هيئة الأطباء: مسجل أو غير مسجل."))
+    elif registered in ("yes","oui") and not str(row.get("medical_order_number","") or "").strip(): row_errors.append(L("Le numéro de l’Ordre des médecins est obligatoire si le résident est inscrit.","The medical-order number is required when the resident is registered.","رقم هيئة الأطباء إجباري إذا كان المقيم مسجلًا."))
+    row["medical_order_registered"]="yes" if registered in ("yes","oui") else "no" if registered in ("no","non") else registered
+    for date_field,date_label in (("birth_date",L("date de naissance","birth date","تاريخ الميلاد")),("registration_date",L("date de première inscription","first registration date","تاريخ أول تسجيل"))):
+     raw_date=str(row.get(date_field,"") or "").strip()
+     if raw_date:
+      try:
+       parsed_date=date.fromisoformat(raw_date)
+       if parsed_date>date.today(): raise ValueError()
+      except ValueError:
+       row_errors.append(L(f"La {date_label} doit être une date valide au format AAAA-MM-JJ et ne peut pas être dans le futur.",f"The {date_label} must be a valid YYYY-MM-DD date and cannot be in the future.",f"يجب أن يكون {date_label} تاريخًا صحيحًا بالتنسيق YYYY-MM-DD وألا يكون في المستقبل."))
     if row_type=="external" and (not row.get("origin_hospital","").strip() or not row.get("external_start_date","").strip() or not row.get("external_end_date","").strip()):
      row_errors.append(L("Un résident externe doit avoir un établissement d’origine et des dates de stage.","An external resident must have a home institution and rotation dates.","يجب أن يكون للمقيم الخارجي مؤسسة أصلية وتواريخ تربص."))
     elif row_type=="external":
