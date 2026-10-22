@@ -1923,7 +1923,7 @@ def test_profile_rejects_invalid_identity_and_preserves_photo_when_omitted(tmp_p
         "surname":"   ","firstname":"Resident","birth_date":"2099-01-01"
     }, follow_redirects=True)
     assert invalid.status_code == 200
-    assert b"Surname and first name are required" in invalid.data
+    assert "Le nom et le prénom sont obligatoires".encode() in invalid.data
     with rotation_app.db() as conn:
         row = conn.execute("SELECT surname,photo_path FROM residents WHERE id=?",(rid,)).fetchone()
         assert row["surname"] == "Original"
