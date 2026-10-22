@@ -2451,6 +2451,9 @@ def trash():
     elif item["entity_type"]=="exam_record":
      record=snap["record"]; cols=[x[1] for x in c.execute("PRAGMA table_info(exam_records)") if x[1] in record]
      c.execute("INSERT INTO exam_records("+",".join(cols)+") VALUES("+",".join("?" for _ in cols)+")",[record[x] for x in cols])
+    elif item["entity_type"]=="leave_entry":
+     record=snap["record"]; cols=[x[1] for x in c.execute("PRAGMA table_info(leave_entries)") if x[1] in record]
+     c.execute("INSERT INTO leave_entries("+",".join(cols)+") VALUES("+",".join("?" for _ in cols)+")",[record[x] for x in cols])
     else: raise ValueError("Unsupported trash type")
     c.execute("DELETE FROM trash_items WHERE id=?",(tid,))
     audit_event(c,"trash.restored",f"trash_id={tid}; resident_id={item['entity_id']}")
@@ -2630,9 +2633,12 @@ def leave_management():
                 existing=c.execute("SELECT * FROM leave_entries WHERE id=?",(entry_id,)).fetchone()
                 if not existing: raise ValueError("Leave entry does not exist.")
                 if action=="delete_entry":
-                    audit_event(c,"leave.entry_deleted",f"entry_id={entry_id}; resident_id={existing['resident_id']}; start={existing['start_date']}; end={existing['end_date']}; days={existing['days']}; notes={existing['notes']}")
+                    reason=L("Suppression demandée par le Super Admin","Deletion requested by Super Admin","طلب المسؤول العام الحذف")
+                    c.execute("INSERT INTO trash_items(entity_type,entity_id,label,reason,snapshot_json,deleted_at,deleted_by) VALUES(?,?,?,?,?,?,?)",
+                      ("leave_entry",str(entry_id),L("Congé du résident","Resident leave entry","إجازة المقيم")+" #"+str(entry_id),reason,json.dumps({"record":dict(existing)},ensure_ascii=False),datetime.now().replace(microsecond=0).isoformat(),session.get("username","")))
+                    audit_event(c,"leave.entry_deleted",f"entry_id={entry_id}; resident_id={existing['resident_id']}; start={existing['start_date']}; end={existing['end_date']}; days={existing['days']}; notes={existing['notes']}; moved_to_trash_for_six_months=true")
                     c.execute("DELETE FROM leave_entries WHERE id=?",(entry_id,))
-                    c.commit(); flash(L("Congé supprimé par le Super Admin ; opération inscrite au journal d’audit.","Leave deleted by Super Admin; action recorded in the audit log.","حذف المسؤول العام الإجازة؛ تم تسجيل العملية في سجل التدقيق."))
+                    c.commit(); flash(L("Congé déplacé dans la corbeille pour six mois.","Leave entry moved to the trash for six months.","تم نقل الإجازة إلى سلة المهملات لمدة ستة أشهر."))
                 else:
                     start=date.fromisoformat(request.form["start_date"]); end=date.fromisoformat(request.form["end_date"])
                     if end<start: raise ValueError(L("La date de fin ne peut pas précéder la date de début.","End date must not precede start date.","لا يمكن أن يسبق تاريخ النهاية تاريخ البداية."))
