@@ -1627,6 +1627,18 @@ def normalize_header(value):
   "period":"period","rotation period":"period","période":"period","periode":"period","الفترة":"period",
   "date done":"date_done","completion date":"date_done","date completed":"date_done","date de réalisation":"date_done","date d’achèvement":"date_done","date de fin":"date_done","تاريخ الإنجاز":"date_done","notes référence du document justificatif":"notes"
  }
+ if "ordre des médecins" in value or "ordre des medecins" in value:
+  if "non inscrit" in value: return "medical_order_registered_no"
+  if "inscrit" in value and "numéro" not in value: return "medical_order_registered_yes"
+  if "numéro" in value: return "medical_order_number"
+ if "identification nationale" in value or value=="nin": return "national_id_number"
+ if value.startswith("numéro de sécurité sociale"): return "social_security_number"
+ if value.startswith("établissement d’origine") or value.startswith("établissement d'origine"): return "origin_hospital"
+ if value.startswith("début du stage au chu"): return "external_start_date"
+ if value.startswith("fin du stage au chu"): return "external_end_date"
+ if value.startswith("catégorie"): return "resident_type"
+ if value.startswith("téléphone 1"): return "phone"
+ if value.startswith("téléphone 2"): return "phone2"
  return aliases.get(value,value.replace(" ","_"))
 def parse_import_file(path, extension, import_type='residents'):
  rows=[]
