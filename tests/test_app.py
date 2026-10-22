@@ -3612,7 +3612,7 @@ def test_language_selection_is_consistent_across_core_screens(tmp_path, monkeypa
             assert response.status_code == 200, (language, route)
             assert ('<html lang="' + language + '"').encode() in response.data, (language, route)
             rendered[route] = response.get_data(as_text=True)
-        combined = "\\n".join(rendered.values())
+        combined = "\n".join(rendered.values())
         for phrase in expected[language]:
             assert phrase in combined, (language, phrase)
         assert "الإجازات / Congés / Annual leave" not in combined
@@ -3772,9 +3772,9 @@ def test_downloadable_blank_templates_offer_standardized_headers(tmp_path, monke
 def test_import_template_registration_checkboxes_map_to_registration_status(tmp_path):
     source = tmp_path / "checkbox_residents.csv"
     source.write_text(
-        "surname,firstname,year,medical_order_registered_yes,medical_order_registered_no\\n"
-        "Test,Inscrit,1,x,\\n"
-        "Test,NonInscrit,1,,1\\n",
+        "surname,firstname,year,medical_order_registered_yes,medical_order_registered_no\n"
+        "Test,Inscrit,1,x,\n"
+        "Test,NonInscrit,1,,1\n",
         encoding="utf-8",
     )
     parsed = rotation_app.parse_import_file(str(source), ".csv")
@@ -3787,8 +3787,8 @@ def test_import_template_registration_checkboxes_map_to_registration_status(tmp_
 def test_import_template_rejects_both_registration_checkboxes(tmp_path):
     source = tmp_path / "checkbox_conflict.csv"
     source.write_text(
-        "surname,firstname,year,medical_order_registered_yes,medical_order_registered_no\\n"
-        "Test,Conflit,1,x,1\\n",
+        "surname,firstname,year,medical_order_registered_yes,medical_order_registered_no\n"
+        "Test,Conflit,1,x,1\n",
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="Choose only one"):
