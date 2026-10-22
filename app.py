@@ -540,7 +540,7 @@ def select_postgrad_year():
  if guard(): return redirect("/login")
  year=request.form.get("year","").strip()
  if not re.fullmatch(r"\d{4}-\d{4}",year) or int(year.split("-")[1])!=int(year.split("-")[0])+1:
-  flash("Année de post-graduation invalide.")
+  flash(L("Année de post-graduation invalide.","Invalid postgraduate year.","سنة ما بعد التدرج غير صالحة."))
   return redirect("/")
  session["selected_postgrad_year"]=year
  return redirect("/")
@@ -569,21 +569,21 @@ def residents():
     status=request.form.get("status","")
     change_reason=request.form.get("change_reason","").strip()
    except (TypeError,ValueError):
-    flash("Invalid resident update.")
+    flash(L("Modification du résident invalide.","Invalid resident update.","تعديل بيانات المقيم غير صالح."))
    else:
     target=c.execute("SELECT status,year FROM residents WHERE id=?",(rid,)).fetchone()
     if not target:
-     flash("Resident not found.")
+     flash(L("Résident introuvable.","Resident not found.","لم يتم العثور على المقيم."))
     elif target["status"]=="graduated":
-     flash("Graduated residents are archived; les dossiers DEMS doivent être corrigés depuis la gestion des archives.")
+     flash(L("Les résidents diplômés sont archivés ; corrigez les dossiers DEMS depuis la gestion des archives.","Graduated residents are archived; correct DEMS records from archive management.","يُؤرشف المقيمون المتخرجون؛ صحّح ملفات DEMS من إدارة الأرشيف."))
     elif year not in (1,2,3,4) or repeat_year not in ("0","1") or status not in ("active","inactive"):
-     flash("Année, redoublement ou statut invalide.")
+     flash(L("Année, redoublement ou statut invalide.","Invalid year, repeat status or account status.","السنة أو حالة الإعادة أو الحالة غير صالحة."))
     elif year!=target["year"] and not change_reason:
-     flash("Study-year changes must use the official exam/promotion workflow; provide a reason for an authorized administrative correction.")
+     flash(L("Tout changement d’année doit passer par le processus officiel d’examens et de promotion ; indiquez un motif pour toute correction administrative autorisée.","Study-year changes must use the official exam/promotion workflow; provide a reason for an authorized administrative correction.","يجب أن تمر تغييرات السنة عبر مسار الامتحانات والترقية الرسمي؛ قدّم سببًا لأي تصحيح إداري معتمد."))
     else:
      c.execute("UPDATE residents SET year=?,repeat_year=?,status=? WHERE id=?",(year,int(repeat_year),status,rid))
      audit_event(c,"resident.updated",f"resident_id={rid}; year_before={target['year']}; year_after={year}; repeat_year={repeat_year}; status_before={target['status']}; status_after={status}; reason={change_reason}; source=super_admin_correction")
-     c.commit(); flash("Dossier résident corrigé et opération journalisée.")
+     c.commit(); flash(L("Dossier du résident corrigé et opération consignée dans le journal.","Resident record corrected and action logged.","تم تصحيح ملف المقيم وتسجيل العملية في سجل التدقيق."))
   else:
    if session.get("role")!="super_admin":
     c.close(); return ("Forbidden — Super Admin only",403)
@@ -594,17 +594,17 @@ def residents():
    try: year=int(request.form.get("year","0"))
    except (TypeError,ValueError): year=0
    if not surname or not firstname or len(surname)>100 or len(firstname)>100 or year not in (1,2,3,4):
-    flash("Surname and first name are required (max 100 characters) and a valid study year is required.")
+    flash(L("Le nom et le prénom sont obligatoires (100 caractères maximum) et l’année d’étude doit être valide.","Surname, first name and a valid study year are required (maximum 100 characters for each name).","اللقب والاسم إجباريان (100 حرف كحد أقصى) ويجب تحديد سنة دراسية صالحة."))
    elif len(phone)>40 or repeat_year not in ("0","1"):
-    flash("Phone must be at most 40 characters and repeat flag must be 0 or 1.")
+    flash(L("Le téléphone doit contenir au maximum 40 caractères et le champ redoublement doit valoir 0 ou 1.","Phone must be at most 40 characters and repeat flag must be 0 or 1.","يجب ألا يتجاوز الهاتف 40 حرفًا، ويجب أن تكون قيمة الإعادة 0 أو 1."))
    elif c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=?",(surname,firstname,year)).fetchone():
-    flash("A resident with the same name and study year already exists.")
+    flash(L("Un résident portant le même nom et la même année d’étude existe déjà.","A resident with the same name and study year already exists.","يوجد مقيم بالاسم نفسه وفي السنة الدراسية نفسها."))
    else:
     c.execute("INSERT INTO residents(surname,firstname,year,phone,repeat_year,status) VALUES(?,?,?,?,?,?)",(surname,firstname,year,phone,int(repeat_year),"active"))
     audit_event(c,"resident.created",surname+" "+firstname)
     c.commit(); flash(tr("done"))
  rows=c.execute("SELECT * FROM residents ORDER BY status DESC,year DESC,surname").fetchall(); c.close()
- return page("""<section><h3>{{t('add')}} — {{t('resident')}}</h3><form method="post"><div class="grid"><div><label>{{t('surname')}}</label><input name="surname" required></div><div><label>{{t('firstname')}}</label><input name="firstname" required></div><div><label>{{t('study_year')}}</label><select name="year">{% for y in range(1,5) %}<option>{{y}}</option>{% endfor %}</select></div><div><label>{{t('phone')}}</label><input name="phone"></div></div><label><input type="checkbox" name="repeat_year" value="1"> {{t('repeat')}}</label><button>{{t('add')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('save')}}</th></tr>{% for r in rows %}<tr><td><a href="/profile/{{r.id}}">{{r.surname}} {{r.firstname}}</a></td><td>{{r.year}}</td><td>{% if r.status=='graduated' %}<span>Graduated — DEMS archive</span>{% else %}<form method="post"><input type="hidden" name="action" value="edit"><input type="hidden" name="rid" value="{{r.id}}"><label>Année de post-graduation / année d’études<select name="year" required>{% for yy in range(1,5) %}<option value="{{yy}}" {% if r.year==yy %}selected{% endif %}>{{yy}}</option>{% endfor %}</select></label><label><input type="checkbox" name="repeat_year" value="1" {% if r.repeat_year %}checked{% endif %}> {{t('repeat')}}</label><select name="status"><option value="active" {% if r.status=='active' %}selected{% endif %}>{{t('active')}}</option><option value="inactive" {% if r.status=='inactive' %}selected{% endif %}>{{t('inactive')}}</option></select><label>Motif si changement d’année<input name="change_reason" maxlength="500" placeholder="Passage, redoublement ou correction"></label><button>{{t('save')}}</button></form>{% endif %}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
+ return page("""<section><h3>{{t('add')}} — {{t('resident')}}</h3><form method="post"><div class="grid"><div><label>{{t('surname')}}</label><input name="surname" required></div><div><label>{{t('firstname')}}</label><input name="firstname" required></div><div><label>{{t('study_year')}}</label><select name="year">{% for y in range(1,5) %}<option>{{y}}</option>{% endfor %}</select></div><div><label>{{t('phone')}}</label><input name="phone"></div></div><label><input type="checkbox" name="repeat_year" value="1"> {{t('repeat')}}</label><button>{{t('add')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('save')}}</th></tr>{% for r in rows %}<tr><td><a href="/profile/{{r.id}}">{{r.surname}} {{r.firstname}}</a></td><td>{{r.year}}</td><td>{% if r.status=='graduated' %}<span>{{L('Diplômé — archive DEMS','Graduated — DEMS archive','متخرج — أرشيف DEMS')}}</span>{% else %}<form method="post"><input type="hidden" name="action" value="edit"><input type="hidden" name="rid" value="{{r.id}}"><label>{{L('Année de post-graduation','Postgraduate year','سنة ما بعد التدرج')}}<select name="year" required>{% for yy in range(1,5) %}<option value="{{yy}}" {% if r.year==yy %}selected{% endif %}>{{yy}}</option>{% endfor %}</select></label><label><input type="checkbox" name="repeat_year" value="1" {% if r.repeat_year %}checked{% endif %}> {{t('repeat')}}</label><select name="status"><option value="active" {% if r.status=='active' %}selected{% endif %}>{{t('active')}}</option><option value="inactive" {% if r.status=='inactive' %}selected{% endif %}>{{t('inactive')}}</option></select><label>{{L('Motif du changement d’année','Reason for year change','سبب تغيير السنة')}}<input name="change_reason" maxlength="500" placeholder="{{L('Passage, redoublement ou correction','Promotion, repeat or correction','ترقية أو إعادة أو تصحيح')}}"></label><button>{{t('save')}}</button></form>{% endif %}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
 @app.route("/terrains",methods=["GET","POST"])
 def terrains():
  if guard(): return redirect("/login")
@@ -682,7 +682,7 @@ def rotation_board():
     if start_date and end_date and end_date<start_date: raise ValueError("La date de fin doit être postérieure ou égale à la date de début")
     c.execute("UPDATE periods SET start_date=?,end_date=? WHERE id=? AND year_label=?",(start_date,end_date,pid,y))
     audit_event(c,"period.dates_updated","year="+y+"; period_id="+str(pid)+"; start="+start_date+"; end="+end_date)
-    c.commit(); flash("Dates de la période enregistrées")
+    c.commit(); flash(L("Dates de la période enregistrées.","Period dates saved.","تم حفظ تواريخ الفترة."))
     c.close(); return redirect("/rotation-board?year="+y.replace("&","%26").replace(" ","%20"))
    tid=int(request.form.get("terrain_id","0")); pid=int(request.form.get("period_id","0"))
    period=c.execute("SELECT id,name FROM periods WHERE id=? AND year_label=?",(pid,y)).fetchone()
@@ -694,13 +694,13 @@ def rotation_board():
     if not assignment: raise ValueError("Aucune affectation active à supprimer pour ce résident")
     c.execute("UPDATE assignments SET status='cancelled' WHERE id=?",(assignment["id"],))
     audit_event(c,"assignment.cancelled","assignment_id="+str(assignment["id"])+"; resident_id="+str(rid)+"; terrain_id="+str(tid)+"; period_id="+str(pid)+"; year="+y+"; reason=user_removed_from_board")
-    c.commit(); flash("Choix supprimé du tableau. L’opération reste inscrite dans le journal.")
+    c.commit(); flash(L("Choix supprimé du tableau. L’opération reste inscrite dans le journal.","Assignment removed from the board. The action remains in the audit log.","تم حذف الاختيار من الجدول. تبقى العملية مسجلة في سجل التدقيق."))
    elif action=="capacity":
     places=int(request.form.get("places",""))
     if places<0: raise ValueError("Capacity cannot be negative")
     c.execute("INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,?) ON CONFLICT(year_label,terrain_id,period_id) DO UPDATE SET places=excluded.places",(y,tid,pid,places))
     audit_event(c,"capacity.updated","year="+y+"; terrain_id="+str(tid)+"; period_id="+str(pid)+"; places="+str(places))
-    c.commit(); flash("Capacité enregistrée / Capacity saved")
+    c.commit(); flash(L("Capacité enregistrée.","Capacity saved.","تم حفظ السعة."))
    elif action=="move":
     if session.get("role")!="super_admin": raise ValueError("Only a Super Admin may move an existing assignment")
     rid=int(request.form.get("resident_id","0"))
@@ -708,7 +708,7 @@ def rotation_board():
     if not old: raise ValueError("Resident has no active assignment in this period")
     c.execute("UPDATE assignments SET terrain_id=?,status='confirmed' WHERE id=?",(tid,old["id"]))
     audit_event(c,"assignment.moved","assignment_id="+str(old["id"])+"; resident_id="+str(rid)+"; from_terrain_id="+str(old["terrain_id"])+"; to_terrain_id="+str(tid)+"; period_id="+str(pid)+"; super_admin_override=1")
-    c.commit(); flash("Affectation déplacée par Super Admin")
+    c.commit(); flash(L("Affectation déplacée par le Super Admin.","Assignment moved by Super Admin.","تم نقل التعيين بواسطة المسؤول العام."))
    elif action=="assign":
     rid=int(request.form.get("resident_id","0"))
     force=request.form.get("force_rules")=="1"
@@ -878,7 +878,7 @@ def assign():
    if not resident_check or not terrain_check or not period_check:
     raise ValueError("Resident, terrain or period does not exist in the selected postgraduate year.")
    if override and (not override_reason or session.get("role")!="super_admin"):
-    flash("Une dérogation exige un motif et le rôle Super Admin.")
+    flash(L("Une dérogation exige un motif et le rôle Super Admin.","An override requires a reason and the Super Admin role.","يتطلب الاستثناء سببًا وصلاحية المسؤول العام."))
    else:
     ok,msg,status=check(c,rid,tid,pid,y)
     if not ok and not override:
@@ -1095,7 +1095,7 @@ def manage_users():
      audit_event(c,"user.created",f"username={username}; role={role}")
      c.commit(); flash(tr("done"))
     except sqlite3.IntegrityError:
-     flash("Username already exists.")
+     flash(L("Ce nom d’utilisateur existe déjà.","Username already exists.","اسم المستخدم موجود مسبقًا."))
  rows=c.execute("SELECT id,username,role,active,created_at FROM users ORDER BY role DESC,username").fetchall(); c.close()
  return page("""<section><h3>{{t('users')}}</h3><p>{{t('users_help')}}</p><form method="post"><input type="hidden" name="action" value="create"><label>{{t('username')}}</label><input name="username" minlength="3" required><label>{{t('password')}} (12+)</label><div class="password-wrap"><input id="new-user-password" name="password" type="password" minlength="12" required><button class="password-toggle" type="button" aria-label="Show password" onclick="const p=document.getElementById('new-user-password');p.type=p.type==='password'?'text':'password';this.setAttribute('aria-label',p.type==='password'?'Show password':'Hide password')">◉</button></div><label>{{t('role')}}</label><select name="role"><option value="user">{{t('standard_user')}}</option><option value="super_admin">{{t('super_admin')}}</option></select><button>{{t('add')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('username')}}</th><th>{{t('role')}}</th><th>{{t('active_col')}}</th><th>{{t('created')}}</th><th>{{L('Gestion du compte','Account controls','إدارة الحساب')}}</th></tr>{% for u in rows %}<tr><td>{{u.username}}</td><td>{{u.role}}</td><td>{{u.active}}</td><td>{{u.created_at}}</td><td><form method="post"><input type="hidden" name="user_id" value="{{u.id}}"><label>{{L('Rôle','Role','الصلاحية')}}</label><select name="new_role"><option value="user" {% if u.role=='user' %}selected{% endif %}>{{L('Utilisateur standard','Standard user','مستخدم عادي')}}</option><option value="super_admin" {% if u.role=='super_admin' %}selected{% endif %}>{{L('Super administrateur','Super Admin','مسؤول عام')}}</option></select><button name="action" value="change_role">{{L('Enregistrer le rôle','Save role','حفظ الصلاحية')}}</button></form><form method="post"><input type="hidden" name="user_id" value="{{u.id}}"><label>{{L('Nouveau mot de passe (12 caractères minimum)','New password (12+ characters)','كلمة مرور جديدة (12 حرفًا على الأقل)')}}</label><input name="new_password" type="password" minlength="12" required><button name="action" value="reset_password">{{L('Réinitialiser le mot de passe','Reset password','إعادة تعيين كلمة المرور')}}</button></form>{% if u.username!=session.get('user') or u.active==0 %}<form method="post"><input type="hidden" name="user_id" value="{{u.id}}"><button name="action" value="{{'deactivate' if u.active else 'activate'}}">{{L('Désactiver','Deactivate','تعطيل') if u.active else L('Activer','Activate','تفعيل')}}</button></form>{% else %}{{L('Compte actuel','Current account','الحساب الحالي')}}{% endif %}</td></tr>{% endfor %}</table></div></section>""",rows=rows)
 
