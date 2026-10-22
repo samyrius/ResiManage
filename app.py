@@ -1740,8 +1740,10 @@ def import_residents():
    inserted=0
    try:
     for row in rows:
-     c.execute("INSERT INTO residents(surname,firstname,year,phone,birth_place,birth_date,status) VALUES(?,?,?,?,?,?, 'active')",
-       (row["surname"],row["firstname"],int(row["year"]),row.get("phone",""),row.get("birth_place",""),row.get("birth_date","")))
+     resident_type=str(row.get("resident_type","local") or "local").strip().lower()
+     if resident_type not in ("local","external"): resident_type="local"
+     c.execute("INSERT INTO residents(surname,firstname,year,phone,birth_place,birth_date,status,phone2,address,email,resident_card_number,national_id_number,medical_order_registered,medical_order_number,social_security_number,registration_date,resident_type,origin_hospital,external_start_date,external_end_date,additional_info) VALUES(?,?,?,?,?,?, 'active',?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+       (row["surname"],row["firstname"],int(row["year"]),row.get("phone",""),row.get("birth_place",""),row.get("birth_date",""),row.get("phone2",""),row.get("address",""),row.get("email",""),row.get("resident_card_number",""),row.get("national_id_number",""),row.get("medical_order_registered","no"),row.get("medical_order_number",""),row.get("social_security_number",""),row.get("registration_date",""),resident_type,row.get("origin_hospital",""),row.get("external_start_date",""),row.get("external_end_date",""),row.get("additional_info","")))
      inserted+=1
    except sqlite3.IntegrityError:
     c.rollback(); c.close()
@@ -1779,8 +1781,12 @@ def import_residents():
     key=(surname.casefold(),firstname.casefold(),row.get("year"))
     if key in seen: row_errors.append(L("Cette ligne de résident est dupliquée dans le fichier.","Duplicate resident row in this file.","سطر المقيم هذا مكرر في الملف."))
     seen.add(key)
-    exists=c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=?",(surname,firstname,row.get("year",0))).fetchone()
-    if exists: row_errors.append(L("Un résident portant le même nom et la même année existe déjà.","Resident with same name and year already exists.","يوجد مقيم بالاسم والسنة نفسيهما."))
+    row_type=str(row.get("resident_type","local") or "local").strip().lower()
+    if row_type not in ("local","external"): row_errors.append(L("La catégorie doit être local ou external.","Category must be local or external.","يجب أن تكون الفئة local أو external."))
+    if row_type=="external" and (not row.get("origin_hospital","").strip() or not row.get("external_start_date","").strip() or not row.get("external_end_date","").strip()):
+     row_errors.append(L("Un résident externe doit avoir un établissement d’origine et des dates de stage.","An external resident must have a home institution and rotation dates.","يجب أن يكون للمقيم الخارجي مؤسسة أصلية وتواريخ تربص."))
+    exists=c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=? AND COALESCE(resident_type,'local')=? AND COALESCE(origin_hospital,'')=?",(surname,firstname,row.get("year",0),row_type,row.get("origin_hospital",""))).fetchone()
+    if exists: row_errors.append(L("Un résident portant le même nom, la même année et le même établissement existe déjà.","Resident with same name, year and institution already exists.","يوجد مقيم بالاسم والسنة والمؤسسة نفسها."))
     if row_errors: errors.append({"row":row.get("row_number"),"message":" ".join(row_errors)})
    rows.sort(key=lambda row:(row.get("year",99),row.get("surname","").casefold(),row.get("firstname","").casefold()))
    c.execute("DELETE FROM import_previews WHERE created_at < datetime('now','-1 day')")
