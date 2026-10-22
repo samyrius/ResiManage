@@ -35,6 +35,18 @@ def current_language():
  return lang if lang in LANGS else "fr"
 def L(fr,en,ar):
  return {"fr":fr,"en":en,"ar":ar}[current_language()]
+def period_label(name):
+ value=str(name or "").strip()
+ aliases={"01 Fév - 30 Avr":1,"01 Fév–30 Avr":1,"01 Mai - 30 Juillet":2,"01 Août - 30 Oct":3,"01 Aout - 30 Oct":3,"01 Nov - 30 Jan":4}
+ number=aliases.get(value)
+ if number is None:
+  import re as _re
+  match=_re.fullmatch(r"(?:Période|Period|الفترة)\\s*(\\d+)",value,flags=_re.IGNORECASE)
+  if match:
+   number=int(match.group(1))
+ if number in (1,2,3,4):
+  return L(f"Période {number}",f"Period {number}",f"الفترة {number}")
+ return value
 def tr(k):
  lang=current_language()
  return D.get(lang,D["fr"]).get(k,D["fr"].get(k,k))
@@ -378,7 +390,7 @@ html[data-interior-theme="holographic"] body{background:radial-gradient(ellipse 
   year_options=available_postgrad_years(c)
  finally:
   c.close()
- context={"t":tr,"L":L,"lang":lang,"year":current_year,"year_options":year_options}
+ context={"t":tr,"L":L,"lang":lang,"period_label":period_label,"year":current_year,"year_options":year_options}
  context.update(kw)
  context.setdefault("role",session.get("role",""))
  context.setdefault("csrf_token",csrf_token)
