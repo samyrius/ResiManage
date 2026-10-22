@@ -3723,6 +3723,46 @@ def test_external_resident_is_saved_with_origin_and_rotation_dates(tmp_path, mon
         assert tuple(row) == ("external", "Hôpital périphérique", "2026-11-01", "2027-01-30")
 
 
+def test_external_resident_obeys_same_one_service_per_period_rule(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status,resident_type,origin_hospital,external_start_date,external_end_date) "
+            "VALUES('Visiting','RuleCheck',2,'active','external','EHS Cardio DBK','2026-02-01','2027-01-31')"
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='Visiting' AND firstname='RuleCheck'"
+        ).fetchone()["id"]
+        terrains = []
+        for name in ("External Rule Service A", "External Rule Service B"):
+            conn.execute("INSERT INTO terrains(name,kind,mandatory_year) VALUES(?, 'optional', 0)", (name,))
+            terrains.append(conn.execute("SELECT id FROM terrains WHERE name=?", (name,)).fetchone()["id"])
+        period = conn.execute("SELECT id,year_label FROM periods ORDER BY id LIMIT 1").fetchone()
+        for terrain_id in terrains:
+            conn.execute(
+                "INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,1)",
+                (period["year_label"], terrain_id, period["id"]),
+            )
+
+    first = client.post("/assign", data={
+        "resident": str(rid), "terrain": str(terrains[0]), "period": str(period["id"]),
+        "year": period["year_label"],
+    }, follow_redirects=True)
+    assert first.status_code == 200
+    second = client.post("/assign", data={
+        "resident": str(rid), "terrain": str(terrains[1]), "period": str(period["id"]),
+        "year": period["year_label"],
+    }, follow_redirects=True)
+    assert second.status_code == 200
+    with rotation_app.db() as conn:
+        assigned = conn.execute(
+            "SELECT COUNT(*) FROM assignments WHERE resident_id=? AND period_id=? AND status IN ('confirmed','pending')",
+            (rid, period["id"]),
+        ).fetchone()[0]
+        assert assigned == 1
+
+
 def test_external_resident_form_suggests_common_hospitals_and_shared_rules(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
