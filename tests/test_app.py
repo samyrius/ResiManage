@@ -874,7 +874,7 @@ def test_external_rotation_blocks_overlapping_local_period(tmp_path, monkeypatch
         conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)", ("Away", "Resident", 2, "active"))
         rid = conn.execute("SELECT id FROM residents WHERE surname='Away'").fetchone()[0]
         tid = conn.execute("SELECT id FROM terrains WHERE name='Réanimation chirurgicale'").fetchone()[0]
-        period = conn.execute("SELECT id,year_label,name FROM periods WHERE name LIKE '%Août%' OR name LIKE '%Aout%'").fetchone()
+        period = conn.execute("SELECT id,year_label,name FROM periods WHERE name='Période 3'").fetchone()
         if period is None:
             period = conn.execute("SELECT id,year_label,name FROM periods ORDER BY id LIMIT 1").fetchone()
         conn.execute("INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,status) VALUES(?,?,?,?,?,?,?,?,?)",
@@ -948,7 +948,7 @@ def test_external_rotation_returned_record_still_blocks_overlapping_period(tmp_p
         conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)", ("Returned", "Away", 2, "active"))
         rid = conn.execute("SELECT id FROM residents WHERE surname='Returned'").fetchone()[0]
         tid = conn.execute("SELECT id FROM terrains WHERE name='Réanimation chirurgicale'").fetchone()[0]
-        period = conn.execute("SELECT id,year_label,name FROM periods WHERE name LIKE '%Août%' OR name LIKE '%Aout%'").fetchone()
+        period = conn.execute("SELECT id,year_label,name FROM periods WHERE name='Période 3'").fetchone()
         assert period is not None
         conn.execute("INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,status) VALUES(?,?,?,?,?,?,?,?,?)",
                      (rid, "Dr Test", "Paris", "CHU Test", "France", "Observation", "2026-08-01", "2026-10-30", "returned"))
@@ -1444,7 +1444,7 @@ def test_startup_fills_missing_periods_in_partial_legacy_academic_year(tmp_path,
     legacy.close()
 
     assert client.get("/login").status_code == 200
-    expected = {"01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"}
+    expected = {"Période 1","Période 2","Période 3","Période 4"}
     with rotation_app.db() as conn:
         names = {row[0] for row in conn.execute("SELECT name FROM periods WHERE year_label='2026-2027'")}
         assert names == expected
@@ -2870,7 +2870,7 @@ def test_external_internship_request_requires_admin_approval_before_blocking_ass
         )
         rid = conn.execute("SELECT id FROM residents WHERE surname='Request'").fetchone()[0]
         period = conn.execute(
-            "SELECT id,year_label,name FROM periods WHERE name LIKE '%Août%' OR name LIKE '%Aout%'"
+            "SELECT id,year_label,name FROM periods WHERE name='Période 3'"
         ).fetchone()
         assert period is not None
         tid = conn.execute(
@@ -3153,7 +3153,7 @@ def test_sync_external_rotation_request_rejects_overlap_with_local_assignment(tm
         rid = conn.execute("SELECT id FROM residents WHERE surname='SyncExternal'").fetchone()[0]
         terrain_id = conn.execute("SELECT id FROM terrains WHERE name='Réanimation chirurgicale'").fetchone()[0]
         period = conn.execute(
-            "SELECT id FROM periods WHERE year_label LIKE '2026-%' AND name LIKE '%Fév%' LIMIT 1"
+            "SELECT id FROM periods WHERE year_label LIKE '2026-%' AND name='Période 1' LIMIT 1"
         ).fetchone()
         assert period is not None
         conn.execute(
