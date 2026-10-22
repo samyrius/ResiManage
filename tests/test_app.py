@@ -2064,7 +2064,7 @@ def test_exam_route_rejects_malformed_ids_and_scores_without_server_error(tmp_pa
         "module":"Module A","theory":"not-a-number","practical":"13",
     }, follow_redirects=True)
     assert bad_score.status_code == 200
-    assert b"numeric marks from 0 to 20 are required" in bad_score.data
+    assert "Le module et les notes numériques de 0 à 20 sont obligatoires".encode() in bad_score.data
 
     with rotation_app.db() as conn:
         assert conn.execute(
