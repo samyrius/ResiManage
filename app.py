@@ -1826,6 +1826,13 @@ def import_residents():
     if row_type not in ("local","external"): row_errors.append(L("La catégorie doit être local ou external.","Category must be local or external.","يجب أن تكون الفئة local أو external."))
     if row_type=="external" and (not row.get("origin_hospital","").strip() or not row.get("external_start_date","").strip() or not row.get("external_end_date","").strip()):
      row_errors.append(L("Un résident externe doit avoir un établissement d’origine et des dates de stage.","An external resident must have a home institution and rotation dates.","يجب أن يكون للمقيم الخارجي مؤسسة أصلية وتواريخ تربص."))
+    elif row_type=="external":
+     try:
+      external_start=date.fromisoformat(row.get("external_start_date","").strip())
+      external_end=date.fromisoformat(row.get("external_end_date","").strip())
+      if external_end<external_start: raise ValueError()
+     except ValueError:
+      row_errors.append(L("Les dates du stage externe doivent être valides au format AAAA-MM-JJ et la fin ne peut précéder le début.","External rotation dates must be valid YYYY-MM-DD dates and the end cannot precede the start.","يجب أن تكون تواريخ التربص الخارجي صحيحة بالتنسيق YYYY-MM-DD وألا تسبق النهاية البداية."))
     exists=c.execute("SELECT 1 FROM residents WHERE lower(surname)=lower(?) AND lower(firstname)=lower(?) AND year=? AND COALESCE(resident_type,'local')=? AND COALESCE(origin_hospital,'')=?",(surname,firstname,row.get("year",0),row_type,row.get("origin_hospital",""))).fetchone()
     if exists: row_errors.append(L("Un résident portant le même nom, la même année et le même établissement existe déjà.","Resident with same name, year and institution already exists.","يوجد مقيم بالاسم والسنة والمؤسسة نفسها."))
     if row_errors: errors.append({"row":row.get("row_number"),"message":" ".join(row_errors)})
