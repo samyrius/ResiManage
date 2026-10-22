@@ -1611,6 +1611,7 @@ def normalize_header(value):
  # printed in the Word/PDF templates. Remove parenthetical instructions such as
  # "(AAAA-MM-JJ)" before matching, while preserving the original cell values.
  value=re.sub(r"\([^)]*\)"," ",value)
+ value=re.sub(r"[☐☑✓✔]"," ",value)
  value=re.sub(r"[,:;|/]+"," ",value)
  value=re.sub(r"[\s_\-]+"," ",value).strip()
  aliases={
@@ -1756,10 +1757,11 @@ def blank_templates():
      year_col=headers.index("year")+1
      dv=DataValidation(type="list",formula1='"1,2,3,4"',allow_blank=True)
      ws.add_data_validation(dv); dv.add(f"{ws.cell(2,year_col).coordinate}:{ws.cell(501,year_col).coordinate}")
-    if "medical_order_registered" in headers:
-     reg_col=headers.index("medical_order_registered")+1
-     dv=DataValidation(type="list",formula1='"oui,non,yes,no"',allow_blank=True)
-     ws.add_data_validation(dv); dv.add(f"{ws.cell(2,reg_col).coordinate}:{ws.cell(501,reg_col).coordinate}")
+    for registration_column in ("medical_order_registered_yes","medical_order_registered_no"):
+     if registration_column in headers:
+      reg_col=headers.index(registration_column)+1
+      dv=DataValidation(type="list",formula1='"1,X,x,✓,☑"',allow_blank=True)
+      ws.add_data_validation(dv); dv.add(f"{ws.cell(2,reg_col).coordinate}:{ws.cell(501,reg_col).coordinate}")
     if "resident_type" in headers:
      type_col=headers.index("resident_type")+1
      dv=DataValidation(type="list",formula1='"local,external"',allow_blank=True)
