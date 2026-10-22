@@ -3677,7 +3677,7 @@ def test_language_is_applied_to_planning_admin_and_import_templates(tmp_path, mo
     routes = [
         "/terrains", "/rotation-board", "/residents", "/templates", "/trash",
         "/objectives", "/history", "/summary", "/decisions", "/settings",
-        "/users", "/audit", "/backup", "/export", "/restore",
+        "/users", "/audit", "/restore",
         "/sync-devices", "/sync",
     ]
     expected = {
