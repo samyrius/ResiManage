@@ -3617,3 +3617,73 @@ def test_language_selection_is_consistent_across_core_screens(tmp_path, monkeypa
             assert phrase in combined, (language, phrase)
         assert "الإجازات / Congés / Annual leave" not in combined
         assert "التربصات الخارجية / Stages à l’étranger / External rotations" not in combined
+
+
+
+def test_services_add_form_is_collapsed_and_capacity_is_inline_on_board(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    services = client.get("/terrains")
+    assert services.status_code == 200
+    assert 'class="rt-add-terrain"><summary>'.encode() in services.data
+    assert b'href="/capacities"' not in client.get("/").data
+    board = client.get("/rotation-board")
+    assert board.status_code == 200
+    assert b'name="action" value="capacity"' in board.data
+    assert b'name="places"' in board.data
+
+
+def test_postgraduate_year_selector_distinguishes_current_and_history(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "Année en cours".encode() in response.data
+    assert "Historique des années précédentes".encode() in response.data
+    assert b'<optgroup' in response.data
+
+
+def test_temporary_archive_removes_resident_from_rotation_and_can_be_restored(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with sqlite3.connect(rotation_app.DB) as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
+                     ("ArchiveTest", "Resident", 2, "active"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='ArchiveTest'").fetchone()[0]
+    from datetime import date
+    response = client.post("/residents", data={
+        "action": "archive", "rid": str(rid), "archive_type": "temporary",
+        "archive_reason": "Congé prolongé", "archive_return_date": date.today().isoformat()
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert "Date atteinte".encode() in response.data
+    with sqlite3.connect(rotation_app.DB) as conn:
+        row = conn.execute("SELECT status,archive_type,archive_reason,archive_return_date FROM residents WHERE id=?",
+                           (rid,)).fetchone()
+        assert row == ("archived", "temporary", "Congé prolongé", date.today().isoformat())
+    response = client.post("/residents", data={"action": "restore_archive", "rid": str(rid)}, follow_redirects=True)
+    assert response.status_code == 200
+    with sqlite3.connect(rotation_app.DB) as conn:
+        row = conn.execute("SELECT status,archive_type,archive_reason FROM residents WHERE id=?", (rid,)).fetchone()
+        assert row == ("active", "", "")
+
+
+def test_audited_delete_removes_duplicate_resident_and_linked_history(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with sqlite3.connect(rotation_app.DB) as conn:
+        terrain_id = conn.execute("SELECT id FROM terrains LIMIT 1").fetchone()[0]
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
+                     ("Duplicate", "Resident", 1, "active"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Duplicate'").fetchone()[0]
+        conn.execute("INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+                     (rid, terrain_id, "2025-2026", "Période 1", "2025-03-01"))
+    response = client.post("/residents", data={
+        "action": "delete", "rid": str(rid), "delete_reason": "Dossier ajouté en double"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with sqlite3.connect(rotation_app.DB) as conn:
+        assert conn.execute("SELECT 1 FROM residents WHERE id=?", (rid,)).fetchone() is None
+        assert conn.execute("SELECT 1 FROM history WHERE resident_id=?", (rid,)).fetchone() is None
+        event = conn.execute("SELECT details FROM audit WHERE action='resident.deleted' ORDER BY id DESC LIMIT 1").fetchone()
+        assert event and "Dossier ajouté en double" in event[0]
