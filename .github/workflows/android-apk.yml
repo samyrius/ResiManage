@@ -1,33 +1,53 @@
-name: Android APK build
+name: Android APK + emulator smoke tests
 
-# APK builds must be started manually by the user.
-# Do not build on push or pull requests.
+# APK and emulator validation on the active ResiManage 2 branch; manual dispatch remains available.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - resimanage-2-work
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-apk-${{ github.ref }}
+  group: android-validation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-debug-apk:
+  python-regression:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Run Python regression tests
+        env:
+          ROTATION_SECRET: ci-test-secret
+        run: pytest -q
+
+  build-debug-apk:
+    needs: python-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
       - name: Set up Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools platforms;android-35 build-tools;35.0.0 ndk;27.2.12479018'
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0 ndk;27.2.12479018"
           accept-android-sdk-licenses: true
           log-accepted-android-sdk-licenses: false
       - name: Download Gradle
@@ -37,10 +57,56 @@ jobs:
       - name: Build debug APK
         working-directory: android
         run: /tmp/gradle-8.13/bin/gradle --no-daemon --stacktrace assembleDebug
-      - name: Upload debug APK
+      - name: Upload APK for emulator and manual phone testing
         uses: actions/upload-artifact@v4
         with:
-          name: rotation-app-debug-apk
+          name: resimanage2-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 14
+
+  android-emulator-smoke:
+    needs: build-debug-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download built APK
+        uses: actions/download-artifact@v4
+        with:
+          name: resimanage2-debug-apk
+          path: test-apk
+      - name: Run app on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          script: |
+            set -eu
+            mkdir -p emulator-evidence
+            # Always preserve diagnostic evidence, including when install/launch fails.
+            trap 'adb logcat -d -t 5000 > emulator-evidence/emulator-logcat.txt 2>&1 || true; adb exec-out screencap -p > emulator-evidence/emulator-screenshot.png 2>/dev/null || true' EXIT
+            APK="test-apk/app-debug.apk"
+            test -f "$APK"
+            adb install -r "$APK"
+            adb shell am force-stop com.samyrius.rotationapp
+            adb shell monkey -p com.samyrius.rotationapp 1
+            sleep 25
+            adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | grep "com.samyrius.rotationapp"
+            # Fail only for a fatal exception associated with this app, not unrelated emulator/system crashes.
+            if adb logcat -d -t 5000 | grep -A 12 "FATAL EXCEPTION" | grep -q "com.samyrius.rotationapp"; then
+              echo "Fatal exception associated with ResiManage detected."
+              exit 1
+            fi
+      - name: Upload emulator evidence (logs and screenshot)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resimanage2-android-emulator-evidence
+          path: |
+            emulator-evidence/emulator-logcat.txt
+            emulator-evidence/emulator-screenshot.png
+          if-no-files-found: warn
           retention-days: 14

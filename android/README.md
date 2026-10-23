@@ -4,7 +4,7 @@ This project wraps the Flask/SQLite application in an Android WebView and starts
 
 ## Build
 
-The GitHub Actions workflow **Android APK build** runs Gradle and uploads the artifact `rotation-app-debug-apk`. To build locally, install JDK 17, Android SDK platform 35/build-tools 35, and Gradle 8.13, then run:
+The Android build workflows are currently **manual-only** by user request while the remaining directives are implemented. Do not start the APK build or emulator smoke test until the final review. At that point, run the relevant workflow manually from GitHub Actions; the main validation workflow runs Python tests, builds the APK, and performs an emulator smoke test. To build locally, install JDK 17, Android SDK platform 35/build-tools 35, and Gradle 8.13, then run:
 
 ```bash
 cd android
@@ -15,13 +15,13 @@ The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Install
 
-1. Download the `rotation-app-debug-apk` artifact from a successful GitHub Actions run.
+1. For the baseline APK, download the `rotation-app-debug-apk` artifact from the successful `Android APK build` workflow run; for the later final-validation workflow, use its named artifact.
 2. Extract `app-debug.apk` from the ZIP.
 3. Install it on a 64-bit ARM Android device (the APK includes `arm64-v8a` and `x86_64` libraries; x86_64 is included for emulator testing).
 4. Open the app and create the first administrator password when prompted.
 5. Open **Administrator accounts** and create usernames `benhocine` and `drdris`, both with the **Super administrator** role and separate strong passwords.
 
-This is a debug-signed test build, not a Play Store release. The APK build succeeds in CI, but emulator startup has not yet been reliably confirmed and it has not been installed and tested on a physical phone. Back up the data from inside the app before uninstalling it: Android removes private app data on uninstall.
+This will be a debug-signed test build, not a Play Store release. The latest source changes have not yet been rebuilt or checked on an emulator, and the APK has not been confirmed on a physical phone. Back up the data from inside the app before uninstalling it: Android removes private app data on uninstall.
 
 ## Import and backup notes
 
