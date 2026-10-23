@@ -3,9 +3,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:allowBackup="false"
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
+        android:icon="@drawable/resimanage_3d_launcher"
+        android:roundIcon="@drawable/resimanage_3d_launcher"
+        android:label="ResiManage"
         android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:supportsRtl="true">
