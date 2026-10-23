@@ -55,8 +55,14 @@ def db():
 def setting(c,k,default=""):
  r=c.execute("SELECT value FROM settings WHERE key=?",(k,)).fetchone(); return r["value"] if r else default
 def available_postgrad_years(c):
- years={"2022-2023","2023-2024","2024-2025","2025-2026","2026-2027"}
+ # Offer every postgraduate year from 2022-2023 through the configured current
+ # year, while also retaining years found in historical records.
  current=setting(c,"year")
+ try:
+  current_start=int(current.split("-")[0]) if re.fullmatch(r"\\d{4}-\\d{4}",current) else date.today().year
+ except (ValueError,IndexError):
+  current_start=date.today().year
+ years={f"{start}-{start+1}" for start in range(2022,max(2022,current_start)+1)}
  if current: years.add(current)
  # Recover years from every feature that stores its own postgraduate-year label.
  # Older databases may not have every newer table/column yet, so each source is
@@ -1178,7 +1184,12 @@ def cancel_assignment(aid):
    c.commit(); flash(tr("done"))
   except (TypeError,ValueError,sqlite3.IntegrityError) as exc:
    c.rollback(); flash(str(exc) or L("Stage historique invalide.","Invalid historical rotation.","التربص السابق غير صالح."))
- selected_year=active_postgrad_year(c); year_options=available_postgrad_years(c); current_year=setting(c,"year"); rs=c.execute("SELECT * FROM residents WHERE status NOT IN ('graduated','archived') OR (status='archived' AND COALESCE(archive_type,'')='temporary' AND COALESCE(archive_return_date,'')<>'' AND archive_return_date<=?) ORDER BY year DESC,surname",(selected_year.split("-")[1]+'-01-31',)).fetchall(); ts=c.execute("SELECT * FROM terrains WHERE active=1 ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END, name").fetchall()
+ selected_year=active_postgrad_year(c); year_options=available_postgrad_years(c); current_year=setting(c,"year")
+ # Historical resident choices: include anyone who had joined by the end of the
+ # selected postgraduate year and had not yet been archived before it began.
+ year_start=f"{selected_year.split('-')[0]}-02-01"; year_end=f"{selected_year.split('-')[1]}-01-31"
+ rs=c.execute("SELECT * FROM residents WHERE (registration_date IS NULL OR registration_date='' OR registration_date<=?) AND (archived_at IS NULL OR archived_at='' OR substr(archived_at,1,10)>=?) ORDER BY year DESC,surname",(year_end,year_start)).fetchall()
+ ts=c.execute("SELECT * FROM terrains WHERE active=1 ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END, name").fetchall()
  rows=c.execute("SELECT h.*,r.surname,r.firstname,t.name terrain FROM history h JOIN residents r ON r.id=h.resident_id JOIN terrains t ON t.id=h.terrain_id WHERE h.year_label=? ORDER BY h.id DESC",(selected_year,)).fetchall(); c.close()
  return page("""<section><div class="rt-history-yearbar"><h3>{{L('Historique de l’année de post-graduation','History for postgraduate year','سجل سنة ما بعد التدرج')}}</h3><form method="post" action="/select-year" class="rt-year-inline"><label for="history-postgrad-year">{{t('year')}}</label><select id="history-postgrad-year" name="year" onchange="this.form.submit()">{% for yy in year_options %}<option value="{{yy}}" {% if yy==year %}selected{% endif %}>{{yy}}{% if yy==current_year %} — {{L('en cours','current','الحالية')}}{% endif %}</option>{% endfor %}</select><noscript><button type="submit">{{t('choose')}}</button></noscript></form></div><p>{{L('Les lignes affichées ci-dessous correspondent uniquement à l’année sélectionnée. Choisissez une année précédente pour saisir son historique.','The rows below show only the selected year. Choose a previous year to enter its history.','السطور أدناه تخص السنة المختارة فقط. اختر سنة سابقة لإدخال سجلها.')}}</p><h3>{{t('history_add')}}</h3><form method="post"><label>{{t('resident')}}</label><select name="resident">{% for r in rs %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}} — {{r.year}}</option>{% endfor %}</select><label>{{t('terrain')}}</label><select name="terrain">{% for x in ts %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select><label>{{t('academic_year')}}</label><input name="year_label" required value="{{year}}" placeholder="2025-2026"><label>{{t('period')}}</label><select name="period"><option value="">—</option>{% for p in ["01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"] %}<option value="{{p}}">{{period_label(p)}}</option>{% endfor %}</select><label>{{t('date')}}</label><input type="date" name="date_done"><button>{{t('save')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('terrain')}}</th><th>{{t('academic_year')}}</th><th>{{t('period')}}</th><th>{{t('date')}}</th></tr>{% for h in rows %}<tr><td>{{h.surname}} {{h.firstname}}</td><td>{{h.terrain}}</td><td>{{h.year_label}}</td><td>{{period_label(h.period)}}</td><td>{{h.date_done}}</td></tr>{% endfor %}</table></div></section>""",rs=rs,ts=ts,rows=rows)button>{{t('save')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('terrain')}}</th><th>{{t('academic_year')}}</th><th>{{t('period')}}</th><th>{{t('date')}}</th></tr>{% for h in rows %}<tr><td>{{h.surname}} {{h.firstname}}</td><td>{{h.terrain}}</td><td>{{h.year_label}}</td><td>{{period_label(h.period)}}</td><td>{{h.date_done}}</td></tr>{% endfor %}</table></div></section>""",rs=rs,ts=ts,rows=rows)
 @app.get("/summary")
