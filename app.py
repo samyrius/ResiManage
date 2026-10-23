@@ -1154,7 +1154,15 @@ def cancel_assignment(aid):
  c=db()
  row=c.execute("SELECT status FROM assignments WHERE id=?",(aid,)).fetchone()
  if not row:
-  c.close(); return ("Assignment notdef history():
+  c.close(); return ("Assignment not found",404)
+ if row["status"]=="cancelled":
+  c.close(); flash("Assignment already cancelled."); return redirect("/assign")
+ c.execute("UPDATE assignments SET status='cancelled' WHERE id=?",(aid,))
+ audit_event(c,"assignment.cancelled",f"assignment_id={aid}; previous_status={row['status']}")
+ c.commit(); c.close(); flash("Assignment cancelled; historical record retained.")
+ return redirect("/assign")
+@app.route("/history",methods=["GET","POST"])
+def history():
  if guard():return redirect("/login")
  c=db()
  if request.method=="POST":
