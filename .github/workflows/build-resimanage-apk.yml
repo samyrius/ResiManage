@@ -1,0 +1,74 @@
+name: ResiManage Android reference/test APK
+
+# Manual-only: build the selected ResiManage 2 source for phone testing.
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "Branch or tag to build"
+        required: true
+        default: resimanage-2-work
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-debug-apk:
+    name: Build debug APK for phone testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout selected ResiManage source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref }}
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0 ndk;27.2.12479018"
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Show build environment
+        run: |
+          java -version
+          gradle --version
+          test -f android/settings.gradle
+          test -f android/app/build.gradle
+          test -f app.py
+          test -f requirements.txt
+
+      - name: Build Android debug APK
+        working-directory: android
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+
+      - name: Verify APK and record source
+        run: |
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          mkdir -p release-test
+          cp "$APK" release-test/ResiManage-2-reference.apk
+          printf "source_ref=%s\\n" "${{ inputs.source_ref }}" > release-test/BUILD_SOURCE.txt
+          sha256sum release-test/ResiManage-2-reference.apk | tee release-test/SHA256SUMS.txt
+          ls -lh release-test/
+
+      - name: Upload reference/test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ResiManage-2-reference-apk
+          path: release-test/*
+          if-no-files-found: error
+          retention-days: 30
