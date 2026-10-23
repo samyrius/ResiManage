@@ -425,6 +425,49 @@ table{color:#eafaff!important;border-color:#155b7b!important}th{background:#0b35
 @keyframes rmLogoFloat{0%,100%{transform:perspective(500px) rotateY(-7deg) translateY(0)}50%{transform:perspective(500px) rotateY(7deg) translateY(-4px)}}
 @keyframes rmPulse{0%,100%{filter:drop-shadow(0 0 10px #1ce8ff7a)}50%{filter:drop-shadow(0 0 25px #1ce8ffe0)}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* ResiManage 3D visual pass inspired by the user's interior reference board.
+   Keep the existing medical imagery, navigation, labels and controls intact. */
+:root{--rm-depth:0 24px 52px #0008;--rm-glass:linear-gradient(145deg,#0e3557f5,#06162cf7 62%,#09213af2)}
+body{perspective:1200px}
+body:after{content:"";position:fixed;inset:-12%;z-index:-1;pointer-events:none;opacity:.32;background:radial-gradient(ellipse at 20% 25%,#0ae5ff18,transparent 25%),radial-gradient(ellipse at 78% 32%,#20f4d018,transparent 22%),radial-gradient(ellipse at 52% 90%,#347dff18,transparent 30%);animation:rmAmbientDrift 18s ease-in-out infinite alternate}
+.brand-header{position:relative;overflow:hidden;isolation:isolate}
+.brand-header:after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(115deg,transparent 15%,#67f9ff13 43%,transparent 68%);transform:translateX(-100%);animation:rmLightSweep 9s ease-in-out infinite}
+.brand-lockup{transform-style:preserve-3d;gap:16px}
+.brand-icon{object-fit:cover;border:1px solid #77fbffad;box-shadow:0 0 0 2px #0b6c8b70,0 0 28px #00dfff85,0 16px 30px #000b,inset 0 1px #fff9}
+.brand-header h2{font-weight:850;text-shadow:0 2px 0 #00415c,0 0 22px #13dfff9c;letter-spacing:.015em}
+.rt-app-shell{transform-style:preserve-3d}
+.main-nav{box-shadow:0 24px 42px #0008,inset 0 1px #ffffff20,inset 0 -1px #00eaff20!important}
+.main-nav>a,.nav-group summary{position:relative;overflow:hidden;box-shadow:inset 0 1px #ffffff22,0 5px 0 #03101f,0 9px 14px #0005!important;transform:translateY(0);transition:transform .22s ease,box-shadow .22s ease,filter .22s ease!important}
+.main-nav>a:before,.nav-group summary:before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg,#ffffff13,transparent 38%,#00e5ff08 70%,#ffffff04)}
+.main-nav>a:hover,.nav-group summary:hover{transform:translateY(-2px)!important;box-shadow:inset 0 1px #ffffff35,0 7px 0 #03101f,0 14px 22px #0008,0 0 18px #00dfff22!important}
+.main-nav a.is-active,.nav-menu a.is-active{box-shadow:inset 0 1px #ffffff50,0 5px 0 #034257,0 10px 22px #00dfff24!important}
+section,.rt-stat,.rt-action-card,.rt-card,.panel,.form-card,.resident-card,.dashboard-card{position:relative;isolation:isolate;overflow:hidden;transform-style:preserve-3d;box-shadow:0 18px 34px #0007,0 0 0 1px #26eaff10,inset 0 1px #e7ffff22,inset 0 -1px #00bde51b!important}
+section:before,.rt-stat:before,.rt-action-card:before,.rt-card:before,.panel:before,.form-card:before,.resident-card:before,.dashboard-card:before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;background:linear-gradient(130deg,#ffffff0b,transparent 28%,transparent 70%,#11dff10a)}
+.rt-stat,.rt-action-card{transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s ease,border-color .25s ease!important}
+.rt-action-card:hover,.rt-stat:hover{transform:translateY(-5px) rotateX(1deg)!important;box-shadow:0 25px 45px #0009,0 0 25px #00dfff30,inset 0 1px #ffffff35!important}
+button,.btn,a.button,input[type=submit]{position:relative;overflow:hidden;box-shadow:0 7px 0 #03476a,0 12px 24px #00101f80,inset 0 1px #ffffff8c,inset 0 -2px #002f4e55!important;transform:translateY(0);transition:transform .16s ease,filter .16s ease,box-shadow .16s ease!important}
+button:active,.btn:active,a.button:active,input[type=submit]:active{transform:translateY(4px)!important;box-shadow:0 3px 0 #03476a,0 5px 12px #00101f80,inset 0 1px #ffffff55!important}
+button:after,.btn:after,a.button:after,input[type=submit]:after{content:"";position:absolute;inset:-80% auto -80% -45%;width:28%;pointer-events:none;transform:rotate(22deg);background:linear-gradient(90deg,transparent,#ffffff55,transparent);transition:left .55s ease}
+button:hover:after,.btn:hover:after,a.button:hover:after,input[type=submit]:hover:after{left:125%}
+input,select,textarea{box-shadow:inset 0 4px 12px #0008,0 1px #ffffff0d!important}
+.login-hero{border:1px solid #35e9ff80;box-shadow:0 34px 90px #000a,0 0 0 1px #18c8ff18,inset 0 1px #ffffff40, inset 0 -2px #00dfff36!important;transform-style:preserve-3d}
+.login-hero:before{box-shadow:inset 0 0 40px #d5ffff18,0 18px 50px #00dfff25}
+.login-emblem{border:1px solid #8effffb0!important;box-shadow:0 0 0 3px #0c72945c,0 0 34px #17e8ffb0,0 18px 28px #000b!important;transform-style:preserve-3d;animation:rmEmblem3D 5s ease-in-out infinite!important}
+.login-panel{border-color:#5beeff91!important;box-shadow:0 25px 55px #0008,inset 0 1px #ffffff2b,inset 0 -1px #00dfff30!important}
+.login-submit{box-shadow:0 7px 0 #00607a,0 14px 26px #00cde944,inset 0 1px #ffffffbd!important}
+.login-feature-row span{border-color:#28dff177!important;box-shadow:0 8px 18px #0005,inset 0 1px #ffffff24;background:linear-gradient(145deg,#0b3654cc,#061a2bcc)!important}
+.rt-profile-avatar{box-shadow:0 0 0 3px #0b5575,0 16px 32px #0008,0 0 26px #00cfff35!important;transform:perspective(800px) rotateY(-2deg)}
+.rt-photo-picker{box-shadow:inset 0 1px #ffffff24,0 12px 22px #0004!important}
+table{border-radius:12px;overflow:hidden;box-shadow:0 14px 28px #0005}
+th{box-shadow:inset 0 1px #ffffff1e}
+.msg{box-shadow:0 8px 20px #0004,inset 0 1px #ffffff25}
+@keyframes rmAmbientDrift{0%{transform:translate3d(-1%,0,0) scale(1)}100%{transform:translate3d(1.5%,1%,0) scale(1.04)}}
+@keyframes rmLightSweep{0%,55%{transform:translateX(-100%)}80%,100%{transform:translateX(100%)}}
+@keyframes rmEmblem3D{0%,100%{transform:perspective(700px) rotateY(-4deg) rotateX(1deg) translateY(0)}50%{transform:perspective(700px) rotateY(4deg) rotateX(-1deg) translateY(-5px)}}
+@media(max-width:680px){.brand-icon{width:52px!important;height:52px!important;border-radius:14px!important}.main-nav>a,.nav-group summary{box-shadow:inset 0 1px #ffffff1f,0 4px 0 #03101f,0 7px 12px #0005!important}.rt-action-card:hover,.rt-stat:hover{transform:translateY(-2px)!important}}
+@media(prefers-reduced-motion:reduce){body:after,.brand-header:after,.login-emblem{animation:none!important}button:after,.btn:after,a.button:after,input[type=submit]:after{display:none!important}}
+
 </style><header class="brand-header"><div class="brand-lockup"><img class="brand-icon" src="/static/resimanage-3d-icon.jpg" width="64" height="64" alt="ResiManage"><div><h2>{{t('app')}}</h2><p class="brand-tagline">{% if lang=='ar' %}تسيير تربصات الأطباء المقيمين{% elif lang=='fr' %}Gestion des stages des médecins résidents{% else %}Resident rotation management{% endif %}</p><span class="brand-year">{{t('year')}}: {{year}}</span></div></div></header><div class="rt-app-shell">{% if user %}<nav class="main-nav" aria-label="{{L('Navigation principale','Main navigation','التنقل الرئيسي')}}">
 <a class="nav-home {% if request.path=='/' %}is-active{% endif %}" href="/"><span class="nav-icon">⌂</span><span>{{t('home')}}</span></a>
 <details class="nav-group" {% if request.path in ['/residents','/objectives','/import','/exams','/dems'] %}open{% endif %}><summary><span class="nav-icon">♙</span><span>{{t('residents')}}</span></summary><div class="nav-menu"><a href="/residents" class="{% if request.path=='/residents' %}is-active{% endif %}">{{t('manage_residents')}}</a><a href="/objectives" class="{% if request.path=='/objectives' %}is-active{% endif %}">{{t('objectives')}}</a><a href="/import" class="{% if request.path=='/import' %}is-active{% endif %}">{{t('import_residents')}}</a><a href="/templates" class="{% if request.path=='/templates' %}is-active{% endif %}">{{L('Formulaires vierges','Blank forms','استمارات فارغة')}}</a><a href="/exams" class="{% if request.path=='/exams' %}is-active{% endif %}">{{t('promotion')}}</a><a href="/dems" class="{% if request.path=='/dems' %}is-active{% endif %}">{{t('dems_success')}}</a></div></details>
