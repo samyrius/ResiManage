@@ -685,6 +685,12 @@ def select_postgrad_year():
   flash(L("Année de post-graduation invalide.","Invalid postgraduate year.","سنة ما بعد التدرج غير صالحة."))
   return redirect("/")
  session["selected_postgrad_year"]=year
+ target=request.form.get("next","").strip()
+ if target.startswith("/") and not target.startswith("//") and not target.startswith("/\\"):
+  return redirect(target)
+ referrer=request.referrer or "/"
+ if referrer.startswith("/") and not referrer.startswith("//"):
+  return redirect(referrer)
  return redirect("/")
 
 @app.get("/")
