@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: "Branch or tag to build (select the baseline branch for the rollback APK)"
+        description: "Branch or tag to build (development branch for latest fixes)"
         required: true
-        default: resimanage2-apk-baseline-20261020
+        default: resimanage-2-work
         type: string
 
 permissions:
