@@ -934,5 +934,5 @@ def test_selected_postgraduate_year_filters_history_summary_and_pending_decision
 
     decisions_page = client.get("/decisions")
     assert decisions_page.status_code == 200
-    assert b"01 FÃ©v - 30 Avr" in decisions_page.data
+    assert "01 Fév - 30 Avr".encode() in decisions_page.data
     assert decisions_page.data.count(b"YearFilter Resident") == 1
