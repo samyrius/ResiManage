@@ -111,6 +111,16 @@ def verify_csrf():
   if not expected or not supplied or not hmac.compare_digest(expected,supplied):
    return "Invalid or missing CSRF token",400
 
+@app.after_request
+def keep_post_workflow_on_current_page(response):
+ # Safety net for form handlers that render the page directly after saving.
+ # Use Post/Redirect/Get so the user remains in the same module, not the dashboard.
+ if request.method=="POST" and response.status_code==200 and response.mimetype=="text/html":
+  target=request.full_path
+  if target.endswith("?"): target=target[:-1]
+  response=redirect(target,code=303)
+ return response
+
 def page(body,**kw):
  lang=session.get("lang","ar")
  csrf_token=session.setdefault("_csrf_token",secrets.token_urlsafe(32))
