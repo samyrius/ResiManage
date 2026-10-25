@@ -4109,7 +4109,7 @@ def test_pending_assignment_approval_uses_custom_period_dates(tmp_path, monkeypa
             "SELECT id FROM residents WHERE surname='CustomPeriod'"
         ).fetchone()[0]
         conn.execute(
-            "INSERT INTO terrains(name,kind,mandatory_year) VALUES(?,?,3)",
+            "INSERT INTO terrains(name,kind,mandatory_year) VALUES(?,?,?)",
             ("Custom Period Terrain", "mandatory", 3),
         )
         tid = conn.execute(
