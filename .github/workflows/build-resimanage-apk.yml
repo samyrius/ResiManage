@@ -1,13 +1,13 @@
 name: ResiManage Android reference/test APK
 
-# Manual-only: build the selected ResiManage 2 source for phone testing.
+# Manual-only: build the selected ResiManage source for phone testing.
 on:
   workflow_dispatch:
     inputs:
       source_ref:
         description: "Branch or tag to build"
         required: true
-        default: resimanage-2-work
+        default: fix/mobile-vertical-scroll
         type: string
 
 permissions:
@@ -50,18 +50,20 @@ jobs:
           test -f android/app/build.gradle
           test -f app.py
           test -f requirements.txt
+          echo "Building source ref: ${{ inputs.source_ref }}"
+          git rev-parse HEAD
 
       - name: Build Android debug APK
         working-directory: android
         run: gradle --no-daemon --stacktrace :app:assembleDebug
 
-      - name: Verify APK and record source
+      - name: Verify APK and record exact source
         run: |
           APK="android/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
           mkdir -p release-test
           cp "$APK" release-test/ResiManage-2-reference.apk
-          printf "source_ref=%s\\n" "${{ inputs.source_ref }}" > release-test/BUILD_SOURCE.txt
+          printf "source_ref=%s\nsource_commit=%s\n" "${{ inputs.source_ref }}" "$(git rev-parse HEAD)" > release-test/BUILD_SOURCE.txt
           sha256sum release-test/ResiManage-2-reference.apk | tee release-test/SHA256SUMS.txt
           ls -lh release-test/
 
