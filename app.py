@@ -497,6 +497,7 @@ def assign():
      audit_event(c,"assignment.created",f"resident_id={rid}; terrain_id={tid}; period_id={pid}; status={status}")
      c.commit(); flash(msg)
   except Exception: c.rollback(); flash("Invalid assignment / Affectation invalide / تعيين غير صالح")
+  c.close(); return redirect("/assign")
  rs=c.execute("SELECT * FROM residents WHERE status='active' ORDER BY year DESC,surname").fetchall(); ts=c.execute("SELECT * FROM terrains WHERE active=1 ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END, name").fetchall(); ps=c.execute("SELECT * FROM periods WHERE year_label=? ORDER BY id",(y,)).fetchall()
  external_records=c.execute("SELECT resident_id,start_date,end_date FROM external_rotations WHERE status<>'cancelled'").fetchall()
  blocked_periods_by_resident={}
