@@ -113,9 +113,12 @@ def verify_csrf():
 
 @app.after_request
 def keep_post_workflow_on_current_page(response):
- # Safety net for form handlers that render the page directly after saving.
- # Use Post/Redirect/Get so the user remains in the same module, not the dashboard.
- if request.method=="POST" and response.status_code==200 and response.mimetype=="text/html":
+ # Safety net for ordinary module forms that render the page directly after saving.
+ # Some routes intentionally render POST responses: import previews and validation
+ # errors must remain visible, and account/admin workflows are covered by tests.
+ post_routes_that_must_render = {"/import", "/register", "/verify-email", "/users"}
+ if (request.method=="POST" and request.path not in post_routes_that_must_render
+     and response.status_code==200 and response.mimetype=="text/html"):
   target=request.full_path
   if target.endswith("?"): target=target[:-1]
   response=redirect(target,code=303)
