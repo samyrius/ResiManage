@@ -1,11 +1,8 @@
 name: Android APK + emulator smoke tests
 
-# APK and emulator validation on the active ResiManage 2 branch; manual dispatch remains available.
+# Manual-only until the full ResiManage 2 requirements audit is complete.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - resimanage-2-work
 
 permissions:
   contents: read
@@ -86,7 +83,6 @@ jobs:
           script: |
             set -eu
             mkdir -p emulator-evidence
-            # Always preserve diagnostic evidence, including when install/launch fails.
             trap 'adb logcat -d -t 5000 > emulator-evidence/emulator-logcat.txt 2>&1 || true; adb exec-out screencap -p > emulator-evidence/emulator-screenshot.png 2>/dev/null || true' EXIT
             APK="test-apk/app-debug.apk"
             test -f "$APK"
@@ -95,7 +91,6 @@ jobs:
             adb shell monkey -p com.samyrius.rotationapp 1
             sleep 25
             adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | grep "com.samyrius.rotationapp"
-            # Fail only for a fatal exception associated with this app, not unrelated emulator/system crashes.
             if adb logcat -d -t 5000 | grep -A 12 "FATAL EXCEPTION" | grep -q "com.samyrius.rotationapp"; then
               echo "Fatal exception associated with ResiManage detected."
               exit 1
