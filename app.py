@@ -490,7 +490,13 @@ def check(c,rid,tid,pid,y):
 @app.route("/assign",methods=["GET","POST"])
 def assign():
  if guard():return redirect("/login")
- c=db(); y=setting(c,"year")
+ c=db()
+ default_year=setting(c,"year")
+ years={row[0] for row in c.execute("SELECT year_label FROM periods UNION SELECT year_label FROM capacities UNION SELECT year_label FROM history WHERE year_label IS NOT NULL AND year_label<>''").fetchall()}
+ years.add(default_year)
+ years=sorted((value for value in years if re.fullmatch(r"\d{4}-\d{4}",value) and int(value.split("-")[1])==int(value.split("-")[0])+1),reverse=True)
+ requested_year=(request.form.get("year") if request.method=="POST" else request.args.get("year")) or default_year
+ y=requested_year if requested_year in years else default_year
  if request.method=="POST":
   try:
    rid,tid,pid=map(int,(request.form["resident"],request.form["terrain"],request.form["period"])); ok,msg,status=check(c,rid,tid,pid,y)
@@ -507,7 +513,7 @@ def assign():
      audit_event(c,"assignment.created",f"resident_id={rid}; terrain_id={tid}; period_id={pid}; status={status}")
      c.commit(); flash(msg)
   except Exception: c.rollback(); flash("Invalid assignment / Affectation invalide / تعيين غير صالح")
-  c.close(); return redirect("/assign")
+  c.close(); return redirect("/assign?year="+y)
  rs=c.execute("SELECT * FROM residents WHERE status='active' ORDER BY year DESC,surname").fetchall(); ts=c.execute("SELECT * FROM terrains WHERE active=1 ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END, name").fetchall(); ps=c.execute("SELECT * FROM periods WHERE year_label=? ORDER BY id",(y,)).fetchall()
  external_records=c.execute("SELECT resident_id,start_date,end_date FROM external_rotations WHERE status<>'cancelled'").fetchall()
  blocked_periods_by_resident={}
@@ -519,20 +525,23 @@ def assign():
     blocked.append(str(p["id"]))
   blocked_periods_by_resident[r["id"]]=",".join(blocked)
  rows=c.execute("SELECT a.*,r.surname,r.firstname,r.year,t.name terrain,p.name period FROM assignments a JOIN residents r ON r.id=a.resident_id JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id WHERE p.year_label=? ORDER BY p.id,r.year DESC",(y,)).fetchall(); c.close()
- return page("""<section><h3>{{t('assign_now')}}</h3><p>{{t('priority')}}</p><form method="post"><label>{{t('resident')}}</label><select name="resident" id="assignment-resident">{% for r in rs %}<option value="{{r.id}}" data-blocked-periods="{{blocked_periods_by_resident[r.id]}}" data-base-label="{{r.year}} — {{r.surname}} {{r.firstname}}">{{r.year}} — {{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>{{t('terrain')}}</label><select name="terrain">{% for x in ts %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select><label>{{t('period')}}</label><select name="period" id="assignment-period">{% for x in ps %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select><button>{{t('check_save')}}</button></form><script>(function(){const p=document.getElementById("assignment-period"),r=document.getElementById("assignment-resident");if(!p||!r)return;function update(){const pid=p.value;Array.from(r.options).forEach(o=>{const blocked=(o.dataset.blockedPeriods||"").split(",").includes(pid);o.disabled=blocked;o.textContent=o.dataset.baseLabel+(blocked?" — External rotation conflict":"");});if(r.selectedOptions.length&&r.selectedOptions[0].disabled){const next=Array.from(r.options).find(o=>!o.disabled);if(next)r.value=next.value;}}p.addEventListener("change",update);update();})();</script></section><section><div class="wrap"><table><tr><th>{{t('period')}}</th><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('terrain')}}</th><th>{{t('status')}}</th><th>Admin action</th></tr>{% for a in rows %}<tr><td>{{a.period}}</td><td>{{a.surname}} {{a.firstname}}</td><td>{{a.year}}</td><td>{{a.terrain}}</td><td>{{t(a.status) if a.status in ['confirmed','pending','rejected'] else a.status}}</td><td>{% if role=='super_admin' and a.status not in ['cancelled','rejected'] %}<form method="post" action="/assignments/{{a.id}}/cancel"><button>Cancel</button></form>{% endif %}</td></tr>{% endfor %}</table></div></section>""",rs=rs,ts=ts,ps=ps,rows=rows,blocked_periods_by_resident=blocked_periods_by_resident)
+ return page("""<section><h3>{{t('assign_now')}}</h3><p>{{t('priority')}}</p><form method="get" class="year-switcher"><label for="assign-year">Année de post-graduation</label><div class="grid"><div><select id="assign-year" name="year" onchange="this.form.submit()">{% for option in years %}<option value="{{option}}" {% if option==year %}selected{% endif %}>{{option}}</option>{% endfor %}</select></div><div><button type="submit">Afficher cette année</button></div></div></form><form method="post"><input type="hidden" name="year" value="{{year}}"><label>{{t('resident')}}</label><select name="resident" id="assignment-resident">{% for r in rs %}<option value="{{r.id}}" data-blocked-periods="{{blocked_periods_by_resident[r.id]}}" data-base-label="{{r.year}} — {{r.surname}} {{r.firstname}}">{{r.year}} — {{r.surname}} {{r.firstname}}</option>{% endfor %}</select><label>{{t('terrain')}}</label><select name="terrain">{% for x in ts %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select><label>{{t('period')}}</label><select name="period" id="assignment-period">{% for x in ps %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select><button>{{t('check_save')}}</button></form><script>(function(){const p=document.getElementById("assignment-period"),r=document.getElementById("assignment-resident");if(!p||!r)return;function update(){const pid=p.value;Array.from(r.options).forEach(o=>{const blocked=(o.dataset.blockedPeriods||"").split(",").includes(pid);o.disabled=blocked;o.textContent=o.dataset.baseLabel+(blocked?" — External rotation conflict":"");});if(r.selectedOptions.length&&r.selectedOptions[0].disabled){const next=Array.from(r.options).find(o=>!o.disabled);if(next)r.value=next.value;}}p.addEventListener("change",update);update();})();</script></section><section><div class="wrap"><table><tr><th>{{t('period')}}</th><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('terrain')}}</th><th>{{t('status')}}</th><th>Admin action</th></tr>{% for a in rows %}<tr><td>{{a.period}}</td><td>{{a.surname}} {{a.firstname}}</td><td>{{a.year}}</td><td>{{a.terrain}}</td><td>{{t(a.status) if a.status in ['confirmed','pending','rejected'] else a.status}}</td><td>{% if role=='super_admin' and a.status not in ['cancelled','rejected'] %}<form method="post" action="/assignments/{{a.id}}/cancel?year={{year}}"><button>Cancel</button></form>{% endif %}</td></tr>{% endfor %}</table></div></section>""",rs=rs,ts=ts,ps=ps,rows=rows,blocked_periods_by_resident=blocked_periods_by_resident,year=y,years=years)
 @app.post("/assignments/<int:aid>/cancel")
 def cancel_assignment(aid):
  if super_guard(): return super_guard()
  c=db()
+ selected_year=request.args.get("year","")
+ if not re.fullmatch(r"\d{4}-\d{4}",selected_year) or int(selected_year.split("-")[1])!=int(selected_year.split("-")[0])+1:
+  selected_year=""
  row=c.execute("SELECT status FROM assignments WHERE id=?",(aid,)).fetchone()
  if not row:
   c.close(); return ("Assignment not found",404)
  if row["status"]=="cancelled":
-  c.close(); flash("Assignment already cancelled."); return redirect("/assign")
+  c.close(); flash("Assignment already cancelled."); return redirect("/assign"+("?year="+selected_year if selected_year else ""))
  c.execute("UPDATE assignments SET status='cancelled' WHERE id=?",(aid,))
  audit_event(c,"assignment.cancelled",f"assignment_id={aid}; previous_status={row['status']}")
  c.commit(); c.close(); flash("Assignment cancelled; historical record retained.")
- return redirect("/assign")
+ return redirect("/assign"+("?year="+selected_year if selected_year else ""))
 @app.route("/history",methods=["GET","POST"])
 def history():
  if guard():return redirect("/login")
