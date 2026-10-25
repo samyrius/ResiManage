@@ -1,13 +1,13 @@
 name: ResiManage Android reference/test APK
 
-# Manual-only: build the selected ResiManage source for phone testing.
+# Manual-only: build the selected ResiManage 2 source for phone testing.
 on:
   workflow_dispatch:
     inputs:
       source_ref:
         description: "Branch or tag to build"
         required: true
-        default: fix/mobile-vertical-scroll
+        default: resimanage-2-work
         type: string
 
 permissions:
