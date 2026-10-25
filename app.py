@@ -68,6 +68,8 @@ def init():
  # Additive migrations preserve existing resident and rotation-history records.
  for col, spec in {"birth_place":"TEXT DEFAULT ''","birth_date":"TEXT DEFAULT ''","photo_path":"TEXT DEFAULT ''","dems_status":"TEXT DEFAULT ''","origin_hospital":"TEXT NOT NULL DEFAULT 'CHU Nedir Mohamed - Tizi Ouzou'"}.items():
   ensure_column(c,"residents",col,spec)
+ ensure_column(c,"periods","start_date","TEXT NOT NULL DEFAULT ''")
+ ensure_column(c,"periods","end_date","TEXT NOT NULL DEFAULT ''")
  ensure_column(c,"terrains","active","INTEGER NOT NULL DEFAULT 1")
  ensure_column(c,"audit","actor","TEXT DEFAULT ''")
  c.executescript("""
@@ -220,7 +222,7 @@ form small,form .muted{display:block;line-height:1.55;font-size:14px}
  fieldset{padding:10px}
 }
 
-</style><header class="brand-header"><div class="brand-lockup"><img class="brand-icon" src="/static/resitrack-icon.svg" width="64" height="64" alt="ResiManage"><div><h2>{{t('app')}}</h2><p class="brand-tagline">{% if lang=='ar' %}تسيير تربصات الأطباء المقيمين{% elif lang=='fr' %}Gestion des stages des médecins résidents{% else %}Resident rotation management{% endif %}</p><span class="brand-year">{{t('year')}}: {{year}}</span></div></div></header>{% if user %}<nav class="main-nav"><a href="/"><span class="nav-icon">⌂</span>{{t('home')}}</a><details class="nav-group"><summary><span class="nav-icon">♙</span>{{t('residents')}}</summary><div class="nav-menu"><a href="/residents">{{t('manage_residents')}}</a><a href="/objectives">{{t('objectives')}}</a><a href="/import">{{t('import_residents')}}</a><a href="/exams">{{t('promotion')}}</a><a href="/dems">{{t('dems_success')}}</a></div></details><a href="/terrains"><span class="nav-icon">▥</span>{{t('terrains')}}</a><a href="/capacities"><span class="nav-icon">▦</span>{{t('capacities')}}</a><a href="/assign"><span class="nav-icon">⇄</span>{{t('assign')}}</a><a href="/history"><span class="nav-icon">◷</span>{{t('history')}}</a><a href="/decisions"><span class="nav-icon">✓</span>{{t('decisions')}}</a><a href="/summary"><span class="nav-icon">▤</span>{{t('summary')}}</a><details class="nav-group"><summary><span class="nav-icon">⚙</span>{{t('settings')}}</summary><div class="nav-menu"><a href="/settings">{{t('settings_page')}}</a><a href="/users">{{t('users')}}</a><a href="/audit">{{t('audit')}}</a><a href="/backup">{{t('backup')}}</a><a href="/export">{{t('export')}}</a><a href="/restore">{{t('restore')}}</a><a href="/logout">{{t('logout')}}</a></div></details><div class="rt-language" aria-label="Language"><a href="/lang/ar" {% if lang=='ar' %}aria-current="page"{% endif %} title="العربية">ع</a><a href="/lang/fr" {% if lang=='fr' %}aria-current="page"{% endif %} title="Français">FR</a><a href="/lang/en" {% if lang=='en' %}aria-current="page"{% endif %} title="English">EN</a></div></nav>{% endif %}<main>{% for m in get_flashed_messages() %}<p class="msg">{{m}}</p>{% endfor %}{{body|safe}}</main><footer class="rt-footer">© <strong>Tous droits réservés · ResiManage · Dr Dris</strong><span class="rt-sep"> | </span><strong>All rights reserved · ResiManage · Dr Dris</strong><span class="rt-sep"> | </span><strong>جميع الحقوق محفوظة · ResiManage · Dr Dris</strong></footer></html>"""
+</style><header class="brand-header"><div class="brand-lockup"><img class="brand-icon" src="/static/resitrack-icon.svg" width="64" height="64" alt="ResiManage"><div><h2>{{t('app')}}</h2><p class="brand-tagline">{% if lang=='ar' %}تسيير تربصات الأطباء المقيمين{% elif lang=='fr' %}Gestion des stages des médecins résidents{% else %}Resident rotation management{% endif %}</p><span class="brand-year">{{t('year')}}: {{year}}</span></div></div></header>{% if user %}<nav class="main-nav"><a href="/"><span class="nav-icon">⌂</span>{{t('home')}}</a><details class="nav-group"><summary><span class="nav-icon">♙</span>{{t('residents')}}</summary><div class="nav-menu"><a href="/residents">{{t('manage_residents')}}</a><a href="/objectives">{{t('objectives')}}</a><a href="/import">{{t('import_residents')}}</a><a href="/exams">{{t('promotion')}}</a><a href="/dems">{{t('dems_success')}}</a></div></details><a href="/terrains"><span class="nav-icon">▥</span>{{t('terrains')}}</a><a href="/capacities"><span class="nav-icon">▦</span>{{t('capacities')}}</a><a href="/periods"><span class="nav-icon">◷</span>Périodes</a><a href="/assign"><span class="nav-icon">⇄</span>{{t('assign')}}</a><a href="/history"><span class="nav-icon">◷</span>{{t('history')}}</a><a href="/decisions"><span class="nav-icon">✓</span>{{t('decisions')}}</a><a href="/summary"><span class="nav-icon">▤</span>{{t('summary')}}</a><details class="nav-group"><summary><span class="nav-icon">⚙</span>{{t('settings')}}</summary><div class="nav-menu"><a href="/settings">{{t('settings_page')}}</a><a href="/users">{{t('users')}}</a><a href="/audit">{{t('audit')}}</a><a href="/backup">{{t('backup')}}</a><a href="/export">{{t('export')}}</a><a href="/restore">{{t('restore')}}</a><a href="/logout">{{t('logout')}}</a></div></details><div class="rt-language" aria-label="Language"><a href="/lang/ar" {% if lang=='ar' %}aria-current="page"{% endif %} title="العربية">ع</a><a href="/lang/fr" {% if lang=='fr' %}aria-current="page"{% endif %} title="Français">FR</a><a href="/lang/en" {% if lang=='en' %}aria-current="page"{% endif %} title="English">EN</a></div></nav>{% endif %}<main>{% for m in get_flashed_messages() %}<p class="msg">{{m}}</p>{% endfor %}{{body|safe}}</main><footer class="rt-footer">© <strong>Tous droits réservés · ResiManage · Dr Dris</strong><span class="rt-sep"> | </span><strong>All rights reserved · ResiManage · Dr Dris</strong><span class="rt-sep"> | </span><strong>جميع الحقوق محفوظة · ResiManage · Dr Dris</strong></footer></html>"""
  context={"t":tr,"lang":lang,"year":setting(db(),"year")}
  context.update(kw)
  context.setdefault("csrf_token",csrf_token)
@@ -466,7 +468,7 @@ def capacities():
 def check(c,rid,tid,pid,y):
  r=c.execute("SELECT * FROM residents WHERE id=? AND status='active'",(rid,)).fetchone(); t=c.execute("SELECT * FROM terrains WHERE id=?",(tid,)).fetchone(); p=c.execute("SELECT * FROM periods WHERE id=? AND year_label=?",(pid,y)).fetchone()
  if not r or not t or not t["active"] or not p: return False,tr("none"),None
- start_day, end_day = rotation_period_bounds(p["year_label"], p["name"])
+ start_day, end_day = rotation_period_bounds(p["year_label"], p["name"], p["start_date"], p["end_date"])
  external = c.execute("SELECT hospital,country,start_date,end_date FROM external_rotations WHERE resident_id=? AND status<>'cancelled' AND start_date<=? AND end_date>=? LIMIT 1",(rid,end_day.isoformat(),start_day.isoformat())).fetchone()
  if external: return False,("External rotation blocks local assignment: "+external["hospital"]+", "+external["country"]+" ("+external["start_date"]+" to "+external["end_date"]+")"),None
  dup=c.execute("SELECT t.name FROM assignments a JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=? AND a.period_id=? AND a.status IN ('confirmed','pending')",(rid,pid)).fetchone()
@@ -500,6 +502,33 @@ def check(c,rid,tid,pid,y):
  if h and done<total:return False,tr("history_block")+f" ({h['year_label']} / {h['period']} / {h['date_done']})",None
  if t["mandatory_year"] and t["mandatory_year"]!=r["year"]:return True,tr("mismatch"),"pending"
  return True,(tr("history_repeat") if h else tr("done")),"confirmed"
+@app.route("/periods",methods=["GET","POST"])
+def manage_periods():
+ if guard(): return redirect("/login")
+ c=db(); y=setting(c,"year")
+ if request.method=="POST":
+  if session.get("role")!="super_admin": c.close(); return ("Forbidden — Super Admin only",403)
+  try:
+   pid=int(request.form["period"])
+   start=date.fromisoformat(request.form["start_date"])
+   end=date.fromisoformat(request.form["end_date"])
+   period=c.execute("SELECT * FROM periods WHERE id=? AND year_label=?",(pid,y)).fetchone()
+   if not period: raise ValueError("La période ne correspond pas à l’année sélectionnée.")
+   if end<start: raise ValueError("La date de fin doit être postérieure ou égale à la date de début.")
+   c.execute("UPDATE periods SET start_date=?,end_date=? WHERE id=?",(start.isoformat(),end.isoformat(),pid))
+   audit_event(c,"period.dates_updated",f"year={y}; period_id={pid}; start={start}; end={end}")
+   c.commit(); flash("Dates de période enregistrées.")
+  except (ValueError,KeyError) as exc:
+   c.rollback(); flash("Dates non enregistrées : "+str(exc))
+  c.close(); return redirect("/periods")
+ periods=c.execute("SELECT * FROM periods WHERE year_label=? ORDER BY id",(y,)).fetchall()
+ rows=[]
+ for p in periods:
+  start,end=rotation_period_bounds(p["year_label"],p["name"],p["start_date"],p["end_date"])
+  rows.append({"id":p["id"],"name":p["name"],"start_date":start.isoformat(),"end_date":end.isoformat()})
+ c.close()
+ return page("""<section><h3>Gestion des périodes — {{year}}</h3><p>Les dates ci-dessous s’appliquent aux contrôles de chevauchement des stages et aux affectations. Réservé au Super Admin pour modification.</p><div class="wrap"><table><tr><th>Période</th><th>Dates</th></tr>{% for p in periods %}<tr><td>{{p.name}}</td><td><form method="post" class="grid"><input type="hidden" name="period" value="{{p.id}}"><label>Début <input type="date" name="start_date" value="{{p.start_date}}" required></label><label>Fin <input type="date" name="end_date" value="{{p.end_date}}" required></label><button {% if role!='super_admin' %}disabled{% endif %}>Enregistrer</button></form></td></tr>{% else %}<tr><td colspan="2">Aucune période pour cette année.</td></tr>{% endfor %}</table></div></section>""",periods=rows,year=y)
+
 @app.route("/assign",methods=["GET","POST"])
 def assign():
  if guard():return redirect("/login")
@@ -547,7 +576,7 @@ def assign():
  for r in rs:
   blocked=[]
   for p in ps:
-   pstart,pend=rotation_period_bounds(p["year_label"],p["name"])
+   pstart,pend=rotation_period_bounds(p["year_label"],p["name"],p["start_date"],p["end_date"])
    if any(e["resident_id"]==r["id"] and e["start_date"]<=pend.isoformat() and e["end_date"]>=pstart.isoformat() for e in external_records):
     blocked.append(str(p["id"]))
   blocked_periods_by_resident[r["id"]]=",".join(blocked)
@@ -1136,7 +1165,15 @@ def restore():
    if workdir and os.path.exists(workdir): shutil.rmtree(workdir,ignore_errors=True)
   return redirect("/restore")
  return page("""<section><h3>{{t('restore')}}</h3><p>{{t('restore_help')}} Upload a full .zip backup (database and resident photos) or a legacy .db/.sqlite database backup.</p><form method="post" enctype="multipart/form-data"><label>{{t('file')}} (.zip/.db/.sqlite)</label><input type="file" name="backup_file" accept=".zip,.db,.sqlite,.sqlite3" required><button>{{t('restore')}}</button></form></section>""")
-def rotation_period_bounds(year_label, period_name):
+def rotation_period_bounds(year_label, period_name, start_date=None, end_date=None):
+    try:
+        if start_date and end_date:
+            custom_start=date.fromisoformat(str(start_date))
+            custom_end=date.fromisoformat(str(end_date))
+            if custom_end>=custom_start:
+                return custom_start,custom_end
+    except ValueError:
+        pass
     try:
         y = int(str(year_label).split("-")[0])
     except (ValueError, IndexError):
