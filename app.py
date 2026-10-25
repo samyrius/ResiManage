@@ -357,7 +357,7 @@ def home():
    selected=request.form.get("year","").strip()
    known={row[0] for row in c.execute("SELECT year_label FROM periods UNION SELECT year_label FROM capacities UNION SELECT year_label FROM history WHERE year_label IS NOT NULL AND year_label<>''").fetchall()}
    known.add(y)
-   if selected in known and re.fullmatch(r"\\d{4}-\\d{4}",selected) and int(selected.split("-")[1])==int(selected.split("-")[0])+1:
+   if selected in known and re.fullmatch(r"\d{4}-\d{4}",selected) and int(selected.split("-")[1])==int(selected.split("-")[0])+1:
     y=selected
     c.execute("INSERT INTO settings(key,value) VALUES('year',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(y,))
     if not c.execute("SELECT 1 FROM periods WHERE year_label=?",(y,)).fetchone():
@@ -371,7 +371,7 @@ def home():
   return redirect("/")
  years={row[0] for row in c.execute("SELECT year_label FROM periods UNION SELECT year_label FROM capacities UNION SELECT year_label FROM history WHERE year_label IS NOT NULL AND year_label<>''").fetchall()}
  years.add(y)
- years=sorted((value for value in years if re.fullmatch(r"\\d{4}-\\d{4}",value)),reverse=True)
+ years=sorted((value for value in years if re.fullmatch(r"\d{4}-\d{4}",value)),reverse=True)
  rs=c.execute("SELECT * FROM residents WHERE status='active' ORDER BY year DESC,surname").fetchall()
  count=c.execute("SELECT COUNT(*) FROM terrains").fetchone()[0]
  confirmed=c.execute("SELECT COUNT(*) FROM assignments a JOIN periods p ON p.id=a.period_id WHERE p.year_label=? AND a.status='confirmed'",(y,)).fetchone()[0]
