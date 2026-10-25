@@ -936,3 +936,41 @@ def test_selected_postgraduate_year_filters_history_summary_and_pending_decision
     assert decisions_page.status_code == 200
     assert "01 Fév - 30 Avr".encode() in decisions_page.data
     assert decisions_page.data.count(b"YearFilter Resident") == 1
+
+
+def test_residents_can_record_external_origin_hospital_and_other_requires_detail(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+
+    external = client.post("/residents", data={
+        "surname": "External",
+        "firstname": "Cardio",
+        "year": "2",
+        "origin_hospital": "EHS Cardio - DBK",
+    }, follow_redirects=True)
+    assert external.status_code == 200
+    with rotation_app.db() as conn:
+        row = conn.execute("SELECT origin_hospital FROM residents WHERE surname='External'").fetchone()
+        assert row["origin_hospital"] == "EHS Cardio - DBK"
+
+    missing_detail = client.post("/residents", data={
+        "surname": "Other",
+        "firstname": "Missing",
+        "year": "1",
+        "origin_hospital": "Autre",
+    }, follow_redirects=True)
+    assert missing_detail.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT 1 FROM residents WHERE surname='Other'").fetchone() is None
+
+    other = client.post("/residents", data={
+        "surname": "Other",
+        "firstname": "Hospital",
+        "year": "1",
+        "origin_hospital": "Autre",
+        "origin_hospital_other": "Hôpital de test",
+    }, follow_redirects=True)
+    assert other.status_code == 200
+    with rotation_app.db() as conn:
+        row = conn.execute("SELECT origin_hospital FROM residents WHERE surname='Other'").fetchone()
+        assert row["origin_hospital"] == "Autre — Hôpital de test"
