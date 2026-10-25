@@ -4095,3 +4095,72 @@ def test_inline_capacity_cannot_be_lower_than_active_assignments(tmp_path, monke
         capacity = conn.execute("SELECT places FROM capacities WHERE year_label=? AND terrain_id=? AND period_id=?",
                                 (year, terrain_id, period_id)).fetchone()
         assert capacity["places"] == 1
+
+
+def test_pending_assignment_approval_uses_custom_period_dates(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,2)",
+            ("CustomPeriod", "Resident"),
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='CustomPeriod'"
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO terrains(name,kind,mandatory_year) VALUES(?,?,3)",
+            ("Custom Period Terrain", "mandatory", 3),
+        )
+        tid = conn.execute(
+            "SELECT id FROM terrains WHERE name='Custom Period Terrain'"
+        ).fetchone()[0]
+        period = conn.execute(
+            "SELECT id,year_label,name FROM periods ORDER BY id LIMIT 1"
+        ).fetchone()
+        conn.execute(
+            "UPDATE periods SET start_date=?,end_date=? WHERE id=?",
+            ("2026-03-01", "2026-06-30", period["id"]),
+        )
+        conn.execute(
+            "INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,1)",
+            (period["year_label"], tid, period["id"]),
+        )
+        conn.commit()
+
+    response = client.post(
+        "/assign",
+        data={"resident": str(rid), "terrain": str(tid), "period": str(period["id"])},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        assignment = conn.execute(
+            "SELECT id,status FROM assignments WHERE resident_id=? AND terrain_id=?",
+            (rid, tid),
+        ).fetchone()
+        assert assignment is not None
+        assert assignment["status"] == "pending"
+        conn.execute(
+            "INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,status,request_status) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (
+                rid, "Dr Test", "Paris", "CHU Test", "France", "Observation",
+                "2026-05-15", "2026-05-20", "active", "approved",
+            ),
+        )
+        conn.commit()
+
+    response = client.post(
+        "/decisions",
+        data={
+            "aid": str(assignment["id"]),
+            "outcome": "approve",
+            "reason": "Custom period overlap regression",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT status FROM assignments WHERE id=?", (assignment["id"],)
+        ).fetchone()[0] == "pending"
