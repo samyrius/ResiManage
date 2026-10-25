@@ -4176,3 +4176,38 @@ def test_mobile_layout_has_touch_scroll_fallback(tmp_path, monkeypatch):
     assert b"touch-action:pan-y" in response.data
     assert b"-webkit-overflow-scrolling:touch" in response.data
     assert b".main-nav{backdrop-filter:none!important" in response.data
+
+
+def test_legacy_decisions_are_scoped_to_selected_postgraduate_year(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO decisions(details,decision,reason,actor,created_at,postgrad_year) VALUES(?,?,?,?,?,?)",
+            ("Legacy decision 2025", "Approved", "Historical test", "test-admin", "2025-03-15 10:00:00", ""),
+        )
+        conn.execute(
+            "INSERT INTO decisions(details,decision,reason,actor,created_at,postgrad_year) VALUES(?,?,?,?,?,?)",
+            ("Legacy decision 2026", "Rejected", "Historical test", "test-admin", "2026-03-15 10:00:00", ""),
+        )
+        conn.commit()
+
+    client.post(
+        "/select-year",
+        data={"year": "2025-2026", "next": "/decisions"},
+        follow_redirects=True,
+    )
+    response = client.get("/decisions")
+    assert response.status_code == 200
+    assert b"Legacy decision 2025" in response.data
+    assert b"Legacy decision 2026" not in response.data
+
+    client.post(
+        "/select-year",
+        data={"year": "2026-2027", "next": "/decisions"},
+        follow_redirects=True,
+    )
+    response = client.get("/decisions")
+    assert response.status_code == 200
+    assert b"Legacy decision 2026" in response.data
+    assert b"Legacy decision 2025" not in response.data
