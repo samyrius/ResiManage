@@ -135,11 +135,19 @@ def test_android_launcher_has_resimanage_name_and_doctor_icon():
     manifest = (project_root / "android/app/src/main/AndroidManifest.xml").read_text(
         encoding="utf-8"
     )
-    launcher_icon = project_root / "android/app/src/main/res/drawable-nodpi/resimanage_3d_launcher.jpg"
-    assert 'android:label="ResiManage"' in manifest
-    assert 'android:icon="@drawable/resimanage_3d_launcher"' in manifest
-    assert 'android:roundIcon="@drawable/resimanage_3d_launcher"' in manifest
-    assert launcher_icon.is_file()
+    strings = (project_root / "android/app/src/main/res/values/strings.xml").read_text(
+        encoding="utf-8"
+    )
+    launcher_xml = (
+        project_root / "android/app/src/main/res/mipmap-anydpi-v26/resimanage_launcher.xml"
+    ).read_text(encoding="utf-8")
+    brand_image = project_root / "static/resimanage-3d-icon.jpg"
+    assert 'android:label="@string/app_name"' in manifest
+    assert '<string name="app_name">ResiManage</string>' in strings
+    assert 'android:icon="@mipmap/resimanage_launcher"' in manifest
+    assert 'android:roundIcon="@mipmap/resimanage_launcher"' in manifest
+    assert '@drawable/resimanage_3d_launcher' in launcher_xml
+    assert brand_image.is_file()
 
 
 def test_login_and_protected_dashboard(tmp_path, monkeypatch):
@@ -2454,10 +2462,12 @@ def test_android_launcher_icon_is_bundled_from_current_brand_artwork():
     manifest = (project_root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
     gradle = (project_root / "android/app/build.gradle").read_text(encoding="utf-8")
     brand_image = project_root / "static/resimanage-3d-icon.jpg"
-    assert 'android:icon="@drawable/resimanage_3d_launcher"' in manifest
-    assert 'android:roundIcon="@drawable/resimanage_3d_launcher"' in manifest
+    assert 'android:icon="@mipmap/resimanage_launcher"' in manifest
+    assert 'android:roundIcon="@mipmap/resimanage_launcher"' in manifest
     assert 'copyRotationLauncherIcon' in gradle
+    assert 'copyRotationLauncherIconMipmap' in gradle
     assert 'rename { "resimanage_3d_launcher.jpg" }' in gradle
+    assert 'rename { "resimanage_launcher.jpg" }' in gradle
     assert brand_image.is_file()
 
 def test_android_package_version_identifies_resimanage_2():
