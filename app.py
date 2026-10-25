@@ -2288,7 +2288,7 @@ def resident_profile(rid):
    (surname,firstname,birth_place,birth_date,registration_date,photo_path,phone,phone2,address,email,resident_card_number,national_id_number,medical_order_registered,medical_order_number,social_security_number,additional_info,origin_hospital,external_start_date,external_end_date,rid))
   audit_event(c,"resident.profile_updated",f"resident_id={rid}; name={surname} {firstname}; photo_uploaded={bool(photo_file and photo_file.filename)}")
   c.commit(); r=c.execute("SELECT * FROM residents WHERE id=?",(rid,)).fetchone(); flash(tr("done"))
- history_rows=c.execute("SELECT h.*,t.name terrain FROM history h JOIN terrains t ON t.id=h.terrain_id WHERE h.resident_id=? ORDER BY h.id DESC",(rid,)).fetchall()
+ history_rows=c.execute("SELECT h.*,t.name terrain,p.start_date AS period_start_date,p.end_date AS period_end_date FROM history h JOIN terrains t ON t.id=h.terrain_id LEFT JOIN periods p ON p.year_label=h.year_label AND p.name=h.period WHERE h.resident_id=? ORDER BY h.id DESC",(rid,)).fetchall()
  assignment_rows=c.execute("SELECT a.status,p.name period,p.year_label,t.name terrain FROM assignments a JOIN periods p ON p.id=a.period_id JOIN terrains t ON t.id=a.terrain_id WHERE a.resident_id=? ORDER BY p.year_label DESC,p.id",(rid,)).fetchall()
  objectives=c.execute("SELECT o.*,t.name terrain FROM objectives o JOIN terrains t ON t.id=o.terrain_id ORDER BY o.study_year,t.name").fetchall()
  exam_rows=c.execute("SELECT * FROM exam_records WHERE resident_id=? ORDER BY study_year,module",(rid,)).fetchall()
