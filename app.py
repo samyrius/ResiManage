@@ -1051,8 +1051,10 @@ def check(c,rid,tid,pid,y):
  today=date.today()
  completed_terrains=set()
  history_rows=c.execute("""
-  SELECT h.terrain_id,h.year_label,h.period,h.date_done
+  SELECT h.terrain_id,h.year_label,h.period,h.date_done,
+         p.start_date AS period_start_date,p.end_date AS period_end_date
   FROM history h JOIN terrains t ON t.id=h.terrain_id
+  LEFT JOIN periods p ON p.year_label=h.year_label AND p.name=h.period
   WHERE h.resident_id=? AND t.kind IN ('mandatory','basic') AND t.active=1
  """,(rid,)).fetchall()
  for history_row in history_rows:
@@ -1065,7 +1067,7 @@ def check(c,rid,tid,pid,y):
     continue
   else:
    try:
-    _,history_period_end=rotation_period_bounds(history_row["year_label"],history_row["period"])
+    _,history_period_end=rotation_period_bounds(history_row["year_label"],history_row["period"],history_row["period_start_date"],history_row["period_end_date"])
     if history_period_end<today:
      completed_terrains.add(history_row["terrain_id"])
    except (ValueError,TypeError):
@@ -1073,13 +1075,13 @@ def check(c,rid,tid,pid,y):
  # A confirmed assignment is completion evidence only after its rotation period has ended.
  # Future/current assignments must not unlock repetition of mandatory terrains.
  completed_assignments=c.execute("""
-  SELECT a.terrain_id,p.year_label,p.name FROM assignments a
+  SELECT a.terrain_id,p.year_label,p.name,p.start_date,p.end_date FROM assignments a
   JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id
   WHERE a.resident_id=? AND a.status='confirmed'
     AND t.kind IN ('mandatory','basic') AND t.active=1
  """,(rid,)).fetchall()
  for completed in completed_assignments:
-  _,period_end=rotation_period_bounds(completed["year_label"],completed["name"])
+  _,period_end=rotation_period_bounds(completed["year_label"],completed["name"],completed["start_date"],completed["end_date"])
   if period_end<today:
    completed_terrains.add(completed["terrain_id"])
  done=len(completed_terrains)
@@ -1142,7 +1144,7 @@ def assign():
  for r in rs:
   blocked=[]
   for p in ps:
-   pstart,pend=rotation_period_bounds(p["year_label"],p["name"])
+   pstart,pend=rotation_period_bounds(p["year_label"],p["name"],p["start_date"],p["end_date"])
    if any(e["resident_id"]==r["id"] and e["start_date"]<=pend.isoformat() and e["end_date"]>=pstart.isoformat() for e in external_records):
     blocked.append(str(p["id"]))
   blocked_periods_by_resident[r["id"]]=",".join(blocked)
@@ -1233,7 +1235,7 @@ def decisions():
  if request.method=="POST":
   aid=request.form.get("aid",type=int); outcome=request.form.get("outcome",""); reason=request.form.get("reason","").strip()
   if outcome not in ("approve","reject"): c.close(); return ("Invalid decision",400)
-  a=c.execute("SELECT a.*,r.surname,r.firstname,r.status resident_status,t.name terrain,t.active terrain_active,p.name period,p.year_label FROM assignments a JOIN residents r ON r.id=a.resident_id JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id WHERE a.id=? AND a.status='pending' AND p.year_label=?",(aid,selected_year)).fetchone()
+  a=c.execute("SELECT a.*,r.surname,r.firstname,r.status resident_status,t.name terrain,t.active terrain_active,p.name period,p.year_label,p.start_date,p.end_date FROM assignments a JOIN residents r ON r.id=a.resident_id JOIN terrains t ON t.id=a.terrain_id JOIN periods p ON p.id=a.period_id WHERE a.id=? AND a.status='pending' AND p.year_label=?",(aid,selected_year)).fetchone()
   if a and reason:
    if outcome=="approve":
     if a["resident_status"]!="active":
@@ -1241,7 +1243,7 @@ def decisions():
     elif not a["terrain_active"]:
      flash("Cannot approve: the terrain has been deactivated.")
     else:
-     start_day,end_day=rotation_period_bounds(a["year_label"],a["period"])
+     start_day,end_day=rotation_period_bounds(a["year_label"],a["period"],a["start_date"],a["end_date"])
      external=c.execute("SELECT hospital,country,start_date,end_date FROM external_rotations WHERE resident_id=? AND request_status='approved' AND status<>'cancelled' AND start_date<=? AND end_date>=? LIMIT 1",(a["resident_id"],end_day.isoformat(),start_day.isoformat())).fetchone()
      if external:
       flash("Cannot approve: an external rotation overlaps this period.")
@@ -2302,14 +2304,14 @@ def resident_profile(rid):
     continue
   else:
    try:
-    _,period_end=rotation_period_bounds(item["year_label"],item["period"])
+    _,period_end=rotation_period_bounds(item["year_label"],item["period"],item["period_start_date"],item["period_end_date"])
     if period_end<today: done.add(item["terrain_id"])
    except (ValueError,TypeError):
     continue
- profile_assignments=c.execute("SELECT a.terrain_id,p.year_label,p.name FROM assignments a JOIN periods p ON p.id=a.period_id WHERE a.resident_id=? AND a.status='confirmed'",(rid,)).fetchall()
+ profile_assignments=c.execute("SELECT a.terrain_id,p.year_label,p.name,p.start_date,p.end_date FROM assignments a JOIN periods p ON p.id=a.period_id WHERE a.resident_id=? AND a.status='confirmed'",(rid,)).fetchall()
  for item in profile_assignments:
   try:
-   _,period_end=rotation_period_bounds(item["year_label"],item["name"])
+   _,period_end=rotation_period_bounds(item["year_label"],item["name"],item["start_date"],item["end_date"])
    if period_end<today: done.add(item["terrain_id"])
   except (ValueError,TypeError):
    continue
