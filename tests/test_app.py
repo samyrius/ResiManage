@@ -974,3 +974,30 @@ def test_residents_can_record_external_origin_hospital_and_other_requires_detail
     with rotation_app.db() as conn:
         row = conn.execute("SELECT origin_hospital FROM residents WHERE surname='Other'").fetchone()
         assert row["origin_hospital"] == "Autre — Hôpital de test"
+
+
+def test_super_admin_can_edit_period_dates_and_rotation_bounds_use_them(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    page = client.get("/periods")
+    assert page.status_code == 200
+    assert "Gestion des périodes".encode() in page.data
+
+    with rotation_app.db() as conn:
+        period = conn.execute("SELECT id,year_label,name FROM periods ORDER BY id LIMIT 1").fetchone()
+        assert period is not None
+        pid = period["id"]
+
+    response = client.post("/periods", data={
+        "period": str(pid),
+        "start_date": "2025-03-05",
+        "end_date": "2025-05-12",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        saved = conn.execute("SELECT start_date,end_date,year_label,name FROM periods WHERE id=?", (pid,)).fetchone()
+        assert saved["start_date"] == "2025-03-05"
+        assert saved["end_date"] == "2025-05-12"
+        assert rotation_app.rotation_period_bounds(saved["year_label"], saved["name"], saved["start_date"], saved["end_date"]) == (
+            rotation_app.date(2025, 3, 5), rotation_app.date(2025, 5, 12)
+        )
