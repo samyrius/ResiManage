@@ -894,3 +894,45 @@ def test_year_progression_is_not_approved_if_either_official_rejects(tmp_path, m
         decision = conn.execute("SELECT decision FROM decisions WHERE details LIKE '%Reject Resident — year 3%'").fetchone()
         assert decision[0] == "Rejected by official vote"
 
+
+
+def test_selected_postgraduate_year_filters_history_summary_and_pending_decisions(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
+                     ("YearFilter", "Resident", 2, "active"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='YearFilter'").fetchone()[0]
+        tid = conn.execute("SELECT id FROM terrains WHERE name='Urologie'").fetchone()[0]
+        conn.execute("INSERT INTO periods(year_label,name) VALUES(?,?)", ("2025-2026", "01 Fév - 30 Avr"))
+        current_pid = conn.execute("SELECT id FROM periods WHERE year_label=? AND name=?",
+                                   ("2025-2026", "01 Fév - 30 Avr")).fetchone()[0]
+        conn.execute("INSERT INTO periods(year_label,name) VALUES(?,?)", ("2024-2025", "01 Fév - 30 Avr"))
+        previous_pid = conn.execute("SELECT id FROM periods WHERE year_label=? AND name=?",
+                                   ("2024-2025", "01 Fév - 30 Avr")).fetchone()[0]
+        conn.execute("INSERT INTO settings(key,value) VALUES('year',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                     ("2025-2026",))
+        conn.execute("INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+                     (rid, tid, "2025-2026", "01 Fév - 30 Avr", "2025-02-10"))
+        conn.execute("INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+                     (rid, tid, "2024-2025", "01 Fév - 30 Avr", "2024-02-10"))
+        conn.execute("INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,?)",
+                     (rid, tid, current_pid, "pending"))
+        conn.execute("INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,?)",
+                     (rid, tid, previous_pid, "pending"))
+        conn.commit()
+
+    history_page = client.get("/history")
+    assert history_page.status_code == 200
+    assert b"2025-02-10" in history_page.data
+    assert b"2024-02-10" not in history_page.data
+
+    summary_page = client.get("/summary")
+    assert summary_page.status_code == 200
+    assert b"2025-2026" in summary_page.data
+    assert b"2024-2025" not in summary_page.data
+
+    decisions_page = client.get("/decisions")
+    assert decisions_page.status_code == 200
+    assert b"01 FÃ©v - 30 Avr" in decisions_page.data
+    assert decisions_page.data.count(b"YearFilter Resident") == 1
