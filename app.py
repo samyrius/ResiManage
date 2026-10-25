@@ -347,15 +347,40 @@ def verify_email():
 @app.get("/logout")
 def logout(): session.clear(); return redirect("/login")
 @app.get("/")
+@app.post("/")
 def home():
  if guard(): return redirect("/login")
- c=db(); y=setting(c,"year"); rs=c.execute("SELECT * FROM residents WHERE status='active' ORDER BY year DESC,surname").fetchall()
- count=c.execute("SELECT COUNT(*) FROM terrains").fetchone()[0]; confirmed=c.execute("SELECT COUNT(*) FROM assignments a JOIN periods p ON p.id=a.period_id WHERE p.year_label=? AND a.status='confirmed'",(y,)).fetchone()[0]
+ c=db()
+ y=setting(c,"year")
+ if request.method=="POST":
+  if request.form.get("action")=="select_year":
+   selected=request.form.get("year","").strip()
+   known={row[0] for row in c.execute("SELECT year_label FROM periods UNION SELECT year_label FROM capacities UNION SELECT year_label FROM history WHERE year_label IS NOT NULL AND year_label<>''").fetchall()}
+   known.add(y)
+   if selected in known and re.fullmatch(r"\\d{4}-\\d{4}",selected) and int(selected.split("-")[1])==int(selected.split("-")[0])+1:
+    y=selected
+    c.execute("INSERT INTO settings(key,value) VALUES('year',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(y,))
+    if not c.execute("SELECT 1 FROM periods WHERE year_label=?",(y,)).fetchone():
+     for n in ["01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"]:
+      c.execute("INSERT OR IGNORE INTO periods(year_label,name) VALUES(?,?)",(y,n))
+    audit_event(c,"settings.year_selected",f"year={y}")
+    c.commit()
+   else:
+    flash("Année de post-graduation invalide ou indisponible.")
+  c.close()
+  return redirect("/")
+ years={row[0] for row in c.execute("SELECT year_label FROM periods UNION SELECT year_label FROM capacities UNION SELECT year_label FROM history WHERE year_label IS NOT NULL AND year_label<>''").fetchall()}
+ years.add(y)
+ years=sorted((value for value in years if re.fullmatch(r"\\d{4}-\\d{4}",value)),reverse=True)
+ rs=c.execute("SELECT * FROM residents WHERE status='active' ORDER BY year DESC,surname").fetchall()
+ count=c.execute("SELECT COUNT(*) FROM terrains").fetchone()[0]
+ confirmed=c.execute("SELECT COUNT(*) FROM assignments a JOIN periods p ON p.id=a.period_id WHERE p.year_label=? AND a.status='confirmed'",(y,)).fetchone()[0]
  rows=[]
  for r in rs:
-  n=c.execute("SELECT COUNT(*) FROM assignments a JOIN periods p ON p.id=a.period_id WHERE a.resident_id=? AND p.year_label=? AND a.status='confirmed'",(r["id"],y)).fetchone()[0]; rows.append((r,n))
+  n=c.execute("SELECT COUNT(*) FROM assignments a JOIN periods p ON p.id=a.period_id WHERE a.resident_id=? AND p.year_label=? AND a.status='confirmed'",(r["id"],y)).fetchone()[0]
+  rows.append((r,n))
  c.close()
- return page("""<section><h3 class="rt-dashboard-title"><span class="rt-dot"></span>{{t('overview')}}</h3><p>{{t('priority')}}</p><div class="rt-stats"><div class="rt-stat"><span>{{t('residents')}}</span><strong>{{rows|length}}</strong></div><div class="rt-stat"><span>{{t('terrains')}}</span><strong>{{count}}</strong></div><div class="rt-stat"><span>{{t('confirmed')}}</span><strong>{{confirmed}}</strong></div><div class="rt-stat"><span>{{t('year')}}</span><strong style="font-size:17px">{{year}}</strong></div></div></section><div class="rt-quick-actions"><a class="rt-action-card" href="/leave"><span class="rt-action-icon">◷</span><span><strong>الإجازات / Congés / Leave</strong><small>30 days yearly · carry forward</small></span></a><a class="rt-action-card" href="/external-rotations"><span class="rt-action-icon">✈</span><span><strong>التربصات الخارجية / Stages à l’étranger / External rotations</strong><small>Supervisor · hospital · country · dates</small></span></a><a class="rt-action-card" href="/residents"><span class="rt-action-icon">♙</span><span><strong>{{t('manage_residents')}}</strong><small>Profils · années · coordonnées</small></span></a><a class="rt-action-card" href="/assign"><span class="rt-action-icon">⇄</span><span><strong>{{t('assign')}}</strong><small>Répartition des stages</small></span></a><a class="rt-action-card" href="/terrains"><span class="rt-action-icon">▥</span><span><strong>{{t('terrains')}}</strong><small>Terrains obligatoires et optionnels</small></span></a><a class="rt-action-card" href="/import"><span class="rt-action-icon">⇧</span><span><strong>{{t('import_residents')}}</strong><small>Import avec aperçu et validation</small></span></a></div><section><h3 class="rt-dashboard-title"><span class="rt-dot"></span>{{t('four')}}</h3><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('count')}}</th></tr>{% for r,n in rows %}<tr><td><a class="rt-resident-link" href="/profile/{{r.id}}">{{r.surname}} {{r.firstname}}</a></td><td><span class="rt-year-chip">{{r.year}}</span></td><td><span class="rt-progress"><span style="width:{{[n*25,100]|min}}%"></span></span> {{n}} / 4</td></tr>{% else %}<tr><td colspan="3">{{t('none')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows,count=count,confirmed=confirmed,year=y)
+ return page("""<section><h3 class="rt-dashboard-title"><span class="rt-dot"></span>{{t('overview')}}</h3><p>{{t('priority')}}</p><form method="post" class="year-switcher"><input type="hidden" name="action" value="select_year"><label for="home-year">Année de post-graduation</label><div class="grid"><div><select id="home-year" name="year" aria-label="Année de post-graduation">{% for option in years %}<option value="{{option}}" {% if option==year %}selected{% endif %}>{{option}}</option>{% endfor %}</select></div><div><button type="submit">Afficher cette année</button></div></div></form><div class="rt-stats"><div class="rt-stat"><span>{{t('residents')}}</span><strong>{{rows|length}}</strong></div><div class="rt-stat"><span>{{t('terrains')}}</span><strong>{{count}}</strong></div><div class="rt-stat"><span>{{t('confirmed')}}</span><strong>{{confirmed}}</strong></div><div class="rt-stat"><span>Année de post-graduation</span><strong style="font-size:17px">{{year}}</strong></div></div></section><div class="rt-quick-actions"><a class="rt-action-card" href="/leave"><span class="rt-action-icon">◷</span><span><strong>الإجازات / Congés / Leave</strong><small>30 days yearly · carry forward</small></span></a><a class="rt-action-card" href="/external-rotations"><span class="rt-action-icon">✈</span><span><strong>التربصات الخارجية / Stages à l’étranger / External rotations</strong><small>Supervisor · hospital · country · dates</small></span></a><a class="rt-action-card" href="/residents"><span class="rt-action-icon">♙</span><span><strong>{{t('manage_residents')}}</strong><small>Profils · années · coordonnées</small></span></a><a class="rt-action-card" href="/assign"><span class="rt-action-icon">⇄</span><span><strong>{{t('assign')}}</strong><small>Répartition des stages</small></span></a><a class="rt-action-card" href="/terrains"><span class="rt-action-icon">▥</span><span><strong>{{t('terrains')}}</strong><small>Terrains obligatoires et optionnels</small></span></a><a class="rt-action-card" href="/import"><span class="rt-action-icon">⇧</span><span><strong>{{t('import_residents')}}</strong><small>Import avec aperçu et validation</small></span></a></div><section><h3 class="rt-dashboard-title"><span class="rt-dot"></span>{{t('four')}} — {{year}}</h3><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('study_year')}}</th><th>{{t('count')}}</th></tr>{% for r,n in rows %}<tr><td><a class="rt-resident-link" href="/profile/{{r.id}}">{{r.surname}} {{r.firstname}}</a></td><td><span class="rt-year-chip">{{r.year}}</span></td><td><span class="rt-progress"><span style="width:{{[n*25,100]|min}}%"></span></span> {{n}} / 4</td></tr>{% else %}<tr><td colspan="3">{{t('none')}}</td></tr>{% endfor %}</table></div></section>""",rows=rows,count=count,confirmed=confirmed,year=y,years=years)
 @app.route("/residents",methods=["GET","POST"])
 def residents():
  if guard(): return redirect("/login")
