@@ -182,6 +182,31 @@ body{overflow-x:clip;min-height:100%;touch-action:pan-y}
 .main-nav>a:hover,.nav-group summary:hover{transform:none}
 .wrap{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
 .nav-group[open] .nav-menu{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+
+/* Form readability and touch targets on phones */
+form{min-width:0;max-width:100%}
+form label{display:block;margin:10px 0 4px;font-size:clamp(15px,3.8vw,17px);font-weight:700;line-height:1.45;color:#182b3d}
+input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),select,textarea{display:block;width:100%;min-width:0;min-height:46px;margin:5px 0 14px;padding:11px 12px;background:#fff;color:#182b3d;border:1.5px solid #8fa5bb;border-radius:9px;font-size:16px;line-height:1.45;box-shadow:0 1px 2px #182b3d0a}
+textarea{min-height:110px;resize:vertical}
+input::placeholder,textarea::placeholder{color:#66788a;opacity:1}
+input:focus,select:focus,textarea:focus{outline:3px solid #2768a833;border-color:#2768a8;box-shadow:0 0 0 1px #2768a8}
+input[type="checkbox"],input[type="radio"]{width:20px;height:20px;max-width:20px;vertical-align:middle;margin:6px 8px 6px 0;accent-color:#2768a8}
+input[type="file"]{height:auto;padding:10px;background:#f8fafc}
+button,input[type="submit"],input[type="button"],input[type="reset"]{min-height:44px;padding:11px 16px;font-size:16px;font-weight:700;line-height:1.35;white-space:normal}
+form button,form input[type="submit"]{margin:6px 5px 6px 0}
+fieldset{min-width:0;margin:12px 0;padding:12px;border:1px solid #c6d3e0;border-radius:9px}
+legend{padding:0 6px;font-weight:700;font-size:16px}
+form .grid{align-items:start;gap:6px 14px}
+form .grid>label{margin:7px 0 2px}
+form small,form .muted{display:block;line-height:1.55;font-size:14px}
+@media(max-width:600px){
+ form{width:100%}
+ form label{font-size:16px}
+ input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),select,textarea{font-size:16px;min-height:48px;padding:12px;margin-bottom:16px}
+ button,input[type="submit"],input[type="button"],input[type="reset"]{min-height:46px}
+ fieldset{padding:10px}
+}
+
 </style><header class="brand-header"><div class="brand-lockup"><img class="brand-icon" src="/static/resitrack-icon.svg" width="64" height="64" alt="ResiManage"><div><h2>{{t('app')}}</h2><p class="brand-tagline">{% if lang=='ar' %}تسيير تربصات الأطباء المقيمين{% elif lang=='fr' %}Gestion des stages des médecins résidents{% else %}Resident rotation management{% endif %}</p><span class="brand-year">{{t('year')}}: {{year}}</span></div></div></header>{% if user %}<nav class="main-nav"><a href="/"><span class="nav-icon">⌂</span>{{t('home')}}</a><details class="nav-group"><summary><span class="nav-icon">♙</span>{{t('residents')}}</summary><div class="nav-menu"><a href="/residents">{{t('manage_residents')}}</a><a href="/objectives">{{t('objectives')}}</a><a href="/import">{{t('import_residents')}}</a><a href="/exams">{{t('promotion')}}</a><a href="/dems">{{t('dems_success')}}</a></div></details><a href="/terrains"><span class="nav-icon">▥</span>{{t('terrains')}}</a><a href="/capacities"><span class="nav-icon">▦</span>{{t('capacities')}}</a><a href="/assign"><span class="nav-icon">⇄</span>{{t('assign')}}</a><a href="/history"><span class="nav-icon">◷</span>{{t('history')}}</a><a href="/decisions"><span class="nav-icon">✓</span>{{t('decisions')}}</a><a href="/summary"><span class="nav-icon">▤</span>{{t('summary')}}</a><details class="nav-group"><summary><span class="nav-icon">⚙</span>{{t('settings')}}</summary><div class="nav-menu"><a href="/settings">{{t('settings_page')}}</a><a href="/users">{{t('users')}}</a><a href="/audit">{{t('audit')}}</a><a href="/backup">{{t('backup')}}</a><a href="/export">{{t('export')}}</a><a href="/restore">{{t('restore')}}</a><a href="/logout">{{t('logout')}}</a></div></details><div class="rt-language" aria-label="Language"><a href="/lang/ar" {% if lang=='ar' %}aria-current="page"{% endif %} title="العربية">ع</a><a href="/lang/fr" {% if lang=='fr' %}aria-current="page"{% endif %} title="Français">FR</a><a href="/lang/en" {% if lang=='en' %}aria-current="page"{% endif %} title="English">EN</a></div></nav>{% endif %}<main>{% for m in get_flashed_messages() %}<p class="msg">{{m}}</p>{% endfor %}{{body|safe}}</main><footer class="rt-footer">© <strong>Tous droits réservés · ResiManage · Dr Dris</strong><span class="rt-sep"> | </span><strong>All rights reserved · ResiManage · Dr Dris</strong><span class="rt-sep"> | </span><strong>جميع الحقوق محفوظة · ResiManage · Dr Dris</strong></footer></html>"""
  context={"t":tr,"lang":lang,"year":setting(db(),"year")}
  context.update(kw)
