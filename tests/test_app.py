@@ -4164,3 +4164,15 @@ def test_pending_assignment_approval_uses_custom_period_dates(tmp_path, monkeypa
         assert conn.execute(
             "SELECT status FROM assignments WHERE id=?", (assignment["id"],)
         ).fetchone()[0] == "pending"
+
+
+def test_mobile_layout_has_touch_scroll_fallback(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+
+    response = client.get("/")
+    assert response.status_code == 200
+    assert b"@media(max-width:680px){html{overflow-x:clip;overflow-y:auto" in response.data
+    assert b"touch-action:pan-y" in response.data
+    assert b"-webkit-overflow-scrolling:touch" in response.data
+    assert b".main-nav{backdrop-filter:none!important" in response.data
