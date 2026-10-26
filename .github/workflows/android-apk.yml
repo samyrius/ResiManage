@@ -1,7 +1,10 @@
 name: Android APK + emulator smoke tests
 
-# Manual-only until the full ResiManage 2 requirements audit is complete.
+# Run on demand and for validation changes on the active ResiManage 2 work branch.
 on:
+  push:
+    branches:
+      - resimanage-2-work
   workflow_dispatch:
 
 permissions:
