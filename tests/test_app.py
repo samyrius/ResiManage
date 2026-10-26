@@ -4221,7 +4221,9 @@ def test_login_password_fields_remain_full_size_on_mobile(tmp_path, monkeypatch)
     assert b"font-size:16px" in response.data
     assert b"width:0;min-width:0" in response.data
     assert b'name="password"' in response.data
-    assert b'name="confirm_password"' in response.data
+    registration = client.get("/register")
+    assert registration.status_code == 200
+    assert b'name="confirm_password"' in registration.data
 
 
 def test_android_launcher_metadata_and_keyboard_resize_are_configured():
