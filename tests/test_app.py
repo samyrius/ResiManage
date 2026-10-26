@@ -894,3 +894,110 @@ def test_year_progression_is_not_approved_if_either_official_rejects(tmp_path, m
         decision = conn.execute("SELECT decision FROM decisions WHERE details LIKE '%Reject Resident — year 3%'").fetchone()
         assert decision[0] == "Rejected by official vote"
 
+
+
+def test_selected_postgraduate_year_filters_history_summary_and_pending_decisions(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,?)",
+                     ("YearFilter", "Resident", 2, "active"))
+        rid = conn.execute("SELECT id FROM residents WHERE surname='YearFilter'").fetchone()[0]
+        tid = conn.execute("SELECT id FROM terrains WHERE name='Urologie'").fetchone()[0]
+        conn.execute("INSERT INTO periods(year_label,name) VALUES(?,?)", ("2025-2026", "01 Fév - 30 Avr"))
+        current_pid = conn.execute("SELECT id FROM periods WHERE year_label=? AND name=?",
+                                   ("2025-2026", "01 Fév - 30 Avr")).fetchone()[0]
+        conn.execute("INSERT INTO periods(year_label,name) VALUES(?,?)", ("2024-2025", "01 Fév - 30 Avr"))
+        previous_pid = conn.execute("SELECT id FROM periods WHERE year_label=? AND name=?",
+                                   ("2024-2025", "01 Fév - 30 Avr")).fetchone()[0]
+        conn.execute("INSERT INTO settings(key,value) VALUES('year',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                     ("2025-2026",))
+        conn.execute("INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+                     (rid, tid, "2025-2026", "01 Fév - 30 Avr", "2025-02-10"))
+        conn.execute("INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+                     (rid, tid, "2024-2025", "01 Fév - 30 Avr", "2024-02-10"))
+        conn.execute("INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,?)",
+                     (rid, tid, current_pid, "pending"))
+        conn.execute("INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,?)",
+                     (rid, tid, previous_pid, "pending"))
+        conn.commit()
+
+    history_page = client.get("/history")
+    assert history_page.status_code == 200
+    assert b"2025-02-10" in history_page.data
+    assert b"2024-02-10" not in history_page.data
+
+    summary_page = client.get("/summary")
+    assert summary_page.status_code == 200
+    assert b"2025-2026" in summary_page.data
+    assert b"2024-2025" not in summary_page.data
+
+    decisions_page = client.get("/decisions")
+    assert decisions_page.status_code == 200
+    assert "01 Fév - 30 Avr".encode() in decisions_page.data
+    assert decisions_page.data.count(b"YearFilter Resident") == 1
+
+
+def test_residents_can_record_external_origin_hospital_and_other_requires_detail(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+
+    external = client.post("/residents", data={
+        "surname": "External",
+        "firstname": "Cardio",
+        "year": "2",
+        "origin_hospital": "EHS Cardio - DBK",
+    }, follow_redirects=True)
+    assert external.status_code == 200
+    with rotation_app.db() as conn:
+        row = conn.execute("SELECT origin_hospital FROM residents WHERE surname='External'").fetchone()
+        assert row["origin_hospital"] == "EHS Cardio - DBK"
+
+    missing_detail = client.post("/residents", data={
+        "surname": "Other",
+        "firstname": "Missing",
+        "year": "1",
+        "origin_hospital": "Autre",
+    }, follow_redirects=True)
+    assert missing_detail.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT 1 FROM residents WHERE surname='Other'").fetchone() is None
+
+    other = client.post("/residents", data={
+        "surname": "Other",
+        "firstname": "Hospital",
+        "year": "1",
+        "origin_hospital": "Autre",
+        "origin_hospital_other": "Hôpital de test",
+    }, follow_redirects=True)
+    assert other.status_code == 200
+    with rotation_app.db() as conn:
+        row = conn.execute("SELECT origin_hospital FROM residents WHERE surname='Other'").fetchone()
+        assert row["origin_hospital"] == "Autre — Hôpital de test"
+
+
+def test_super_admin_can_edit_period_dates_and_rotation_bounds_use_them(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    page = client.get("/periods")
+    assert page.status_code == 200
+    assert "Gestion des périodes".encode() in page.data
+
+    with rotation_app.db() as conn:
+        period = conn.execute("SELECT id,year_label,name FROM periods ORDER BY id LIMIT 1").fetchone()
+        assert period is not None
+        pid = period["id"]
+
+    response = client.post("/periods", data={
+        "period": str(pid),
+        "start_date": "2025-03-05",
+        "end_date": "2025-05-12",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        saved = conn.execute("SELECT start_date,end_date,year_label,name FROM periods WHERE id=?", (pid,)).fetchone()
+        assert saved["start_date"] == "2025-03-05"
+        assert saved["end_date"] == "2025-05-12"
+        assert rotation_app.rotation_period_bounds(saved["year_label"], saved["name"], saved["start_date"], saved["end_date"]) == (
+            rotation_app.date(2025, 3, 5), rotation_app.date(2025, 5, 12)
+        )
