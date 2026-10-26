@@ -87,8 +87,10 @@ jobs:
             set -eu
             mkdir -p emulator-evidence
             trap 'adb logcat -d -t 5000 > emulator-evidence/emulator-logcat.txt 2>&1 || true; adb exec-out screencap -p > emulator-evidence/emulator-screenshot.png 2>/dev/null || true' EXIT
-            APK="test-apk/app-debug.apk"
-            test -f "$APK"
+            APK="$(find test-apk -type f -name "*.apk" -print -quit)"
+            test -n "$APK"
+            test -s "$APK"
+            echo "Installing APK: $APK"
             adb install -r "$APK"
             adb shell am force-stop com.samyrius.rotationapp
             adb shell monkey -p com.samyrius.rotationapp 1
