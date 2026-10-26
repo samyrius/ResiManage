@@ -139,13 +139,13 @@ def test_android_launcher_has_resimanage_name_and_doctor_icon():
         encoding="utf-8"
     )
     launcher_xml = (
-        project_root / "android/app/src/main/res/mipmap-anydpi-v26/resimanage_launcher.xml"
+        project_root / "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml"
     ).read_text(encoding="utf-8")
     brand_image = project_root / "static/resimanage-3d-icon.jpg"
     assert 'android:label="@string/app_name"' in manifest
     assert '<string name="app_name">ResiManage</string>' in strings
-    assert 'android:icon="@mipmap/resimanage_launcher"' in manifest
-    assert 'android:roundIcon="@mipmap/resimanage_launcher"' in manifest
+    assert 'android:icon="@mipmap/ic_launcher"' in manifest
+    assert 'android:roundIcon="@mipmap/ic_launcher"' in manifest
     assert '@drawable/resimanage_3d_launcher' in launcher_xml
     assert brand_image.is_file()
 
@@ -2462,12 +2462,12 @@ def test_android_launcher_icon_is_bundled_from_current_brand_artwork():
     manifest = (project_root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
     gradle = (project_root / "android/app/build.gradle").read_text(encoding="utf-8")
     brand_image = project_root / "static/resimanage-3d-icon.jpg"
-    assert 'android:icon="@mipmap/resimanage_launcher"' in manifest
-    assert 'android:roundIcon="@mipmap/resimanage_launcher"' in manifest
+    assert 'android:icon="@mipmap/ic_launcher"' in manifest
+    assert 'android:roundIcon="@mipmap/ic_launcher"' in manifest
     assert 'copyRotationLauncherIcon' in gradle
     assert 'copyRotationLauncherIconMipmap' in gradle
     assert 'rename { "resimanage_3d_launcher.jpg" }' in gradle
-    assert 'rename { "resimanage_launcher.jpg" }' in gradle
+    assert 'rename { "ic_launcher.jpg" }' in gradle
     assert brand_image.is_file()
 
 def test_android_package_version_identifies_resimanage_2():
@@ -4230,9 +4230,9 @@ def test_android_launcher_metadata_and_keyboard_resize_are_configured():
     root = Path(__file__).resolve().parents[1]
     manifest = (root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
     strings = (root / "android/app/src/main/res/values/strings.xml").read_text(encoding="utf-8")
-    launcher = (root / "android/app/src/main/res/mipmap-anydpi-v26/resimanage_launcher.xml").read_text(encoding="utf-8")
-    assert 'android:icon="@mipmap/resimanage_launcher"' in manifest
-    assert 'android:roundIcon="@mipmap/resimanage_launcher"' in manifest
+    launcher = (root / "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml").read_text(encoding="utf-8")
+    assert 'android:icon="@mipmap/ic_launcher"' in manifest
+    assert 'android:roundIcon="@mipmap/ic_launcher"' in manifest
     assert 'android:label="@string/app_name"' in manifest
     assert 'android:windowSoftInputMode="adjustResize"' in manifest
     assert '<string name="app_name">ResiManage</string>' in strings
