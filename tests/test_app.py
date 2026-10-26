@@ -4211,3 +4211,27 @@ def test_legacy_decisions_are_scoped_to_selected_postgraduate_year(tmp_path, mon
     assert response.status_code == 200
     assert b"Legacy decision 2026" in response.data
     assert b"Legacy decision 2025" not in response.data
+
+
+def test_login_password_fields_remain_full_size_on_mobile(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    response = client.get("/login")
+    assert response.status_code == 200
+    assert b"min-height:54px" in response.data
+    assert b"font-size:16px" in response.data
+    assert b"width:0;min-width:0" in response.data
+    assert b'name="password"' in response.data
+    assert b'name="confirm_password"' in response.data
+
+
+def test_android_launcher_metadata_and_keyboard_resize_are_configured():
+    root = Path(__file__).resolve().parents[1]
+    manifest = (root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
+    strings = (root / "android/app/src/main/res/values/strings.xml").read_text(encoding="utf-8")
+    launcher = (root / "android/app/src/main/res/mipmap-anydpi-v26/resimanage_launcher.xml").read_text(encoding="utf-8")
+    assert 'android:icon="@mipmap/resimanage_launcher"' in manifest
+    assert 'android:roundIcon="@mipmap/resimanage_launcher"' in manifest
+    assert 'android:label="@string/app_name"' in manifest
+    assert 'android:windowSoftInputMode="adjustResize"' in manifest
+    assert '<string name="app_name">ResiManage</string>' in strings
+    assert '@drawable/resimanage_3d_launcher' in launcher
