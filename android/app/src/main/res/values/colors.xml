@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="resimanage_launcher_background">#123B5D</color>
+    <color name="resimanage_launcher_background_fixed">#123B5D</color>
 </resources>
