@@ -501,6 +501,8 @@ th{box-shadow:inset 0 1px #ffffff1e}
  .rt-app-shell>main table{font-size:13px}
  .rt-app-shell>main table td form{padding:10px}
  .rt-app-shell>main form button{width:100%;min-height:44px}
+ .rt-app-shell>main .login-panel .password-wrap>input{display:block;flex:1 1 0!important;width:0!important;min-width:0!important;max-width:none!important;box-sizing:border-box!important}
+ .rt-app-shell>main .login-panel .password-wrap>.password-toggle{display:flex;flex:0 0 46px!important;width:46px!important;min-width:46px!important;max-width:46px!important;padding:0!important;align-items:center;justify-content:center;white-space:nowrap}
  .rt-app-shell>main .rt-add-resident>form>button,.rt-app-shell>main .rt-add-terrain>form>button{grid-column:1}
 }
 </style><header class="brand-header"><div class="brand-lockup"><img class="brand-icon" src="/static/resimanage-3d-icon.jpg" width="64" height="64" alt="ResiManage"><div><h2>{{t('app')}}</h2><p class="brand-tagline">{% if lang=='ar' %}تسيير تربصات الأطباء المقيمين{% elif lang=='fr' %}Gestion des stages des médecins résidents{% else %}Resident rotation management{% endif %}</p><span class="brand-year">{{t('year')}}: {{year}}</span></div></div></header><div class="rt-app-shell">{% if user %}<nav class="main-nav" aria-label="{{L('Navigation principale','Main navigation','التنقل الرئيسي')}}">
