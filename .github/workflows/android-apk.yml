@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - resimanage-2-work
+  pull_request:
+    branches:
+      - resimanage-2-work
   workflow_dispatch:
 
 permissions:
