@@ -4237,3 +4237,78 @@ def test_android_launcher_metadata_and_keyboard_resize_are_configured():
     assert 'android:windowSoftInputMode="adjustResize"' in manifest
     assert '<string name="app_name">ResiManage</string>' in strings
     assert '@drawable/resimanage_3d_launcher' in launcher
+
+
+
+def test_period_dates_save_preserves_selected_year_and_values_on_rotation_board(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("UPDATE settings SET value=? WHERE key='year'", ("2026-2027",))
+        conn.execute(
+            "INSERT OR IGNORE INTO periods(name,year_label,start_date,end_date) VALUES(?,?,?,?)",
+            ("Période 1", "2026-2027", "2026-02-01", "2026-04-30"),
+        )
+        conn.commit()
+        period_id = conn.execute(
+            "SELECT id FROM periods WHERE year_label=? ORDER BY id LIMIT 1", ("2026-2027",)
+        ).fetchone()["id"]
+    response = client.post(
+        "/rotation-board",
+        data={
+            "action": "period_dates", "year": "2026-2027", "period_id": str(period_id),
+            "start_date": "2026-02-10", "end_date": "2026-04-25",
+        },
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/rotation-board?year=2026-2027")
+    with rotation_app.db() as conn:
+        saved = conn.execute(
+            "SELECT start_date,end_date FROM periods WHERE id=?", (period_id,)
+        ).fetchone()
+        assert (saved["start_date"], saved["end_date"]) == ("2026-02-10", "2026-04-25")
+
+
+def test_history_period_dates_use_same_previous_year_boundary_rule(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("UPDATE settings SET value=? WHERE key='year'", ("2026-2027",))
+        conn.execute(
+            "INSERT OR IGNORE INTO periods(name,year_label,start_date,end_date) VALUES(?,?,?,?)",
+            ("Période 4", "2025-2026", "2025-11-01", "2026-01-30"),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO periods(name,year_label,start_date,end_date) VALUES(?,?,?,?)",
+            ("Période 1", "2026-2027", "2026-02-01", "2026-04-30"),
+        )
+        conn.commit()
+        current_id = conn.execute(
+            "SELECT id FROM periods WHERE year_label=? AND name=?", ("2026-2027", "Période 1")
+        ).fetchone()["id"]
+    rejected = client.post(
+        "/history",
+        data={
+            "action": "period_dates", "period_id": str(current_id),
+            "start_date": "2026-01-20", "end_date": "2026-04-30",
+        },
+    )
+    assert rejected.status_code == 302
+    with rotation_app.db() as conn:
+        unchanged = conn.execute(
+            "SELECT start_date,end_date FROM periods WHERE id=?", (current_id,)
+        ).fetchone()
+        assert (unchanged["start_date"], unchanged["end_date"]) == ("2026-02-01", "2026-04-30")
+    accepted = client.post(
+        "/history",
+        data={
+            "action": "period_dates", "period_id": str(current_id),
+            "start_date": "2026-02-02", "end_date": "2026-04-30",
+        },
+    )
+    assert accepted.status_code == 302
+    with rotation_app.db() as conn:
+        saved = conn.execute(
+            "SELECT start_date,end_date FROM periods WHERE id=?", (current_id,)
+        ).fetchone()
+        assert (saved["start_date"], saved["end_date"]) == ("2026-02-02", "2026-04-30")
