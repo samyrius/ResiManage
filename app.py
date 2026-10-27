@@ -971,10 +971,10 @@ def rotation_board():
     pid=int(request.form.get("period_id","0"))
     period=c.execute("SELECT id,name FROM periods WHERE id=? AND year_label=?",(pid,y)).fetchone()
     if not period: raise ValueError("Période introuvable pour cette année de post-graduation")
-     start_date,end_date=validate_period_date_values(
+    start_date,end_date=validate_period_date_values(
       c,y,period["name"],request.form.get("start_date","").strip(),request.form.get("end_date","").strip()
      )
-     c.execute("UPDATE periods SET start_date=?,end_date=? WHERE id=? AND year_label=?",(start_date,end_date,pid,y))
+    c.execute("UPDATE periods SET start_date=?,end_date=? WHERE id=? AND year_label=?",(start_date,end_date,pid,y))
     audit_event(c,"period.dates_updated","year="+y+"; period_id="+str(pid)+"; start="+start_date+"; end="+end_date)
     c.commit(); flash(L("Dates de la période enregistrées.","Period dates saved.","تم حفظ تواريخ الفترة."))
     c.close(); return redirect("/rotation-board?year="+y.replace("&","%26").replace(" ","%20"))
@@ -1251,11 +1251,11 @@ def history():
     pid=int(request.form.get("period_id","0"))
     period_row=c.execute("SELECT id,name FROM periods WHERE id=? AND year_label=?",(pid,active_postgrad_year(c))).fetchone()
     if not period_row: raise ValueError("Période introuvable pour l’année sélectionnée.")
-     start_value,end_value=validate_period_date_values(
+    start_value,end_value=validate_period_date_values(
       c,active_postgrad_year(c),period_row["name"],
       request.form.get("start_date","").strip(),request.form.get("end_date","").strip()
      )
-     c.execute("UPDATE periods SET start_date=?,end_date=? WHERE id=? AND year_label=?",(start_value,end_value,pid,active_postgrad_year(c)))
+    c.execute("UPDATE periods SET start_date=?,end_date=? WHERE id=? AND year_label=?",(start_value,end_value,pid,active_postgrad_year(c))
     audit_event(c,"period.dates_updated",f"year={active_postgrad_year(c)}; period_id={pid}; start={start_value}; end={end_value}; source=history")
     c.commit(); c.close(); flash(L("Dates de période mises à jour.","Period dates updated.","تم تحديث تواريخ الفترة.")); return redirect("/history")
    except (ValueError,sqlite3.Error) as exc:
