@@ -46,8 +46,18 @@ def copyRotationLauncherIconMipmap = tasks.register("copyRotationLauncherIconMip
     into(layout.projectDirectory.dir("src/main/res/mipmap-nodpi"))
     rename { "ic_launcher.jpg" }
 }
+def copyRotationLauncherIconPng = tasks.register("copyRotationLauncherIconPng", Copy) {
+    from(rootProject.file("../static/resimanage-3d-icon.png"))
+    into(layout.projectDirectory.dir("src/main/res/drawable-nodpi"))
+    rename { "resimanage_3d_launcher_png.png" }
+}
+def copyRotationLauncherIconMipmapPng = tasks.register("copyRotationLauncherIconMipmapPng", Copy) {
+    from(rootProject.file("../static/resimanage-3d-icon.png"))
+    into(layout.projectDirectory.dir("src/main/res/mipmap-nodpi"))
+    rename { "ic_launcher.png" }
+}
 tasks.named("preBuild").configure {
-    dependsOn(copyRotationPythonApp, copyRotationStaticAssets, copyRotationLauncherIcon, copyRotationLauncherIconMipmap)
+    dependsOn(copyRotationPythonApp, copyRotationStaticAssets, copyRotationLauncherIcon, copyRotationLauncherIconMipmap, copyRotationLauncherIconPng, copyRotationLauncherIconMipmapPng)
 }
 tasks.configureEach {
     if (name.toLowerCase().contains("python") && name != "copyRotationPythonApp" && name != "copyRotationStaticAssets") {
