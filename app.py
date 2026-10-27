@@ -47,6 +47,38 @@ def period_label(name):
  if number in (1,2,3,4):
   return L(f"Période {number}",f"Period {number}",f"الفترة {number}")
  return value
+
+
+def validate_period_date_values(c, year_label, period_name, start_value, end_value):
+    """Validate period dates consistently in the board and history screens."""
+    start_value = date.fromisoformat(start_value).isoformat() if start_value else ""
+    end_value = date.fromisoformat(end_value).isoformat() if end_value else ""
+    if start_value and end_value and end_value < start_value:
+        raise ValueError(L(
+            "La date de fin doit être postérieure ou égale à la date de début.",
+            "The end date must be on or after the start date.",
+            "يجب أن يكون تاريخ النهاية في أو بعد تاريخ البداية."
+        ))
+    if start_value and period_label(period_name).strip().casefold() in {"période 1", "period 1", "الفترة 1"}:
+        start_year = int(year_label.split("-")[0])
+        previous_year = f"{start_year - 1}-{start_year}"
+        previous_periods = c.execute(
+            "SELECT name,end_date FROM periods WHERE year_label=? ORDER BY id DESC",
+            (previous_year,),
+        ).fetchall()
+        previous_end = next(
+            (row["end_date"] for row in previous_periods
+             if period_label(row["name"]).strip().casefold() in {"période 4", "period 4", "الفترة 4"}),
+            "",
+        )
+        if previous_end and start_value <= previous_end:
+            raise ValueError(L(
+                "Le début de la première période doit être postérieur à la fin de la dernière période de l’année précédente.",
+                "The first period must start after the final period of the previous postgraduate year ends.",
+                "يجب أن تبدأ الفترة الأولى بعد نهاية الفترة الأخيرة من سنة ما بعد التدرج السابقة."
+            ))
+    return start_value, end_value
+
 def tr(k):
  lang=current_language()
  return D.get(lang,D["fr"]).get(k,D["fr"].get(k,k))
@@ -939,15 +971,10 @@ def rotation_board():
     pid=int(request.form.get("period_id","0"))
     period=c.execute("SELECT id,name FROM periods WHERE id=? AND year_label=?",(pid,y)).fetchone()
     if not period: raise ValueError("Période introuvable pour cette année de post-graduation")
-    start_date=request.form.get("start_date","").strip(); end_date=request.form.get("end_date","").strip()
-    if start_date: start_date=date.fromisoformat(start_date).isoformat()
-    if end_date: end_date=date.fromisoformat(end_date).isoformat()
-    if start_date and end_date and end_date<start_date: raise ValueError("La date de fin doit être postérieure ou égale à la date de début")
-    if period["name"] in ("Période 1","Period 1","الفترة 1") and start_date:
-     start_year=int(y.split("-")[0]); previous_year=f"{start_year-1}-{start_year}"
-     previous_end=c.execute("SELECT end_date FROM periods WHERE year_label=? AND name IN ('Période 4','Period 4','الفترة 4') ORDER BY id DESC LIMIT 1",(previous_year,)).fetchone()
-     if previous_end and previous_end["end_date"] and start_date<=previous_end["end_date"]: raise ValueError(L("Le début du nouveau roulement doit être postérieur à la fin du dernier stage de l’année précédente.","The new rotation must start after the final rotation of the previous postgraduate year.","يجب أن يبدأ التناوب الجديد بعد نهاية آخر تربص في سنة ما بعد التدرج السابقة."))
-    c.execute("UPDATE periods SET start_date=?,end_date=? WHERE id=? AND year_label=?",(start_date,end_date,pid,y))
+     start_date,end_date=validate_period_date_values(
+      c,y,period["name"],request.form.get("start_date","").strip(),request.form.get("end_date","").strip()
+     )
+c.execute("UPDATE periods SET start_date=?,end_date=? WHERE id=? AND year_label=?",(start_date,end_date,pid,y))
     audit_event(c,"period.dates_updated","year="+y+"; period_id="+str(pid)+"; start="+start_date+"; end="+end_date)
     c.commit(); flash(L("Dates de la période enregistrées.","Period dates saved.","تم حفظ تواريخ الفترة."))
     c.close(); return redirect("/rotation-board?year="+y.replace("&","%26").replace(" ","%20"))
@@ -1224,11 +1251,11 @@ def history():
     pid=int(request.form.get("period_id","0"))
     period_row=c.execute("SELECT id,name FROM periods WHERE id=? AND year_label=?",(pid,active_postgrad_year(c))).fetchone()
     if not period_row: raise ValueError("Période introuvable pour l’année sélectionnée.")
-    start_value=request.form.get("start_date","").strip(); end_value=request.form.get("end_date","").strip()
-    if start_value: start_value=date.fromisoformat(start_value).isoformat()
-    if end_value: end_value=date.fromisoformat(end_value).isoformat()
-    if start_value and end_value and end_value<start_value: raise ValueError("La date de fin doit être postérieure ou égale à la date de début.")
-    c.execute("UPDATE periods SET start_date=?,end_date=? WHERE id=? AND year_label=?",(start_value,end_value,pid,active_postgrad_year(c)))
+     start_value,end_value=validate_period_date_values(
+      c,active_postgrad_year(c),period_row["name"],
+      request.form.get("start_date","").strip(),request.form.get("end_date","").strip()
+     )
+c.execute("UPDATE periods SET start_date=?,end_date=? WHERE id=? AND year_label=?",(start_value,end_value,pid,active_postgrad_year(c)))
     audit_event(c,"period.dates_updated",f"year={active_postgrad_year(c)}; period_id={pid}; start={start_value}; end={end_value}; source=history")
     c.commit(); c.close(); flash(L("Dates de période mises à jour.","Period dates updated.","تم تحديث تواريخ الفترة.")); return redirect("/history")
    except (ValueError,sqlite3.Error) as exc:
@@ -1266,7 +1293,7 @@ def history():
  ts=c.execute("SELECT * FROM terrains WHERE active=1 ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END, name").fetchall()
  period_rows=c.execute("SELECT * FROM periods WHERE year_label=? ORDER BY id",(selected_year,)).fetchall()
  rows=c.execute("SELECT h.*,r.surname,r.firstname,t.name terrain FROM history h JOIN residents r ON r.id=h.resident_id JOIN terrains t ON t.id=h.terrain_id WHERE h.year_label=? ORDER BY h.id DESC",(selected_year,)).fetchall(); c.close()
- return page("""<section><div class="rt-history-yearbar"><h3>{{L('Historique de l’année de post-graduation','History for postgraduate year','سجل سنة ما بعد التدرج')}}</h3><form method="post" action="/select-year" class="rt-year-inline"><label for="history-postgrad-year">{{t('year')}}</label><select id="history-postgrad-year" name="year" onchange="this.form.submit()">{% for yy in year_options %}<option value="{{yy}}" {% if yy==year %}selected{% endif %}>{{yy}}{% if yy==current_year %} — {{L('en cours','current','الحالية')}}{% endif %}</option>{% endfor %}</select><noscript><button type="submit">{{t('choose')}}</button></noscript></form></div><p>{{L('Les lignes affichées ci-dessous correspondent uniquement à l’année sélectionnée. Choisissez une année précédente pour saisir son historique.','The rows below show only the selected year. Choose a previous year to enter its history.','السطور أدناه تخص السنة المختارة فقط. اختر سنة سابقة لإدخال سجلها.')}}</p><h3>{{L('Dates des périodes de cette année','Period dates for this year','تواريخ فترات هذه السنة')}}</h3><p>{{L('Ces dates sont partagées avec le tableau des affectations pour la même année.','These dates are shared with the assignment board for the same year.','هذه التواريخ مشتركة مع جدول التعيينات للسنة نفسها.')}}</p>{% for p in period_rows %}<form method="post" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));align-items:end"><input type="hidden" name="action" value="period_dates"><input type="hidden" name="period_id" value="{{p.id}}"><strong>{{period_label(p.name)}}</strong><label>{{L('Début','Start','البداية')}}<input type="date" name="start_date" value="{{p.start_date}}" required></label><label>{{L('Fin','End','النهاية')}}<input type="date" name="end_date" value="{{p.end_date}}" required></label><button>{{L('Enregistrer les dates','Save dates','حفظ التواريخ')}}</button></form>{% endfor %}<h3>{{t('history_add')}}</h3><form method="post"><label>{{t('resident')}}</label><select name="resident">{% for r in rs %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}} — {{r.year}}</option>{% endfor %}</select><label>{{t('terrain')}}</label><select name="terrain">{% for x in ts %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select><label>{{t('academic_year')}}</label><input name="year_label" required value="{{year}}" placeholder="2025-2026"><label>{{t('period')}}</label><select name="period"><option value="">—</option>{% for p in ["01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"] %}<option value="{{p}}">{{period_label(p)}}</option>{% endfor %}</select><label>{{t('date')}}</label><input type="date" name="date_done"><button>{{t('save')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('terrain')}}</th><th>{{t('academic_year')}}</th><th>{{t('period')}}</th><th>{{t('date')}}</th></tr>{% for h in rows %}<tr><td>{{h.surname}} {{h.firstname}}</td><td>{{h.terrain}}</td><td>{{h.year_label}}</td><td>{{period_label(h.period)}}</td><td>{{h.date_done}}</td></tr>{% endfor %}</table></div></section>""",rs=rs,ts=ts,rows=rows,period_rows=period_rows)
+ return page("""<section><div class="rt-history-yearbar"><h3>{{L('Historique de l’année de post-graduation','History for postgraduate year','سجل سنة ما بعد التدرج')}}</h3><form method="post" action="/select-year" class="rt-year-inline"><input type="hidden" name="next" value="/history"><label for="history-postgrad-year">{{t('year')}}</label><select id="history-postgrad-year" name="year" onchange="this.form.submit()">{% for yy in year_options %}<option value="{{yy}}" {% if yy==year %}selected{% endif %}>{{yy}}{% if yy==current_year %} — {{L('en cours','current','الحالية')}}{% endif %}</option>{% endfor %}</select><noscript><button type="submit">{{t('choose')}}</button></noscript></form></div><p>{{L('Les lignes affichées ci-dessous correspondent uniquement à l’année sélectionnée. Choisissez une année précédente pour saisir son historique.','The rows below show only the selected year. Choose a previous year to enter its history.','السطور أدناه تخص السنة المختارة فقط. اختر سنة سابقة لإدخال سجلها.')}}</p><h3>{{L('Dates des périodes de cette année','Period dates for this year','تواريخ فترات هذه السنة')}}</h3><p>{{L('Ces dates sont partagées avec le tableau des affectations pour la même année.','These dates are shared with the assignment board for the same year.','هذه التواريخ مشتركة مع جدول التعيينات للسنة نفسها.')}}</p>{% for p in period_rows %}<form method="post" action="/history" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));align-items:end"><input type="hidden" name="action" value="period_dates"><input type="hidden" name="next" value="/history"><input type="hidden" name="period_id" value="{{p.id}}"><strong>{{period_label(p.name)}}</strong><label>{{L('Début','Start','البداية')}}<input type="date" name="start_date" value="{{p.start_date}}" required></label><label>{{L('Fin','End','النهاية')}}<input type="date" name="end_date" value="{{p.end_date}}" required></label><button>{{L('Enregistrer les dates','Save dates','حفظ التواريخ')}}</button></form>{% endfor %}<h3>{{t('history_add')}}</h3><form method="post"><label>{{t('resident')}}</label><select name="resident">{% for r in rs %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}} — {{r.year}}</option>{% endfor %}</select><label>{{t('terrain')}}</label><select name="terrain">{% for x in ts %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select><label>{{t('academic_year')}}</label><input name="year_label" required value="{{year}}" placeholder="2025-2026"><label>{{t('period')}}</label><select name="period"><option value="">—</option>{% for p in ["01 Fév - 30 Avr","01 Mai - 30 Juillet","01 Août - 30 Oct","01 Nov - 30 Jan"] %}<option value="{{p}}">{{period_label(p)}}</option>{% endfor %}</select><label>{{t('date')}}</label><input type="date" name="date_done"><button>{{t('save')}}</button></form></section><section><div class="wrap"><table><tr><th>{{t('resident')}}</th><th>{{t('terrain')}}</th><th>{{t('academic_year')}}</th><th>{{t('period')}}</th><th>{{t('date')}}</th></tr>{% for h in rows %}<tr><td>{{h.surname}} {{h.firstname}}</td><td>{{h.terrain}}</td><td>{{h.year_label}}</td><td>{{period_label(h.period)}}</td><td>{{h.date_done}}</td></tr>{% endfor %}</table></div></section>""",rs=rs,ts=ts,rows=rows,period_rows=period_rows)
 @app.get("/summary")
 def summary():
  if guard():return redirect("/login")
