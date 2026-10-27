@@ -4282,6 +4282,15 @@ def test_history_period_dates_use_same_previous_year_boundary_rule(tmp_path, mon
             "INSERT OR IGNORE INTO periods(name,year_label,start_date,end_date) VALUES(?,?,?,?)",
             ("Période 1", "2026-2027", "2026-02-01", "2026-04-30"),
         )
+        # The shared test database may already contain this period with blank dates.
+        conn.execute(
+            "UPDATE periods SET start_date=?,end_date=? WHERE year_label=? AND name=?",
+            ("2025-11-01", "2026-01-30", "2025-2026", "Période 4"),
+        )
+        conn.execute(
+            "UPDATE periods SET start_date=?,end_date=? WHERE year_label=? AND name=?",
+            ("2026-02-01", "2026-04-30", "2026-2027", "Période 1"),
+        )
         conn.commit()
         current_id = conn.execute(
             "SELECT id FROM periods WHERE year_label=? AND name=?", ("2026-2027", "Période 1")
