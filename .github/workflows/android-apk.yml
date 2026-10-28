@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - resimanage-2-work
+  pull_request:
+    branches:
+      - resimanage-2-work
   workflow_dispatch:
 
 permissions:
@@ -87,8 +90,16 @@ jobs:
             set -eu
             mkdir -p emulator-evidence
             trap 'adb logcat -d -t 5000 > emulator-evidence/emulator-logcat.txt 2>&1 || true; adb exec-out screencap -p > emulator-evidence/emulator-screenshot.png 2>/dev/null || true' EXIT
-            APK="$(find test-apk -type f -name "*.apk" -print -quit)"
-            test -n "$APK"
+            APK_DIR="$GITHUB_WORKSPACE/test-apk"
+            echo "Workspace: $GITHUB_WORKSPACE"
+            echo "Downloaded files:"
+            find "$GITHUB_WORKSPACE" -maxdepth 4 -type f \( -name "*.apk" -o -name "*.zip" \) -print
+            APK="$(find "$APK_DIR" -type f -name "*.apk" -print -quit)"
+            if [ -z "$APK" ]; then
+              echo "No APK found under $APK_DIR; listing downloaded artifact directory:"
+              ls -la "$APK_DIR" || true
+              exit 1
+            fi
             test -s "$APK"
             echo "Installing APK: $APK"
             adb install -r "$APK"
