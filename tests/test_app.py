@@ -2465,9 +2465,10 @@ def test_android_launcher_icon_is_bundled_from_current_brand_artwork():
     assert 'android:icon="@mipmap/ic_launcher"' in manifest
     assert 'android:roundIcon="@mipmap/ic_launcher"' in manifest
     assert 'copyRotationLauncherIcon' in gradle
-    assert 'copyRotationLauncherIconMipmap' in gradle
+    assert 'copyRotationLauncherIconMipmapPng' in gradle
     assert 'rename { "resimanage_3d_launcher.jpg" }' in gradle
-    assert 'rename { "ic_launcher.jpg" }' in gradle
+    assert 'rename { "ic_launcher.png" }' in gradle
+    assert (project_root / "static/resimanage-3d-icon.png").is_file()
     assert brand_image.is_file()
 
 def test_android_package_version_identifies_resimanage_2():
