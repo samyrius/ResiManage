@@ -539,30 +539,33 @@ th{box-shadow:inset 0 1px #ffffff1e}
 }
 /* Minimal mobile fix: pin the existing navigation and its submenus to the viewport without changing document scrolling. */
 @media(max-width:680px){
- /* A perspective on body can make fixed descendants scroll with the document. */
+ /* Remove effects on the app shell that can turn fixed positioning into document-relative positioning. */
  body{perspective:none!important;transform:none!important;filter:none!important}
- .rt-app-shell{padding-bottom:112px!important}
+ .rt-app-shell{padding-bottom:112px!important;transform:none!important;transform-style:flat!important;filter:none!important;perspective:none!important}
  .main-nav{
   position:fixed!important;top:auto!important;bottom:calc(8px + env(safe-area-inset-bottom,0px))!important;
   left:8px!important;right:8px!important;width:auto!important;max-width:none!important;
-  z-index:1000!important;margin:0!important;padding:8px!important;
+  z-index:1000!important;margin:0!important;padding:7px!important;
   display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;
   align-items:stretch!important;gap:5px!important;border-radius:16px!important;
  }
+ /* The old mobile rule made Home span every column; explicitly restore equal-width items. */
+ .main-nav>.nav-home{grid-column:auto!important;min-width:0!important}
  .main-nav>a,.main-nav .nav-group>summary{
-  min-width:0!important;min-height:44px!important;padding:6px 2px!important;
+  box-sizing:border-box!important;min-width:0!important;width:100%!important;min-height:52px!important;padding:5px 2px!important;
   display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;
-  text-align:center!important;font-size:11px!important;line-height:1.15!important;
+  text-align:center!important;font-size:10px!important;line-height:1.15!important;overflow-wrap:anywhere!important;
  }
- .main-nav .nav-icon{margin:0 0 3px!important}
- .main-nav .nav-group{position:static!important;min-width:0!important}
+ .main-nav .nav-icon{flex:0 0 20px!important;min-width:20px!important;height:20px!important;margin:0 0 3px!important;font-size:16px!important}
+ .main-nav .nav-group{position:static!important;min-width:0!important;width:100%!important}
  .main-nav .nav-group[open] .nav-menu{
   position:absolute!important;left:0!important;right:0!important;bottom:calc(100% + 8px)!important;
   max-height:50vh!important;overflow-y:auto!important;overscroll-behavior:contain!important;
   -webkit-overflow-scrolling:touch!important;
  }
  .main-nav .nav-menu a{min-height:44px!important}
- .main-nav .rt-language{grid-column:1/-1!important;display:flex!important;justify-content:center!important;gap:12px!important}
+ .main-nav .rt-language{grid-column:1/-1!important;display:flex!important;justify-content:center!important;gap:10px!important;padding-top:5px!important}
+ .main-nav .rt-language img,.main-nav .rt-language button{max-width:42px!important;max-height:42px!important}
 }
 </style><header class="brand-header"><div class="brand-lockup"><img class="brand-icon" src="/static/resimanage-3d-icon.jpg" width="64" height="64" alt="ResiManage"><div><h2>{{t('app')}}</h2><p class="brand-tagline">{% if lang=='ar' %}تسيير تربصات الأطباء المقيمين{% elif lang=='fr' %}Gestion des stages des médecins résidents{% else %}Resident rotation management{% endif %}</p><span class="brand-year">{{t('year')}}: {{year}}</span></div></div></header><div class="rt-app-shell">{% if user %}<nav class="main-nav" aria-label="{{L('Navigation principale','Main navigation','التنقل الرئيسي')}}">
 <a class="nav-home {% if request.path=='/' %}is-active{% endif %}" href="/"><span class="nav-icon">⌂</span><span>{{t('home')}}</span></a>
