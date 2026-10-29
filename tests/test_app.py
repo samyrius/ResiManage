@@ -68,6 +68,14 @@ def test_internal_navigation_is_grouped_responsive_and_marks_current_page(tmp_pa
     assert b'class="nav-home is-active"' in response.data
     assert b'grid-template-columns:260px minmax(0,1fr)' in response.data
     assert b'@media(max-width:680px)' in response.data
+    assert b'.main-nav{\n    position:fixed!important' in response.data
+    assert b'grid-template-columns:repeat(5,minmax(0,1fr))!important' in response.data
+    assert b'safe-area-inset-bottom' in response.data
+    assert b'.main-nav .nav-group[open] .nav-menu' in response.data
+    assert b'max-height:min(50dvh,340px)!important' in response.data
+    assert b'overflow-y:auto!important' in response.data
+    assert b'overscroll-behavior:contain!important' in response.data
+    assert b'touch-action:pan-y!important' in response.data
     residents = client.get("/residents")
     assert residents.status_code == 200
     assert b'href="/residents" class="is-active"' in residents.data

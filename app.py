@@ -537,6 +537,48 @@ th{box-shadow:inset 0 1px #ffffff1e}
  .rt-app-shell>main .login-panel .password-wrap>.password-toggle{display:flex;flex:0 0 46px!important;width:46px!important;min-width:46px!important;max-width:46px!important;padding:0!important;align-items:center;justify-content:center;white-space:nowrap}
  .rt-app-shell>main .rt-add-resident>form>button,.rt-app-shell>main .rt-add-terrain>form>button{grid-column:1}
 }
+
+/* Mobile navigation: fixed viewport bar; submenu is an overlay and never expands the page layout. */
+@media(max-width:680px){
+  html,body{min-height:100%;overflow-x:hidden}
+  .rt-app-shell{display:block!important;padding:8px 8px calc(100px + env(safe-area-inset-bottom,0px))!important}
+  .rt-app-shell>main{display:block!important;width:100%!important;min-width:0!important;padding:0!important}
+  .main-nav{
+    position:fixed!important;left:8px!important;right:8px!important;
+    bottom:calc(8px + env(safe-area-inset-bottom,0px))!important;top:auto!important;
+    z-index:1000!important;display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;
+    align-items:center!important;gap:3px!important;width:auto!important;max-width:none!important;
+    margin:0!important;padding:6px 5px!important;border:1px solid #18799a!important;border-radius:16px!important;
+    background:#041629f5!important;box-shadow:0 8px 28px #0009!important;
+    transform:none!important;overflow:visible!important;touch-action:pan-y!important;
+    backdrop-filter:blur(12px)!important;-webkit-backdrop-filter:blur(12px)!important
+  }
+  .main-nav>.nav-home,.main-nav>.nav-group{grid-column:auto!important;width:auto!important;min-width:0!important;align-self:stretch!important}
+  .main-nav>.nav-home,.main-nav>.nav-group>summary{
+    display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;
+    gap:3px!important;width:100%!important;min-width:0!important;height:54px!important;min-height:54px!important;
+    margin:0!important;padding:4px 2px!important;border:1px solid transparent!important;border-radius:10px!important;
+    background:transparent!important;color:#c4e1ee!important;text-align:center!important;
+    font-size:10px!important;font-weight:700!important;line-height:1.15!important;white-space:normal!important;
+    overflow-wrap:anywhere!important;box-shadow:none!important;transform:none!important
+  }
+  .main-nav .nav-icon{display:block!important;flex:none!important;min-width:0!important;height:auto!important;margin:0!important;font-size:20px!important;line-height:1!important}
+  .main-nav>.nav-home.is-active,.main-nav>.nav-group[open]>summary{background:#0c4a62!important;border-color:#20c9d0!important;color:#fff!important}
+  .main-nav .nav-group summary:after{display:none!important;content:none!important}
+  .main-nav .nav-group[open]{position:static!important;z-index:1001!important}
+  .main-nav .nav-group[open] .nav-menu{
+    position:absolute!important;left:0!important;right:0!important;bottom:calc(100% + 9px)!important;top:auto!important;
+    display:flex!important;flex-direction:column!important;gap:4px!important;width:100%!important;max-width:none!important;
+    max-height:min(50dvh,340px)!important;overflow-x:hidden!important;overflow-y:auto!important;
+    overscroll-behavior:contain!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;
+    margin:0!important;padding:8px!important;border:1px solid #18799a!important;border-radius:14px!important;
+    background:#041629fa!important;box-shadow:0 12px 32px #000b!important
+  }
+  .main-nav .nav-menu a{display:flex!important;align-items:center!important;min-height:44px!important;padding:10px 12px!important;font-size:13px!important;touch-action:manipulation!important}
+  .main-nav .rt-language{display:none!important}
+  .rt-footer{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))!important}
+}
+@media(min-width:681px){.rt-app-shell{padding-bottom:16px}}
 </style><header class="brand-header"><div class="brand-lockup"><img class="brand-icon" src="/static/resimanage-3d-icon.jpg" width="64" height="64" alt="ResiManage"><div><h2>{{t('app')}}</h2><p class="brand-tagline">{% if lang=='ar' %}تسيير تربصات الأطباء المقيمين{% elif lang=='fr' %}Gestion des stages des médecins résidents{% else %}Resident rotation management{% endif %}</p><span class="brand-year">{{t('year')}}: {{year}}</span></div></div></header><div class="rt-app-shell">{% if user %}<nav class="main-nav" aria-label="{{L('Navigation principale','Main navigation','التنقل الرئيسي')}}">
 <a class="nav-home {% if request.path=='/' %}is-active{% endif %}" href="/"><span class="nav-icon">⌂</span><span>{{t('home')}}</span></a>
 <details class="nav-group" {% if request.path in ['/residents','/objectives','/import','/exams','/dems'] %}open{% endif %}><summary><span class="nav-icon">♙</span><span>{{t('residents')}}</span></summary><div class="nav-menu"><a href="/residents" class="{% if request.path=='/residents' %}is-active{% endif %}">{{t('manage_residents')}}</a><a href="/objectives" class="{% if request.path=='/objectives' %}is-active{% endif %}">{{t('objectives')}}</a><a href="/import" class="{% if request.path=='/import' %}is-active{% endif %}">{{t('import_residents')}}</a><a href="/templates" class="{% if request.path=='/templates' %}is-active{% endif %}">{{L('Formulaires vierges','Blank forms','استمارات فارغة')}}</a><a href="/exams" class="{% if request.path=='/exams' %}is-active{% endif %}">{{t('promotion')}}</a><a href="/dems" class="{% if request.path=='/dems' %}is-active{% endif %}">{{t('dems_success')}}</a></div></details>
