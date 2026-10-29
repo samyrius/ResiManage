@@ -537,8 +537,10 @@ th{box-shadow:inset 0 1px #ffffff1e}
  .rt-app-shell>main .login-panel .password-wrap>.password-toggle{display:flex;flex:0 0 46px!important;width:46px!important;min-width:46px!important;max-width:46px!important;padding:0!important;align-items:center;justify-content:center;white-space:nowrap}
  .rt-app-shell>main .rt-add-resident>form>button,.rt-app-shell>main .rt-add-terrain>form>button{grid-column:1}
 }
-/* Minimal mobile fix: pin the existing navigation to the viewport bottom without changing page scrolling. */
+/* Minimal mobile fix: pin the existing navigation and its submenus to the viewport without changing document scrolling. */
 @media(max-width:680px){
+ /* A perspective on body can make fixed descendants scroll with the document. */
+ body{perspective:none!important;transform:none!important;filter:none!important}
  .rt-app-shell{padding-bottom:112px!important}
  .main-nav{
   position:fixed!important;top:auto!important;bottom:calc(8px + env(safe-area-inset-bottom,0px))!important;
