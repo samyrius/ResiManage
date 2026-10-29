@@ -578,7 +578,11 @@ th{box-shadow:inset 0 1px #ffffff1e}
  .main-nav .nav-menu a{min-height:44px!important;font-size:14px!important;white-space:normal!important}
  /* Keep language switching available without adding a sixth navigation column. */
  .main-nav .rt-language{position:absolute!important;right:8px!important;bottom:calc(100% + 8px)!important;
-  display:none!important}
+  display:flex!important;align-items:center!important;gap:4px!important;padding:4px!important;
+  border:1px solid #ffffff25!important;border-radius:10px!important;background:#071a2b!important;box-shadow:0 4px 12px #0005!important}
+ .main-nav .rt-language a{display:flex!important;align-items:center!important;justify-content:center!important;
+  width:30px!important;height:28px!important;min-height:28px!important;padding:2px!important;font-size:16px!important;
+  border-radius:6px!important;background:#123b54!important;box-shadow:none!important}
  .main-nav a:focus-visible,.main-nav summary:focus-visible{outline:2px solid #42e8d1!important;outline-offset:1px}
 }
 </style><header class="brand-header"><div class="brand-lockup"><img class="brand-icon" src="/static/resimanage-3d-icon.jpg" width="64" height="64" alt="ResiManage"><div><h2>{{t('app')}}</h2><p class="brand-tagline">{% if lang=='ar' %}تسيير تربصات الأطباء المقيمين{% elif lang=='fr' %}Gestion des stages des médecins résidents{% else %}Resident rotation management{% endif %}</p><span class="brand-year">{{t('year')}}: {{year}}</span></div></div></header><div class="rt-app-shell">{% if user %}<nav class="main-nav" aria-label="{{L('Navigation principale','Main navigation','التنقل الرئيسي')}}">
