@@ -537,6 +537,31 @@ th{box-shadow:inset 0 1px #ffffff1e}
  .rt-app-shell>main .login-panel .password-wrap>.password-toggle{display:flex;flex:0 0 46px!important;width:46px!important;min-width:46px!important;max-width:46px!important;padding:0!important;align-items:center;justify-content:center;white-space:nowrap}
  .rt-app-shell>main .rt-add-resident>form>button,.rt-app-shell>main .rt-add-terrain>form>button{grid-column:1}
 }
+/* Minimal mobile fix: pin the existing navigation to the viewport bottom without changing page scrolling. */
+@media(max-width:680px){
+ .rt-app-shell{padding-bottom:112px!important}
+ .main-nav{
+  position:fixed!important;top:auto!important;bottom:calc(8px + env(safe-area-inset-bottom,0px))!important;
+  left:8px!important;right:8px!important;width:auto!important;max-width:none!important;
+  z-index:1000!important;margin:0!important;padding:8px!important;
+  display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;
+  align-items:stretch!important;gap:5px!important;border-radius:16px!important;
+ }
+ .main-nav>a,.main-nav .nav-group>summary{
+  min-width:0!important;min-height:44px!important;padding:6px 2px!important;
+  display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;
+  text-align:center!important;font-size:11px!important;line-height:1.15!important;
+ }
+ .main-nav .nav-icon{margin:0 0 3px!important}
+ .main-nav .nav-group{position:static!important;min-width:0!important}
+ .main-nav .nav-group[open] .nav-menu{
+  position:absolute!important;left:0!important;right:0!important;bottom:calc(100% + 8px)!important;
+  max-height:50vh!important;overflow-y:auto!important;overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+ }
+ .main-nav .nav-menu a{min-height:44px!important}
+ .main-nav .rt-language{grid-column:1/-1!important;display:flex!important;justify-content:center!important;gap:12px!important}
+}
 </style><header class="brand-header"><div class="brand-lockup"><img class="brand-icon" src="/static/resimanage-3d-icon.jpg" width="64" height="64" alt="ResiManage"><div><h2>{{t('app')}}</h2><p class="brand-tagline">{% if lang=='ar' %}تسيير تربصات الأطباء المقيمين{% elif lang=='fr' %}Gestion des stages des médecins résidents{% else %}Resident rotation management{% endif %}</p><span class="brand-year">{{t('year')}}: {{year}}</span></div></div></header><div class="rt-app-shell">{% if user %}<nav class="main-nav" aria-label="{{L('Navigation principale','Main navigation','التنقل الرئيسي')}}">
 <a class="nav-home {% if request.path=='/' %}is-active{% endif %}" href="/"><span class="nav-icon">⌂</span><span>{{t('home')}}</span></a>
 <details class="nav-group" {% if request.path in ['/residents','/objectives','/import','/exams','/dems'] %}open{% endif %}><summary><span class="nav-icon">♙</span><span>{{t('residents')}}</span></summary><div class="nav-menu"><a href="/residents" class="{% if request.path=='/residents' %}is-active{% endif %}">{{t('manage_residents')}}</a><a href="/objectives" class="{% if request.path=='/objectives' %}is-active{% endif %}">{{t('objectives')}}</a><a href="/import" class="{% if request.path=='/import' %}is-active{% endif %}">{{t('import_residents')}}</a><a href="/templates" class="{% if request.path=='/templates' %}is-active{% endif %}">{{L('Formulaires vierges','Blank forms','استمارات فارغة')}}</a><a href="/exams" class="{% if request.path=='/exams' %}is-active{% endif %}">{{t('promotion')}}</a><a href="/dems" class="{% if request.path=='/dems' %}is-active{% endif %}">{{t('dems_success')}}</a></div></details>
