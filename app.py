@@ -748,6 +748,131 @@ html[data-interior-theme="ruby"] .rt-app-shell>main section{border-radius:12px!i
  html[data-interior-theme="nature"] .main-nav{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media(prefers-reduced-motion:reduce){html[data-interior-theme] .main-nav,html[data-interior-theme] .main-nav *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* REAL LAYOUT VARIANTS — each theme changes the navigation model and workspace composition.
+   Business routes, labels, forms and data remain untouched. */
+html[data-interior-theme="crystal"] .rt-app-shell{display:grid!important;grid-template-columns:248px minmax(0,1fr)!important;gap:20px!important;max-width:1560px!important}
+html[data-interior-theme="crystal"] .main-nav{position:sticky!important;top:14px!important;align-self:start!important;min-height:calc(100vh - 28px)!important;border-radius:26px!important}
+html[data-interior-theme="crystal"] .rt-app-shell>main{min-width:0!important;padding:8px 10px 28px!important}
+html[data-interior-theme="crystal"] .rt-app-shell>main section{border-radius:22px!important}
+
+html[data-interior-theme="futuristic"] .rt-app-shell{display:flex!important;flex-direction:column!important;gap:12px!important;max-width:1600px!important;padding:12px 22px!important}
+html[data-interior-theme="futuristic"] .main-nav{position:sticky!important;top:6px!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;gap:8px!important;width:100%!important;overflow:visible!important;border-radius:12px!important;padding:10px!important}
+html[data-interior-theme="futuristic"] .main-nav>.nav-home,html[data-interior-theme="futuristic"] .main-nav>.nav-group{width:auto!important;flex:0 0 auto!important}
+html[data-interior-theme="futuristic"] .main-nav>a,html[data-interior-theme="futuristic"] .main-nav .nav-group summary{min-height:42px!important;width:auto!important;white-space:nowrap!important;border-radius:8px!important}
+html[data-interior-theme="futuristic"] .main-nav .nav-menu{position:absolute!important;top:calc(100% + 6px)!important;left:0!important;z-index:90!important;width:280px!important;max-height:65vh!important;overflow:auto!important}
+html[data-interior-theme="futuristic"] .rt-app-shell>main{width:100%!important;max-width:none!important;padding:12px 4px 30px!important}
+html[data-interior-theme="futuristic"] .rt-app-shell>main section{border-radius:10px!important;clip-path:none!important}
+
+html[data-interior-theme="luxe"] .rt-app-shell{display:grid!important;grid-template-columns:292px minmax(0,1fr)!important;gap:30px!important;max-width:1660px!important;padding:24px!important}
+html[data-interior-theme="luxe"] .main-nav{position:sticky!important;top:22px!important;display:flex!important;flex-direction:column!important;min-height:calc(100vh - 44px)!important;padding:22px 16px!important;border-radius:5px 24px 24px 5px!important}
+html[data-interior-theme="luxe"] .main-nav>a,html[data-interior-theme="luxe"] .main-nav .nav-group summary{min-height:54px!important;border-radius:4px!important;border-inline-start:3px solid transparent!important}
+html[data-interior-theme="luxe"] .rt-app-shell>main{max-width:1180px!important;padding:12px 8px 36px!important}
+html[data-interior-theme="luxe"] .rt-app-shell>main section{border-radius:5px!important;margin-bottom:24px!important;padding:clamp(20px,3vw,34px)!important}
+
+html[data-interior-theme="nature"] .rt-app-shell{display:flex!important;flex-direction:column!important;gap:24px!important;max-width:1420px!important;padding:22px!important}
+html[data-interior-theme="nature"] .main-nav{position:relative!important;display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:14px!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important}
+html[data-interior-theme="nature"] .main-nav>a,html[data-interior-theme="nature"] .main-nav .nav-group summary{display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;min-height:112px!important;padding:16px 8px!important;border-radius:20px!important;text-align:center!important;white-space:normal!important}
+html[data-interior-theme="nature"] .main-nav .nav-icon{font-size:28px!important;margin-bottom:6px!important}
+html[data-interior-theme="nature"] .main-nav .nav-group{position:relative!important;width:100%!important}
+html[data-interior-theme="nature"] .main-nav .nav-menu{position:absolute!important;top:calc(100% + 8px)!important;left:0!important;z-index:100!important;width:min(300px,80vw)!important;max-height:60vh!important;overflow:auto!important}
+html[data-interior-theme="nature"] .rt-app-shell>main{width:100%!important;max-width:1280px!important;margin:0 auto!important;padding:0 4px 34px!important}
+html[data-interior-theme="nature"] .rt-app-shell>main section{border-radius:24px!important;padding:clamp(18px,2.5vw,30px)!important}
+
+html[data-interior-theme="emerald"] .rt-app-shell{display:grid!important;grid-template-columns:76px minmax(0,1fr)!important;gap:18px!important;max-width:1540px!important;padding:14px!important}
+html[data-interior-theme="emerald"] .main-nav{position:sticky!important;top:14px!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;min-height:calc(100vh - 28px)!important;width:76px!important;padding:12px 7px!important;border-radius:24px!important}
+html[data-interior-theme="emerald"] .main-nav>a,html[data-interior-theme="emerald"] .main-nav .nav-group summary{display:flex!important;justify-content:center!important;align-items:center!important;width:100%!important;min-height:58px!important;padding:8px 2px!important;font-size:0!important}
+html[data-interior-theme="emerald"] .main-nav .nav-icon{font-size:24px!important;margin:0!important}
+html[data-interior-theme="emerald"] .main-nav .nav-group{position:relative!important;width:100%!important}
+html[data-interior-theme="emerald"] .main-nav .nav-menu{position:absolute!important;left:calc(100% + 10px)!important;top:0!important;z-index:120!important;width:270px!important;max-height:72vh!important;overflow:auto!important}
+html[data-interior-theme="emerald"] .main-nav .rt-language{display:flex!important;flex-direction:column!important;margin-top:auto!important}
+html[data-interior-theme="emerald"] .rt-app-shell>main{min-width:0!important;padding:10px 12px 30px!important}
+html[data-interior-theme="emerald"] .rt-app-shell>main section{border-radius:18px 6px 18px 6px!important}
+
+html[data-interior-theme="aurora"] .rt-app-shell{display:flex!important;flex-direction:column!important;align-items:center!important;gap:20px!important;max-width:1500px!important;padding:18px 24px!important}
+html[data-interior-theme="aurora"] .main-nav{position:sticky!important;top:10px!important;align-self:center!important;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;justify-content:center!important;gap:10px!important;width:max-content!important;max-width:100%!important;padding:10px 18px!important;border-radius:999px!important}
+html[data-interior-theme="aurora"] .main-nav>.nav-home,html[data-interior-theme="aurora"] .main-nav>.nav-group{width:auto!important;flex:0 1 auto!important}
+html[data-interior-theme="aurora"] .main-nav>a,html[data-interior-theme="aurora"] .main-nav .nav-group summary{min-height:46px!important;width:auto!important;border-radius:999px!important;padding:10px 16px!important;white-space:nowrap!important}
+html[data-interior-theme="aurora"] .main-nav .nav-menu{position:absolute!important;top:calc(100% + 8px)!important;left:0!important;z-index:100!important;max-height:60vh!important;overflow:auto!important}
+html[data-interior-theme="aurora"] .rt-app-shell>main{width:100%!important;max-width:1260px!important;padding:8px 8px 34px!important}
+html[data-interior-theme="aurora"] .rt-app-shell>main section{border-radius:28px!important}
+
+html[data-interior-theme="ruby"] .rt-app-shell{display:flex!important;flex-direction:column!important;gap:0!important;max-width:1440px!important;padding:0 18px 32px!important}
+html[data-interior-theme="ruby"] .main-nav{position:sticky!important;top:0!important;display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:4px!important;width:100%!important;padding:8px 10px!important;border-radius:0 0 18px 18px!important}
+html[data-interior-theme="ruby"] .main-nav>a,html[data-interior-theme="ruby"] .main-nav .nav-group summary{display:flex!important;justify-content:center!important;align-items:center!important;min-height:56px!important;border-radius:8px 8px 0 0!important;border-bottom:3px solid transparent!important;text-align:center!important}
+html[data-interior-theme="ruby"] .main-nav .nav-group{width:100%!important}
+html[data-interior-theme="ruby"] .main-nav .nav-menu{position:absolute!important;top:calc(100% + 4px)!important;left:0!important;z-index:100!important;width:min(340px,90vw)!important;max-height:60vh!important;overflow:auto!important}
+html[data-interior-theme="ruby"] .rt-app-shell>main{width:100%!important;max-width:1180px!important;margin:0 auto!important;padding:18px 10px 28px!important}
+html[data-interior-theme="ruby"] .rt-app-shell>main section{border-radius:12px!important;padding:clamp(14px,2vw,24px)!important}
+
+/* Distinct phone layouts — Crystal keeps the requested fixed bottom bar;
+   alternatives intentionally use different navigation placement and grouping. */
+@media(max-width:680px){
+ html[data-interior-theme] .rt-app-shell{display:block!important;max-width:none!important;padding:0 0 22px!important}
+ html[data-interior-theme] .rt-app-shell>main{width:100%!important;max-width:none!important;margin:0!important;padding:10px 10px 26px!important}
+ html[data-interior-theme="crystal"] .rt-app-shell{padding-bottom:calc(78px + env(safe-area-inset-bottom))!important}
+ html[data-interior-theme="crystal"] .main-nav{position:fixed!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;z-index:1000!important;display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:3px!important;width:100%!important;min-height:66px!important;margin:0!important;padding:7px 6px calc(7px + env(safe-area-inset-bottom))!important;border-radius:16px 16px 0 0!important}
+ html[data-interior-theme="crystal"] .main-nav>.nav-home,html[data-interior-theme="crystal"] .main-nav>.nav-group{grid-column:auto!important;width:100%!important}
+ html[data-interior-theme="crystal"] .main-nav>.nav-home,html[data-interior-theme="crystal"] .main-nav>.nav-group>summary{display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;min-height:48px!important;height:48px!important;padding:3px!important;font-size:0!important}
+ html[data-interior-theme="crystal"] .main-nav .nav-icon{font-size:20px!important;margin:0!important}
+ html[data-interior-theme="crystal"] .main-nav .nav-menu{position:absolute!important;left:6px!important;right:6px!important;bottom:calc(100% + 8px)!important;top:auto!important;width:auto!important;max-height:58vh!important;overflow:auto!important}
+ html[data-interior-theme="crystal"] .main-nav .rt-language{display:none!important}
+
+ html[data-interior-theme="futuristic"] .rt-app-shell{padding-top:0!important}
+ html[data-interior-theme="futuristic"] .main-nav{position:sticky!important;top:0!important;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;justify-content:flex-start!important;gap:6px!important;width:100%!important;overflow-x:auto!important;overflow-y:visible!important;margin:0!important;padding:8px 6px!important;border-radius:0 0 12px 12px!important}
+ html[data-interior-theme="futuristic"] .main-nav>.nav-home,html[data-interior-theme="futuristic"] .main-nav>.nav-group{flex:0 0 auto!important;width:auto!important}
+ html[data-interior-theme="futuristic"] .main-nav>a,html[data-interior-theme="futuristic"] .main-nav .nav-group summary{min-height:42px!important;width:auto!important;padding:8px 11px!important;font-size:11px!important;white-space:nowrap!important}
+ html[data-interior-theme="futuristic"] .main-nav .nav-menu{position:fixed!important;top:112px!important;left:8px!important;right:8px!important;width:auto!important;max-height:55vh!important;overflow:auto!important}
+ html[data-interior-theme="futuristic"] .rt-app-shell>main{padding-top:14px!important}
+
+ html[data-interior-theme="luxe"] .rt-app-shell{padding:8px 10px 20px!important}
+ html[data-interior-theme="luxe"] .main-nav{position:relative!important;top:auto!important;display:flex!important;flex-direction:column!important;gap:5px!important;width:100%!important;min-height:0!important;margin:0 0 14px!important;padding:10px!important;border-radius:6px 18px 18px 6px!important}
+ html[data-interior-theme="luxe"] .main-nav>.nav-home,html[data-interior-theme="luxe"] .main-nav>.nav-group{width:100%!important}
+ html[data-interior-theme="luxe"] .main-nav>a,html[data-interior-theme="luxe"] .main-nav .nav-group summary{min-height:44px!important;justify-content:flex-start!important;font-size:13px!important}
+ html[data-interior-theme="luxe"] .main-nav .nav-menu{position:static!important;width:100%!important;max-height:36vh!important;overflow:auto!important;margin-top:4px!important}
+ html[data-interior-theme="luxe"] .rt-app-shell>main{padding:8px 2px 24px!important}
+
+ html[data-interior-theme="nature"] .rt-app-shell{padding:10px 10px 22px!important}
+ html[data-interior-theme="nature"] .main-nav{position:relative!important;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;margin:0 0 14px!important;padding:0!important}
+ html[data-interior-theme="nature"] .main-nav>.nav-home,html[data-interior-theme="nature"] .main-nav>.nav-group{width:100%!important}
+ html[data-interior-theme="nature"] .main-nav>a,html[data-interior-theme="nature"] .main-nav .nav-group summary{display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;min-height:82px!important;padding:9px 5px!important;font-size:12px!important;text-align:center!important}
+ html[data-interior-theme="nature"] .main-nav .nav-icon{font-size:23px!important;margin:0 0 4px!important}
+ html[data-interior-theme="nature"] .main-nav .nav-menu{position:static!important;width:100%!important;max-height:32vh!important;overflow:auto!important;grid-column:1/-1!important}
+ html[data-interior-theme="nature"] .rt-app-shell>main{padding:6px 0 24px!important}
+
+ html[data-interior-theme="emerald"] .rt-app-shell{padding:0 0 20px 62px!important}
+ html[data-interior-theme="emerald"] .main-nav{position:fixed!important;left:0!important;top:0!important;bottom:0!important;z-index:1000!important;display:flex!important;flex-direction:column!important;justify-content:center!important;gap:8px!important;width:56px!important;min-height:0!important;height:100dvh!important;margin:0!important;padding:8px 4px!important;border-radius:0 18px 18px 0!important}
+ html[data-interior-theme="emerald"] .main-nav>.nav-home,html[data-interior-theme="emerald"] .main-nav>.nav-group{width:100%!important;flex:0 0 auto!important}
+ html[data-interior-theme="emerald"] .main-nav>a,html[data-interior-theme="emerald"] .main-nav .nav-group summary{display:flex!important;justify-content:center!important;align-items:center!important;min-height:46px!important;height:46px!important;padding:3px!important;font-size:0!important}
+ html[data-interior-theme="emerald"] .main-nav .nav-icon{font-size:21px!important;margin:0!important}
+ html[data-interior-theme="emerald"] .main-nav .nav-menu{position:fixed!important;left:62px!important;right:8px!important;top:50%!important;bottom:auto!important;transform:translateY(-50%)!important;width:auto!important;max-height:62vh!important;overflow:auto!important}
+ html[data-interior-theme="emerald"] .main-nav .rt-language{display:none!important}
+ html[data-interior-theme="emerald"] .rt-app-shell>main{padding:10px 8px 24px!important}
+
+ html[data-interior-theme="aurora"] .rt-app-shell{padding:8px 8px calc(82px + env(safe-area-inset-bottom))!important}
+ html[data-interior-theme="aurora"] .main-nav{position:fixed!important;left:50%!important;right:auto!important;bottom:calc(10px + env(safe-area-inset-bottom))!important;top:auto!important;transform:translateX(-50%)!important;z-index:1000!important;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;justify-content:space-around!important;gap:2px!important;width:calc(100% - 20px)!important;max-width:440px!important;margin:0!important;padding:7px!important;border-radius:999px!important}
+ html[data-interior-theme="aurora"] .main-nav>.nav-home,html[data-interior-theme="aurora"] .main-nav>.nav-group{width:auto!important;flex:1 1 0!important;min-width:0!important}
+ html[data-interior-theme="aurora"] .main-nav>a,html[data-interior-theme="aurora"] .main-nav .nav-group summary{display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;min-height:48px!important;height:48px!important;padding:3px!important;font-size:0!important;border-radius:999px!important}
+ html[data-interior-theme="aurora"] .main-nav .nav-icon{font-size:20px!important;margin:0!important}
+ html[data-interior-theme="aurora"] .main-nav .nav-menu{position:fixed!important;left:10px!important;right:10px!important;bottom:calc(76px + env(safe-area-inset-bottom))!important;top:auto!important;width:auto!important;max-height:55vh!important;overflow:auto!important}
+ html[data-interior-theme="aurora"] .main-nav .rt-language{display:none!important}
+
+ html[data-interior-theme="ruby"] .rt-app-shell{padding:54px 8px 18px!important}
+ html[data-interior-theme="ruby"] .main-nav{position:fixed!important;left:0!important;right:0!important;top:0!important;bottom:auto!important;z-index:1000!important;display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:2px!important;width:100%!important;margin:0!important;padding:6px 4px!important;border-radius:0 0 12px 12px!important}
+ html[data-interior-theme="ruby"] .main-nav>.nav-home,html[data-interior-theme="ruby"] .main-nav>.nav-group{width:100%!important}
+ html[data-interior-theme="ruby"] .main-nav>a,html[data-interior-theme="ruby"] .main-nav .nav-group summary{display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;min-height:42px!important;height:42px!important;padding:2px!important;font-size:0!important}
+ html[data-interior-theme="ruby"] .main-nav .nav-icon{font-size:19px!important;margin:0!important}
+ html[data-interior-theme="ruby"] .main-nav .nav-menu{position:fixed!important;left:8px!important;right:8px!important;top:58px!important;bottom:auto!important;width:auto!important;max-height:55vh!important;overflow:auto!important}
+ html[data-interior-theme="ruby"] .main-nav .rt-language{display:none!important}
+}
+@media(min-width:681px) and (max-width:980px){
+ html[data-interior-theme="crystal"] .rt-app-shell{grid-template-columns:210px minmax(0,1fr)!important}
+ html[data-interior-theme="luxe"] .rt-app-shell{grid-template-columns:220px minmax(0,1fr)!important}
+ html[data-interior-theme="emerald"] .rt-app-shell{grid-template-columns:64px minmax(0,1fr)!important}
+ html[data-interior-theme="nature"] .main-nav{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+}
+@media(prefers-reduced-motion:reduce){html[data-interior-theme] .main-nav,html[data-interior-theme] .main-nav *{transition:none!important;animation:none!important}}
+
 </style><header class="brand-header"><div class="brand-lockup"><img class="brand-icon" src="/static/resimanage-3d-icon.jpg" width="64" height="64" alt="ResiManage"><div><h2>{{t('app')}}</h2><p class="brand-tagline">{% if lang=='ar' %}تسيير تربصات الأطباء المقيمين{% elif lang=='fr' %}Gestion des stages des médecins résidents{% else %}Resident rotation management{% endif %}</p><span class="brand-year">{{t('year')}}: {{year}}</span></div></div></header><div class="rt-app-shell">{% if user %}<nav class="main-nav" aria-label="{{L('Navigation principale','Main navigation','التنقل الرئيسي')}}">
 <a class="nav-home {% if request.path=='/' %}is-active{% endif %}" href="/" title="{{t('home')}}" aria-label="{{t('home')}}"><span class="nav-icon" aria-hidden="true">🏠</span><span>{{t('home')}}</span></a>
 <details class="nav-group" {% if request.path in ['/residents','/objectives','/import','/exams','/dems'] %}open{% endif %}><summary title="{{t('residents')}}" aria-label="{{t('residents')}}"><span class="nav-icon" aria-hidden="true">👥</span><span>{{t('residents')}}</span></summary><div class="nav-menu"><a href="/residents" class="{% if request.path=='/residents' %}is-active{% endif %}">{{t('manage_residents')}}</a><a href="/objectives" class="{% if request.path=='/objectives' %}is-active{% endif %}">{{t('objectives')}}</a><a href="/import" class="{% if request.path=='/import' %}is-active{% endif %}">{{t('import_residents')}}</a><a href="/templates" class="{% if request.path=='/templates' %}is-active{% endif %}">{{L('Formulaires vierges','Blank forms','استمارات فارغة')}}</a><a href="/exams" class="{% if request.path=='/exams' %}is-active{% endif %}">{{t('promotion')}}</a><a href="/dems" class="{% if request.path=='/dems' %}is-active{% endif %}">{{t('dems_success')}}</a></div></details>
