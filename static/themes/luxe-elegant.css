@@ -1,2 +1,11 @@
 @import url('/static/themes/common.css');
 html[data-interior-theme="luxe-elegant"] body{background:radial-gradient(ellipse at 10% 0%,#64748b44,transparent 38%),linear-gradient(145deg,#080b11,#1b2432 55%,#080b11)!important}html[data-interior-theme="luxe-elegant"] section,html[data-interior-theme="luxe-elegant"] .rt-stat,html[data-interior-theme="luxe-elegant"] .rt-action-card,html[data-interior-theme="luxe-elegant"] .login-brand,html[data-interior-theme="luxe-elegant"] .login-panel{background:linear-gradient(145deg,#252d3bee,#101722f5)!important;border-color:#64748b!important}html[data-interior-theme="luxe-elegant"] a,html[data-interior-theme="luxe-elegant"] button{background:linear-gradient(120deg,#475569,#334155)!important;border-color:#94a3b8!important}
+
+/* Layout Luxe : contenu central et navigation latérale à droite */
+html[data-interior-theme="luxe-elegant"] .rt-app-shell{display:grid!important;grid-template-columns:minmax(0,1fr) 248px!important;grid-template-areas:"content nav"!important;align-items:start!important;gap:22px!important;max-width:1500px!important}
+html[data-interior-theme="luxe-elegant"] .main-nav{grid-area:nav!important;position:sticky!important;top:16px!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;padding:16px!important;border-radius:20px!important}
+html[data-interior-theme="luxe-elegant"] .rt-app-shell>main{grid-area:content!important;max-width:none!important;width:100%!important}
+html[data-interior-theme="luxe-elegant"] .main-nav>a,html[data-interior-theme="luxe-elegant"] .nav-group summary{min-height:48px!important;border-radius:8px!important;letter-spacing:.02em}
+html[data-interior-theme="luxe-elegant"] .rt-app-shell>main section{border-radius:8px!important}
+@media(max-width:900px){html[data-interior-theme="luxe-elegant"] .rt-app-shell{grid-template-columns:minmax(0,1fr) 215px!important;gap:12px!important}}
+@media(max-width:680px){html[data-interior-theme="luxe-elegant"] .rt-app-shell{display:flex!important;flex-direction:column!important;gap:10px!important}html[data-interior-theme="luxe-elegant"] .main-nav{position:relative!important;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;width:100%!important}html[data-interior-theme="luxe-elegant"] .main-nav>.nav-home{grid-column:1/-1}}
