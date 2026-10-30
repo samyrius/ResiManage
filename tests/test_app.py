@@ -66,12 +66,41 @@ def test_internal_navigation_is_grouped_responsive_and_marks_current_page(tmp_pa
     assert b'href="/external-rotations"' in response.data
     assert "Stages et planification".encode() in response.data
     assert b'class="nav-home is-active"' in response.data
-    assert b'grid-template-columns:260px minmax(0,1fr)' in response.data
-    assert b'@media(max-width:680px)' in response.data
+    common_css = client.get("/static/themes/common.css").data
+    assert b'grid-template-columns:260px minmax(0,1fr)' in common_css
+    assert b'@media(max-width:680px)' in common_css
     residents = client.get("/residents")
     assert residents.status_code == 200
     assert b'href="/residents" class="is-active"' in residents.data
 
+
+
+def test_seven_themes_use_separate_templates_and_stylesheets(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    themes = [
+        "crystal3d",
+        "futuriste",
+        "luxe-elegant",
+        "naturel-moderne",
+        "emeraude",
+        "aurore-boreale",
+        "rubis",
+    ]
+    default_page = client.get("/")
+    assert default_page.status_code == 200
+    assert b'data-theme-template="crystal3d"' in default_page.data
+    assert b'href="/static/themes/crystal3d.css"' in default_page.data
+
+    for theme in themes:
+        client.set_cookie("resimanage_theme", theme)
+        response = client.get("/")
+        assert response.status_code == 200
+        assert f'data-theme-template="{theme}"'.encode() in response.data
+        assert f'href="/static/themes/{theme}.css"'.encode() in response.data
+        stylesheet = client.get(f"/static/themes/{theme}.css")
+        assert stylesheet.status_code == 200
+        assert b"@import url('/static/themes/common.css')" in stylesheet.data
 
 def test_login_page_and_language_selector(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
@@ -110,8 +139,9 @@ def test_login_branding_uses_resimanage_and_navy_cyan_identity(tmp_path, monkeyp
     assert b"ResiManage" in response.data
     assert b"ResiTrack" not in response.data
     assert b"#00dff755" in response.data
-    assert b"#19dfbd" in response.data
-    assert b"white-space:normal;overflow-wrap:anywhere;max-width:100%;line-height:1.3;text-align:center" in response.data
+    common_css = client.get("/static/themes/common.css").data
+    assert b"#19dfbd" in common_css
+    assert b"white-space:normal;overflow-wrap:anywhere;max-width:100%;line-height:1.3;text-align:center" in common_css
     assert b"prefers-reduced-motion:reduce" in response.data
     assert b'src="/static/resimanage-3d-icon.jpg"' in response.data
     assert 'alt="ResiManage — médecin et stéthoscope"'.encode("utf-8") in response.data
@@ -4173,10 +4203,11 @@ def test_mobile_layout_has_touch_scroll_fallback(tmp_path, monkeypatch):
 
     response = client.get("/")
     assert response.status_code == 200
-    assert b"@media(max-width:680px){html{overflow-x:clip;overflow-y:auto" in response.data
-    assert b"touch-action:pan-y" in response.data
-    assert b"-webkit-overflow-scrolling:touch" in response.data
-    assert b".main-nav{backdrop-filter:none!important" in response.data
+    common_css = client.get("/static/themes/common.css").data
+    assert b"@media(max-width:680px){html{overflow-x:clip;overflow-y:auto" in common_css
+    assert b"touch-action:pan-y" in common_css
+    assert b"-webkit-overflow-scrolling:touch" in common_css
+    assert b".main-nav{backdrop-filter:none!important" in common_css
 
 
 def test_legacy_decisions_are_scoped_to_selected_postgraduate_year(tmp_path, monkeypatch):
