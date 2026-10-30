@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - resimanage-2-work
+      - ui/**
   pull_request:
     branches:
       - resimanage-2-work
