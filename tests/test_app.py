@@ -2214,13 +2214,13 @@ def test_resident_profile_photo_frame_is_large_and_responsive(tmp_path, monkeypa
 
     response = client.get(f"/profile/{rid}")
     assert response.status_code == 200
-    html = response.get_data(as_text=True)
-    # Desktop/tablet: scale fluidly up to 240 px; phones stack the header and use a 240 px photo.
-    assert ".rt-avatar-wrap{flex:0 0 auto;width:clamp(220px,30vw,280px)}" in html
-    assert ".rt-profile-avatar{display:block;width:100%;height:clamp(220px,30vw,280px);object-fit:cover" in html
-    assert ".rt-profile-head{align-items:stretch;flex-direction:column;gap:14px}" in html
-    assert ".rt-avatar-wrap{width:min(260px,100%);flex-basis:auto;align-self:center}" in html
-    assert ".rt-profile-avatar{height:260px;border-radius:20px}" in html
+    common_css = client.get("/static/themes/common.css").get_data(as_text=True)
+    # Desktop/tablet: scale fluidly up to 280 px; phones stack the header and use a 260 px photo.
+    assert ".rt-avatar-wrap{flex:0 0 auto;width:clamp(220px,30vw,280px)}" in common_css
+    assert ".rt-profile-avatar{display:block;width:100%;height:clamp(220px,30vw,280px);object-fit:cover" in common_css
+    assert ".rt-profile-head{align-items:stretch;flex-direction:column;gap:14px}" in common_css
+    assert ".rt-avatar-wrap{width:min(260px,100%);flex-basis:auto;align-self:center}" in common_css
+    assert ".rt-profile-avatar{height:260px;border-radius:20px}" in common_css
 
 
 
