@@ -326,7 +326,7 @@ def verify_csrf():
 def page(body,**kw):
  lang=session.get("lang","fr")
  csrf_token=session.setdefault("_csrf_token",secrets.token_urlsafe(32))
- body=re.sub(r'(<form\\b(?=[^>]*\\bmethod\\s*=\\s*["\\']post["\\'])[^>]*>)',lambda match:match.group(1)+'<input type="hidden" name="_csrf_token" value="{{ csrf_token }}">',body,flags=re.IGNORECASE)
+ body=re.sub(r'(<form\b(?=[^>]*\bmethod\s*=\s*["\']post["\'])[^>]*>)',lambda match:match.group(1)+'<input type="hidden" name="_csrf_token" value="{{ csrf_token }}">',body,flags=re.IGNORECASE)
  c=db()
  try:
   selected_year=active_postgrad_year(c)
@@ -345,7 +345,6 @@ def page(body,**kw):
   selected_theme="crystal3d"
  template_name="themes/"+selected_theme+".html"
  return render_template(template_name,body=inner,lang=lang,t=tr,L=L,year=selected_year,current_year=current_year,year_options=year_options,user=bool(session.get("user")),role=session.get("role",""),theme=selected_theme)
-:none}.login-ecg-line{stroke-dashoffset:0}}@media(max-width:520px){.login-hero{margin:4px;padding:14px;border-radius:18px}.login-feature-row span{font-size:12px;padding:7px}.login-rights span{padding:0 2px}}</style>""",setup_required=setup_required)
 
 def _smtp_setting(name, default=""):
  # Prefer current product-specific names, but accept older deployments during migration.
