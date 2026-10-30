@@ -345,6 +345,7 @@ def page(body,**kw):
   selected_theme="crystal3d"
  template_name="themes/"+selected_theme+".html"
  return render_template(template_name,body=inner,lang=lang,t=tr,L=L,year=selected_year,current_year=current_year,year_options=year_options,user=bool(session.get("user")),role=session.get("role",""),theme=selected_theme)
+
 def guard():
  username=session.get("user")
  if not username: return redirect("/login")
