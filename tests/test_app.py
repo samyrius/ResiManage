@@ -2247,6 +2247,7 @@ def test_windows_packaging_bundles_static_assets_and_uses_separate_user_data():
     launcher = (project_root / "windows_launcher.py").read_text(encoding="utf-8")
 
     assert '--add-data "static;static"' in workflow
+    assert '--add-data "templates;templates"' in workflow
     assert 'root / "ResiManage" / "data"' in launcher
     assert 'resimanage.DB = str(data_dir / "rotation.db")' in launcher
     assert 'make_server(host, port, resimanage.app, threaded=True, ssl_context=ssl_context)' in launcher
