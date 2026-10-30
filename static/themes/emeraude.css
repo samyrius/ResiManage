@@ -18,3 +18,13 @@ html[data-interior-theme="emeraude"] td{background:#082a27!important;border-bott
 html[data-interior-theme="emeraude"] table tr:nth-child(even){background:#0b332f!important}
 html[data-interior-theme="emeraude"] .msg{background:#46381d!important;color:#ffe8a8!important;border-color:#806a31!important}
 html[data-interior-theme="emeraude"] .rt-footer,html[data-interior-theme="emeraude"] .rt-footer strong{color:#a6d3c5!important}
+
+
+/* Layout Émeraude : rail latéral compact et panneaux de travail */
+html[data-interior-theme="emeraude"] .rt-app-shell{display:grid!important;grid-template-columns:210px minmax(0,1fr)!important;gap:16px!important;max-width:1450px!important;padding:14px!important}
+html[data-interior-theme="emeraude"] .main-nav{position:sticky!important;top:12px!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;padding:10px!important;border-radius:24px!important}
+html[data-interior-theme="emeraude"] .main-nav>a,html[data-interior-theme="emeraude"] .nav-group summary{min-height:42px!important;border-radius:999px!important}
+html[data-interior-theme="emeraude"] .rt-app-shell>main{max-width:none!important;width:100%!important}
+html[data-interior-theme="emeraude"] .rt-app-shell>main section{border-radius:20px!important}
+@media(max-width:900px){html[data-interior-theme="emeraude"] .rt-app-shell{grid-template-columns:185px minmax(0,1fr)!important;gap:10px!important}}
+@media(max-width:680px){html[data-interior-theme="emeraude"] .rt-app-shell{display:flex!important;flex-direction:column!important;padding:8px!important}html[data-interior-theme="emeraude"] .main-nav{position:relative!important;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;width:100%!important}html[data-interior-theme="emeraude"] .main-nav>.nav-home{grid-column:1/-1}}
