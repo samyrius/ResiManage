@@ -664,7 +664,91 @@ html[data-interior-theme="ruby"] .rt-app-shell>main td{background:#2b1328!import
 @media(max-width:680px){
  html[data-interior-theme="futuristic"] .main-nav,html[data-interior-theme="aurora"] .main-nav,html[data-interior-theme="ruby"] .main-nav{position:fixed!important;top:auto!important;bottom:0!important;left:0!important;right:0!important;width:100%!important;border-radius:16px 16px 0 0!important}
 }
-</style></style><header class="brand-header"><div class="brand-lockup"><img class="brand-icon" src="/static/resimanage-3d-icon.jpg" width="64" height="64" alt="ResiManage"><div><h2>{{t('app')}}</h2><p class="brand-tagline">{% if lang=='ar' %}تسيير تربصات الأطباء المقيمين{% elif lang=='fr' %}Gestion des stages des médecins résidents{% else %}Resident rotation management{% endif %}</p><span class="brand-year">{{t('year')}}: {{year}}</span></div></div></header><div class="rt-app-shell">{% if user %}<nav class="main-nav" aria-label="{{L('Navigation principale','Main navigation','التنقل الرئيسي')}}">
+
+</style>
+<style id="resimanage-seven-layout-systems">
+/* The seven choices are complete navigation/layout systems, not palette-only skins.
+   All routes and page content remain shared; only the presentation shell changes. */
+
+/* 1 — Crystal 3D: glass sidebar on desktop, compact five-icon dock on phones. */
+html[data-interior-theme="crystal"] .rt-app-shell{grid-template-columns:252px minmax(0,1fr);gap:20px}
+html[data-interior-theme="crystal"] .main-nav{border-radius:20px!important}
+html[data-interior-theme="crystal"] .rt-app-shell>main{min-width:0}
+
+/* 2 — Futuriste: full-width command ribbon and compact command dock. */
+html[data-interior-theme="futuristic"] .rt-app-shell{display:flex;flex-direction:column;gap:14px;max-width:1480px}
+html[data-interior-theme="futuristic"] .main-nav{position:sticky;top:8px;display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:center;border-radius:18px!important;padding:10px 14px!important}
+html[data-interior-theme="futuristic"] .main-nav>a,html[data-interior-theme="futuristic"] .main-nav .nav-group{width:auto;flex:1 1 145px}
+html[data-interior-theme="futuristic"] .main-nav .nav-group summary{justify-content:center}
+html[data-interior-theme="futuristic"] .main-nav .nav-menu{position:absolute!important;top:100%;left:0;z-index:60;min-width:230px;max-height:65vh!important;overflow:auto!important}
+html[data-interior-theme="futuristic"] .rt-app-shell>main{max-width:1320px;margin:0 auto;padding:8px 14px}
+
+/* 3 — Luxe Élégant: permanent executive sidebar, restrained editorial content. */
+html[data-interior-theme="luxe"] .rt-app-shell{grid-template-columns:286px minmax(0,1fr);gap:26px;max-width:1540px;padding:22px}
+html[data-interior-theme="luxe"] .main-nav{position:sticky;top:18px;border-radius:4px 20px 20px 4px!important;padding:18px!important}
+html[data-interior-theme="luxe"] .main-nav>a,html[data-interior-theme="luxe"] .main-nav .nav-group summary{min-height:50px;letter-spacing:.025em}
+html[data-interior-theme="luxe"] .rt-app-shell>main{max-width:1160px;padding:10px 4px}
+html[data-interior-theme="luxe"] .rt-app-shell>main section{border-radius:8px!important;padding:clamp(16px,2vw,28px)}
+
+/* 4 — Naturel Moderne: navigation as a clear five-tile launcher above the workspace. */
+html[data-interior-theme="nature"] .rt-app-shell{display:flex;flex-direction:column;gap:18px;max-width:1320px}
+html[data-interior-theme="nature"] .main-nav{position:relative;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;padding:12px!important;border-radius:22px!important}
+html[data-interior-theme="nature"] .main-nav>a,html[data-interior-theme="nature"] .main-nav .nav-group summary{min-height:68px;justify-content:center;flex-direction:column;gap:5px;text-align:center}
+html[data-interior-theme="nature"] .main-nav .nav-group{width:100%}
+html[data-interior-theme="nature"] .main-nav .nav-menu{position:absolute!important;top:100%;left:0;z-index:60;width:100%;max-height:60vh!important;overflow:auto!important}
+html[data-interior-theme="nature"] .rt-app-shell>main{max-width:1180px;margin:0 auto}
+
+/* 5 — Émeraude: narrow icon rail with contextual fly-out submenus. */
+html[data-interior-theme="emerald"] .rt-app-shell{grid-template-columns:82px minmax(0,1fr);gap:18px;max-width:1500px}
+html[data-interior-theme="emerald"] .main-nav{position:sticky;top:12px;align-items:stretch;padding:9px 7px!important;border-radius:22px!important}
+html[data-interior-theme="emerald"] .main-nav>a,html[data-interior-theme="emerald"] .main-nav .nav-group summary{justify-content:center;padding:10px 4px!important;min-height:54px;font-size:0!important}
+html[data-interior-theme="emerald"] .main-nav .nav-icon{font-size:21px!important;margin:0!important}
+html[data-interior-theme="emerald"] .main-nav .nav-group summary:after{display:none}
+html[data-interior-theme="emerald"] .main-nav .nav-menu{position:absolute!important;left:calc(100% + 8px);top:0;z-index:70;width:245px;max-height:70vh!important;overflow:auto!important}
+html[data-interior-theme="emerald"] .main-nav .nav-group{position:relative}
+html[data-interior-theme="emerald"] .main-nav .rt-language{display:flex;flex-direction:column;gap:5px}
+html[data-interior-theme="emerald"] .rt-app-shell>main{max-width:1320px}
+
+/* 6 — Aurore Boréale: centered floating navigation with wide, airy work canvas. */
+html[data-interior-theme="aurora"] .rt-app-shell{display:flex;flex-direction:column;gap:18px;max-width:1440px}
+html[data-interior-theme="aurora"] .main-nav{position:sticky;top:10px;align-self:center;width:min(100%,1120px);display:flex;flex-direction:row;flex-wrap:wrap;justify-content:center;border-radius:999px!important;padding:10px 16px!important}
+html[data-interior-theme="aurora"] .main-nav>a,html[data-interior-theme="aurora"] .main-nav .nav-group{width:auto;flex:0 1 auto}
+html[data-interior-theme="aurora"] .main-nav>a,html[data-interior-theme="aurora"] .main-nav .nav-group summary{border-radius:999px!important}
+html[data-interior-theme="aurora"] .main-nav .nav-menu{position:absolute!important;top:100%;z-index:60;max-height:65vh!important;overflow:auto!important}
+html[data-interior-theme="aurora"] .rt-app-shell>main{width:min(100%,1260px);margin:0 auto}
+
+/* 7 — Rubis: segmented command tabs and a focused, compact content column. */
+html[data-interior-theme="ruby"] .rt-app-shell{display:flex;flex-direction:column;gap:12px;max-width:1380px}
+html[data-interior-theme="ruby"] .main-nav{position:sticky;top:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:stretch;gap:5px;padding:8px!important;border-radius:0 0 16px 16px!important}
+html[data-interior-theme="ruby"] .main-nav>a,html[data-interior-theme="ruby"] .main-nav .nav-group summary{justify-content:center;text-align:center;min-height:48px;padding:8px 5px!important}
+html[data-interior-theme="ruby"] .main-nav .nav-group{width:100%}
+html[data-interior-theme="ruby"] .main-nav .nav-menu{position:absolute!important;top:100%;left:0;z-index:60;width:min(92vw,320px);max-height:60vh!important;overflow:auto!important}
+html[data-interior-theme="ruby"] .rt-app-shell>main{max-width:1160px;margin:0 auto;padding:10px 16px}
+html[data-interior-theme="ruby"] .rt-app-shell>main section{border-radius:12px!important}
+
+/* Shared phone behavior: exactly five navigation destinations, pinned to the bottom.
+   Submenus open upward; page content gets enough clearance and remains independently scrollable. */
+@media(max-width:680px){
+ html[data-interior-theme] .rt-app-shell{display:block!important;padding:0 0 calc(82px + env(safe-area-inset-bottom))!important}
+ html[data-interior-theme] .main-nav{position:fixed!important;z-index:1000!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;width:100%!important;max-width:none!important;height:auto!important;min-height:64px!important;display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;align-items:center!important;gap:3px!important;margin:0!important;padding:7px 6px calc(7px + env(safe-area-inset-bottom))!important;border-radius:16px 16px 0 0!important;border-bottom:0!important;box-shadow:0 -8px 28px rgba(0,0,0,.28)!important;backdrop-filter:blur(20px)!important}
+ html[data-interior-theme] .main-nav>.nav-home,html[data-interior-theme] .main-nav>.nav-group{grid-column:auto!important;width:100%!important;min-width:0!important;flex:none!important}
+ html[data-interior-theme] .main-nav>.nav-home,html[data-interior-theme] .main-nav>.nav-group>summary{display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:3px!important;width:100%!important;min-width:0!important;min-height:48px!important;height:48px!important;padding:4px 2px!important;text-align:center!important;border-radius:10px!important;font-size:0!important;line-height:1!important;white-space:normal!important}
+ html[data-interior-theme] .main-nav .nav-icon{display:flex!important;align-items:center!important;justify-content:center!important;min-width:24px!important;width:24px!important;height:24px!important;margin:0!important;font-size:20px!important;line-height:1!important;flex:0 0 24px!important}
+ html[data-interior-theme] .main-nav .nav-group summary:after{display:none!important;content:none!important}
+ html[data-interior-theme] .main-nav .nav-menu{position:absolute!important;left:6px!important;right:6px!important;bottom:calc(100% + 8px)!important;top:auto!important;width:auto!important;min-width:0!important;max-width:none!important;max-height:min(58vh,430px)!important;overflow:auto!important;margin:0!important;padding:8px!important;border-radius:16px!important;box-shadow:0 12px 34px rgba(0,0,0,.35)!important}
+ html[data-interior-theme] .main-nav .nav-menu a{min-height:42px!important;font-size:13px!important}
+ html[data-interior-theme] .main-nav .rt-language{display:none!important}
+ html[data-interior-theme] .rt-app-shell>main{width:100%!important;max-width:none!important;margin:0!important;padding:10px 9px 22px!important}
+ html[data-interior-theme="nature"] .main-nav,html[data-interior-theme="ruby"] .main-nav{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+ html[data-interior-theme="emerald"] .main-nav>a,html[data-interior-theme="emerald"] .main-nav .nav-group summary{font-size:0!important}
+}
+@media(min-width:681px) and (max-width:980px){
+ html[data-interior-theme="luxe"] .rt-app-shell{grid-template-columns:230px minmax(0,1fr);gap:14px;padding:12px}
+ html[data-interior-theme="emerald"] .rt-app-shell{grid-template-columns:72px minmax(0,1fr);gap:12px}
+ html[data-interior-theme="nature"] .main-nav{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(prefers-reduced-motion:reduce){html[data-interior-theme] .main-nav,html[data-interior-theme] .main-nav *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+</style><header class="brand-header"><div class="brand-lockup"><img class="brand-icon" src="/static/resimanage-3d-icon.jpg" width="64" height="64" alt="ResiManage"><div><h2>{{t('app')}}</h2><p class="brand-tagline">{% if lang=='ar' %}تسيير تربصات الأطباء المقيمين{% elif lang=='fr' %}Gestion des stages des médecins résidents{% else %}Resident rotation management{% endif %}</p><span class="brand-year">{{t('year')}}: {{year}}</span></div></div></header><div class="rt-app-shell">{% if user %}<nav class="main-nav" aria-label="{{L('Navigation principale','Main navigation','التنقل الرئيسي')}}">
 <a class="nav-home {% if request.path=='/' %}is-active{% endif %}" href="/" title="{{t('home')}}" aria-label="{{t('home')}}"><span class="nav-icon" aria-hidden="true">🏠</span><span>{{t('home')}}</span></a>
 <details class="nav-group" {% if request.path in ['/residents','/objectives','/import','/exams','/dems'] %}open{% endif %}><summary title="{{t('residents')}}" aria-label="{{t('residents')}}"><span class="nav-icon" aria-hidden="true">👥</span><span>{{t('residents')}}</span></summary><div class="nav-menu"><a href="/residents" class="{% if request.path=='/residents' %}is-active{% endif %}">{{t('manage_residents')}}</a><a href="/objectives" class="{% if request.path=='/objectives' %}is-active{% endif %}">{{t('objectives')}}</a><a href="/import" class="{% if request.path=='/import' %}is-active{% endif %}">{{t('import_residents')}}</a><a href="/templates" class="{% if request.path=='/templates' %}is-active{% endif %}">{{L('Formulaires vierges','Blank forms','استمارات فارغة')}}</a><a href="/exams" class="{% if request.path=='/exams' %}is-active{% endif %}">{{t('promotion')}}</a><a href="/dems" class="{% if request.path=='/dems' %}is-active{% endif %}">{{t('dems_success')}}</a></div></details>
 <details class="nav-group" {% if request.path in ['/terrains','/assign','/history','/leave','/external-rotations','/rotation-board'] %}open{% endif %}><summary title="{% if lang=='ar' %}التربصات والتخطيط{% elif lang=='fr' %}Stages et planification{% else %}Rotations & planning{% endif %}" aria-label="{% if lang=='ar' %}التربصات والتخطيط{% elif lang=='fr' %}Stages et planification{% else %}Rotations & planning{% endif %}"><span class="nav-icon" aria-hidden="true">🗓️</span><span>{% if lang=='ar' %}التربصات والتخطيط{% elif lang=='fr' %}Stages et planification{% else %}Rotations & planning{% endif %}</span></summary><div class="nav-menu"><a href="/terrains" class="{% if request.path=='/terrains' %}is-active{% endif %}">{{t('terrains')}}</a><a href="/rotation-board" class="{% if request.path=='/rotation-board' %}is-active{% endif %}">{% if lang=='ar' %}جدول التوزيع{% elif lang=='fr' %}Tableau de répartition{% else %}Rotation board{% endif %}</a><a href="/assign" class="{% if request.path=='/assign' %}is-active{% endif %}">{{t('assign')}}</a><a href="/history" class="{% if request.path=='/history' %}is-active{% endif %}">{{t('history')}}</a><a href="/templates" class="{% if request.path=='/templates' %}is-active{% endif %}">{{L('Formulaires vierges','Blank forms','استمارات فارغة')}}</a><a href="/leave" class="{% if request.path=='/leave' %}is-active{% endif %}">{% if lang=='ar' %}الإجازات{% elif lang=='fr' %}Congés{% else %}Annual leave{% endif %}</a><a href="/external-rotations" class="{% if request.path.startswith('/external-rotations') %}is-active{% endif %}">{% if lang=='ar' %}التربصات الخارجية{% elif lang=='fr' %}Stages externes{% else %}External rotations{% endif %}</a></div></details>
