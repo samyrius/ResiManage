@@ -12,6 +12,7 @@ on:
       - "windows_launcher.py"
       - "windows/ResiManage-Setup.iss"
       - "static/**"
+      - "templates/**"
       - "tests/**"
   workflow_dispatch:
 
@@ -46,7 +47,7 @@ jobs:
 
       - name: Build GUI executable (no console)
         run: |
-          pyinstaller --noconfirm --clean --onefile --noconsole --name ResiManage --collect-all webview --collect-all flask --collect-all werkzeug --collect-all openpyxl --collect-all xlrd --collect-all docx --collect-all pypdf --collect-all PIL --add-data "static;static" windows_launcher.py
+          pyinstaller --noconfirm --clean --onefile --noconsole --name ResiManage --collect-all webview --collect-all flask --collect-all werkzeug --collect-all openpyxl --collect-all xlrd --collect-all docx --collect-all pypdf --collect-all PIL --add-data "static;static" --add-data "templates;templates" windows_launcher.py
 
       - name: Install Inno Setup
         shell: pwsh
