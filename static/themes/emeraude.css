@@ -1,0 +1,20 @@
+@import url('/static/themes/common.css');
+html[data-interior-theme="emeraude"]{color-scheme:dark}
+html[data-interior-theme="emeraude"],html[data-interior-theme="emeraude"] body{background:#061c1b!important;color:#e3fff6!important}
+html[data-interior-theme="emeraude"] body{background:radial-gradient(ellipse at 8% 0%,#0b625044,transparent 34%),radial-gradient(ellipse at 92% 20%,#1b7d7040,transparent 28%),linear-gradient(145deg,#041716,#082a29 58%,#071e24)!important}
+html[data-interior-theme="emeraude"] header.brand-header{background:linear-gradient(125deg,#031b1b,#07534b 58%,#14746a)!important;border-bottom:2px solid #48e0bd!important}
+html[data-interior-theme="emeraude"] .main-nav{background:#052421ed!important;border-color:#0f6558!important}
+html[data-interior-theme="emeraude"] .main-nav>a,html[data-interior-theme="emeraude"] .nav-group summary{background:linear-gradient(135deg,#0b453f,#116b60)!important;color:#e3fff6!important;border-color:#168775!important}
+html[data-interior-theme="emeraude"] .nav-icon,html[data-interior-theme="emeraude"] .nav-group summary:after{color:#7cf3cf!important}
+html[data-interior-theme="emeraude"] .nav-menu{background:#052421f5!important;border-color:#12665a!important}
+html[data-interior-theme="emeraude"] .nav-menu a{background:#08332f!important;color:#d5fff1!important;border-color:#10554c!important}
+html[data-interior-theme="emeraude"] section,html[data-interior-theme="emeraude"] .rt-stat,html[data-interior-theme="emeraude"] .rt-action-card,html[data-interior-theme="emeraude"] .login-brand,html[data-interior-theme="emeraude"] .login-panel{background:linear-gradient(145deg,#0b302cf2,#082321f5)!important;border-color:#14594f!important;box-shadow:0 12px 32px #0004!important;color:#e3fff6!important}
+html[data-interior-theme="emeraude"] h1,html[data-interior-theme="emeraude"] h2,html[data-interior-theme="emeraude"] h3,html[data-interior-theme="emeraude"] h4,html[data-interior-theme="emeraude"] strong,html[data-interior-theme="emeraude"] th{color:#e6fff8!important}
+html[data-interior-theme="emeraude"] p,html[data-interior-theme="emeraude"] label,html[data-interior-theme="emeraude"] td,html[data-interior-theme="emeraude"] small,html[data-interior-theme="emeraude"] .muted{color:#b0d8cc!important}
+html[data-interior-theme="emeraude"] a,html[data-interior-theme="emeraude"] button{background:linear-gradient(120deg,#087c6b,#168a86)!important;color:#fff!important;border-color:#2ac5a6!important}
+html[data-interior-theme="emeraude"] input,html[data-interior-theme="emeraude"] select,html[data-interior-theme="emeraude"] textarea{background:#05211f!important;color:#e3fff6!important;border-color:#17685c!important}
+html[data-interior-theme="emeraude"] th{background:#10483f!important;color:#9ef5d7!important}
+html[data-interior-theme="emeraude"] td{background:#082a27!important;border-bottom-color:#14594f!important}
+html[data-interior-theme="emeraude"] table tr:nth-child(even){background:#0b332f!important}
+html[data-interior-theme="emeraude"] .msg{background:#46381d!important;color:#ffe8a8!important;border-color:#806a31!important}
+html[data-interior-theme="emeraude"] .rt-footer,html[data-interior-theme="emeraude"] .rt-footer strong{color:#a6d3c5!important}
