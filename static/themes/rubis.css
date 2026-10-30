@@ -1,2 +1,11 @@
 @import url('/static/themes/common.css');
 html[data-interior-theme="rubis"] body{background:radial-gradient(ellipse at 15% 0%,#9f123955,transparent 38%),linear-gradient(145deg,#160713,#300d24 55%,#100817)!important}html[data-interior-theme="rubis"] section,html[data-interior-theme="rubis"] .rt-stat,html[data-interior-theme="rubis"] .rt-action-card,html[data-interior-theme="rubis"] .login-brand,html[data-interior-theme="rubis"] .login-panel{background:linear-gradient(145deg,#40152fee,#210d20f5)!important;border-color:#9f456e!important}html[data-interior-theme="rubis"] a,html[data-interior-theme="rubis"] button{background:linear-gradient(120deg,#9f1239,#be557c)!important;border-color:#fb7185!important}
+
+/* Layout Rubis : ruban de navigation horizontal et contenu pleine largeur */
+html[data-interior-theme="rubis"] .rt-app-shell{display:block!important;max-width:1500px!important;padding:12px!important}
+html[data-interior-theme="rubis"] .main-nav{position:relative!important;top:auto!important;display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:space-around!important;gap:10px!important;width:100%!important;margin:0 0 16px!important;border-radius:4px 4px 18px 18px!important}
+html[data-interior-theme="rubis"] .main-nav>a,html[data-interior-theme="rubis"] .nav-group summary{min-height:46px!important;border-radius:4px 12px 4px 12px!important}
+html[data-interior-theme="rubis"] .main-nav>.nav-group{flex:0 1 180px!important}
+html[data-interior-theme="rubis"] .rt-app-shell>main{max-width:1180px!important;margin:0 auto!important}
+html[data-interior-theme="rubis"] .rt-app-shell>main section{border-radius:4px 18px 4px 18px!important}
+@media(max-width:680px){html[data-interior-theme="rubis"] .rt-app-shell{padding:8px!important}html[data-interior-theme="rubis"] .main-nav{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;justify-content:stretch!important;gap:7px!important}html[data-interior-theme="rubis"] .main-nav>.nav-home{grid-column:1/-1}html[data-interior-theme="rubis"] .main-nav>.nav-group{width:100%!important}}
