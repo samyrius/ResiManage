@@ -345,6 +345,82 @@ def page(body,**kw):
   selected_theme="crystal3d"
  template_name="themes/"+selected_theme+".html"
  return render_template(template_name,body=inner,lang=lang,t=tr,L=L,year=selected_year,current_year=current_year,year_options=year_options,user=bool(session.get("user")),role=session.get("role",""),theme=selected_theme)
+def guard():
+ username=session.get("user")
+ if not username: return redirect("/login")
+ c=db()
+ account=c.execute("SELECT role,active FROM users WHERE username=?",(username,)).fetchone()
+ c.close()
+ if not account or not account["active"]:
+  session.clear()
+  return redirect("/login")
+ # Reflect the current role from the database instead of trusting stale session data.
+ session["role"]=account["role"]
+def super_guard():
+ denied=guard()
+ if denied: return denied
+ if session.get("role")!="super_admin": return ("Forbidden — Super Admin only",403)
+
+@app.before_request
+def purge_expired_trash_automatically():
+ # Expired trash is purged on normal app traffic, not only when an admin opens /trash.
+ try:
+  c=db()
+  if not c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='trash_items'").fetchone():
+   c.close(); return
+  for item in c.execute("SELECT id,deleted_at,snapshot_json FROM trash_items").fetchall():
+   try:
+    deleted=datetime.fromisoformat(item["deleted_at"])
+    month=deleted.month+6; year=deleted.year+(month-1)//12; month=(month-1)%12+1
+    day=min(deleted.day,__import__("calendar").monthrange(year,month)[1])
+    if datetime.now()<deleted.replace(year=year,month=month,day=day): continue
+    snapshot=json.loads(item["snapshot_json"] or "{}")
+    photo_path=(snapshot.get("resident") or {}).get("photo_path","")
+    if photo_path:
+     photo_name=os.path.basename(photo_path)
+     photo_file=os.path.join(os.path.dirname(os.path.abspath(DB)),"resident_photos",photo_name)
+     if photo_name.startswith("resident_") and os.path.isfile(photo_file):
+      try: os.remove(photo_file)
+      except OSError: app.logger.warning("Could not purge expired resident photo: %s",photo_file)
+    c.execute("DELETE FROM trash_items WHERE id=?",(item["id"],))
+    audit_event(c,"trash.expired",f"trash_id={item['id']}; purged_after_six_calendar_months")
+   except (ValueError,TypeError,KeyError): continue
+  c.commit(); c.close()
+ except sqlite3.Error:
+  try: c.close()
+  except Exception: pass
+@app.get("/lang/<lang>")
+def lang(lang):
+ if lang in LANGS: session["lang"]=lang
+ return redirect(request.referrer or "/login")
+@app.route("/login",methods=["GET","POST"])
+def login():
+ c=db(); p=setting(c,"password")
+ if request.method=="POST":
+  username=request.form.get("username","admin").strip()
+  password=request.form.get("password","")
+  account=c.execute("SELECT * FROM users WHERE (username=? OR (lower(email)=? AND email_verified=1)) AND active=1",(username,username.lower())).fetchone()
+  if not p:
+   confirm=request.form.get("confirm_password","")
+   if username!="admin" or len(password)<12 or password!=confirm:
+    c.close(); flash(L("La première configuration exige l’identifiant admin et un mot de passe confirmé d’au moins 12 caractères.","First setup requires username admin and a matching password of at least 12 characters.","يتطلب الإعداد الأول اسم المستخدم admin وكلمة مرور مؤكدة من 12 حرفًا على الأقل."))
+    return redirect("/login")
+   p=hash_password(password)
+   c.execute("INSERT INTO settings(key,value) VALUES('password',?)",(p,))
+   c.execute("INSERT OR IGNORE INTO users(username,password_hash,role) VALUES('admin',?,'super_admin')",(p,))
+   c.commit(); c.close(); lang=session.get("lang","fr"); session.clear(); session["lang"]=lang; session["user"]="admin"; session["role"]="super_admin"; return redirect("/")
+  if account and verify_password(password,account["password_hash"]):
+   c.close(); lang=session.get("lang","fr"); session.clear(); session["lang"]=lang; session["user"]=account["username"]; session["role"]=account["role"]; return redirect("/")
+  if username=="admin" and not account and verify_password(password,p):
+   secure_hash=hash_password(password)
+   c.execute("UPDATE settings SET value=? WHERE key='password'",(secure_hash,))
+   c.execute("INSERT OR IGNORE INTO users(username,password_hash,role) VALUES('admin',?,'super_admin')",(secure_hash,))
+   c.commit(); c.close(); lang=session.get("lang","fr"); session.clear(); session["lang"]=lang; session["user"]="admin"; session["role"]="super_admin"; return redirect("/")
+  c.close(); flash(tr("badpass"))
+ else:
+  c.close()
+ setup_required=not p
+ return page("""<section class="login-hero"><div class="login-language"><span>🌐</span> <a href="/lang/ar">🇩🇿 العربية</a><a href="/lang/fr">🇫🇷 Français</a><a href="/lang/en">🇬🇧 English</a></div><div class="login-heartbeat" role="img" aria-label="{{L('Cœur battant avec tracé de pouls','Beating heart with pulse trace','قلب نابض مع تخطيط النبض')}}"><svg viewBox="0 0 180 86" xmlns="http://www.w3.org/2000/svg"><path class="login-heart-shape" d="M90 73S18 35 32 17C43 2 66 8 90 32C114 8 137 2 148 17C162 35 90 73 90 73Z"/><path class="login-ecg-glow" d="M8 47H48L61 35L74 59L91 18L108 55L120 43H172"/><path class="login-ecg-line" d="M8 47H48L61 35L74 59L91 18L108 55L120 43H172"/></svg></div><div class="login-brand"><img class="login-emblem" src="/static/resimanage-3d-icon.jpg" alt="{{L('ResiManage — médecin et stéthoscope','ResiManage — doctor and stethoscope','ResiManage — طبيب وسماعة طبية')}}"><p class="login-kicker">CHU Nedir Mohamed · Tizi Ouzou</p><h1>Resi<span>Manage</span></h1><p class="login-subtitle">{{L('Gestion des rotations des résidents','Resident rotation management','تسيير تربصات الأطباء المقيمين')}}</p><p class="login-motto">{{L('Aujourd’hui, un pas de plus vers votre avenir','One step closer to your future, every day','اليوم خطوة إضافية نحو مستقبلك')}}</p></div><div class="login-panel"><h2>{{t('login')}}</h2><p class="login-hint">{{L('Accédez à votre espace sécurisé','Access your secure workspace','ادخل إلى مساحتك الآمنة')}}</p><form method="post"><label>{{L('Identifiant ou e-mail','Username or email','اسم المستخدم أو البريد الإلكتروني')}}</label><input name="username" value="admin" autocomplete="username" required><label>{{t('password')}}</label><div class="password-wrap"><input id="login-password" name="password" type="password" autocomplete="off" autocorrect="off" spellcheck="false" minlength="{{12 if setup_required else 1}}" required><button class="password-toggle" type="button" onclick="const p=document.getElementById('login-password');p.type=p.type==='password'?'text':'password';this.setAttribute('aria-label',p.type==='password'?'{{L('Afficher le mot de passe','Show password','إظهار كلمة المرور')}}':'{{L('Masquer le mot de passe','Hide password','إخفاء كلمة المرور')}}')">◉</button></div>{% if setup_required %}<label>{{L('Confirmer le mot de passe','Confirm password','تأكيد كلمة المرور')}}</label><div class="password-wrap"><input id="first-confirm-password" name="confirm_password" type="password" autocomplete="off" autocorrect="off" spellcheck="false" minlength="12" required><button class="password-toggle" type="button" aria-label="{{L('Afficher le mot de passe','Show password','إظهار كلمة المرور')}}" onclick="const p=document.getElementById('first-confirm-password');p.type=p.type==='password'?'text':'password';this.setAttribute('aria-label',p.type==='password'?'{{L('Afficher le mot de passe','Show password','إظهار كلمة المرور')}}':'{{L('Masquer le mot de passe','Hide password','إخفاء كلمة المرور')}}')">◉</button></div><p>{{L('Créez le mot de passe du premier administrateur (12 caractères minimum).','Create the first administrator password (12+ characters).','أنشئ كلمة مرور المسؤول الأول (12 حرفًا على الأقل).')}}</p>{% endif %}<button class="login-submit">{{L('Créer l’administrateur','Create administrator','إنشاء المسؤول') if setup_required else t('signin')}} <span>➜</span></button></form><p class="login-security">♧ {{L('Connexion sécurisée','Secure sign-in','دخول آمن')}}</p><p class="login-security"><a href="/register" style="color:#8df2df;text-decoration:underline">{{L('Créer un compte','Create account','إنشاء حساب')}}</a></p></div><div class="login-feature-row"><span>🩺 {{L('Médecine','Medicine','الطب')}}</span><span>🩺 {{L('Réanimation','Critical care','الإنعاش')}}</span><span>✨ {{L('Anesthésie','Anesthesia','التخدير')}}</span><span>📋 {{L('Formation','Training','التكوين')}}</span></div><footer class="login-rights">{{L('Tous droits réservés · ResiManage · Dr Dris','All rights reserved · ResiManage · Dr Dris','جميع الحقوق محفوظة · ResiManage · Dr Dris')}}</footer></section><style>.login-hero{position:relative;isolation:isolate;overflow:hidden;max-width:980px;margin:12px auto;padding:clamp(16px,4vw,38px);border-radius:28px;color:#f8fbff;background:radial-gradient(ellipse at 12% 15%,#00dff755,transparent 32%),radial-gradient(ellipse at 88% 24%,#3278ff55,transparent 30%),radial-gradient(ellipse at 80% 85%,#19dfbd55,transparent 30%),linear-gradient(135deg,#020b22,#073d85 48%,#041426);box-shadow:0 24px 60px #152d4c35}.login-hero:before,.login-hero:after{content:'';position:absolute;z-index:-1;border-radius:50%;filter:blur(2px);animation:orbit 12s ease-in-out infinite alternate}.login-hero:before{width:230px;height:230px;right:-55px;top:-75px;background:linear-gradient(135deg,#47e4d8aa,#4c8bff44)}.login-hero:after{width:190px;height:190px;left:-65px;bottom:90px;background:linear-gradient(135deg,#00eaffaa,#087dff55);animation-delay:-4s}.login-language{display:flex;justify-content:center;align-items:center;gap:clamp(8px,2vw,20px);flex-wrap:wrap}.login-language a{color:#fff;text-decoration:none;border:1px solid #ffffff45;background:#ffffff12;border-radius:22px;padding:7px 12px}.login-heartbeat{position:relative;display:flex;justify-content:center;align-items:center;width:min(180px,55vw);height:78px;margin:0 auto -4px;transform:translateY(-8px);filter:drop-shadow(0 0 12px #ff436b66);animation:heartbeat 1.65s ease-in-out infinite;pointer-events:none}.login-heartbeat svg{display:block;width:100%;height:100%;overflow:visible;background:transparent;border:0;box-shadow:none}.login-heart-shape{fill:#ff416b;fill-opacity:.92;stroke:#ff9caf;stroke-width:1.5}.login-ecg-glow{fill:none;stroke:#37f4ed;stroke-width:7;stroke-linejoin:round;stroke-linecap:round;opacity:.22}.login-ecg-line{fill:none;stroke:#9ffff7;stroke-width:2.8;stroke-linejoin:round;stroke-linecap:round;stroke-dasharray:260;stroke-dashoffset:260;animation:ecg-trace 1.65s linear infinite;filter:drop-shadow(0 0 4px #38fff0)}.login-brand{text-align:center;padding:12px 0 14px}.login-emblem{display:block;width:clamp(76px,16vw,112px);height:clamp(76px,16vw,112px);object-fit:cover;border-radius:24px;margin:0 auto 12px;border:1px solid #ffffff55;box-shadow:0 0 28px #53e2c477;animation:none}.login-brand h1{font-size:clamp(38px,8vw,68px);line-height:1;margin:4px 0;font-weight:800;letter-spacing:-2px}.login-brand h1 span{background:linear-gradient(90deg,#19d9e8,#58a7ff,#19dfbd);-webkit-background-clip:text;background-clip:text;color:transparent}.login-kicker,.login-subtitle,.login-motto{margin:7px 0}.login-kicker{color:#b8d8f0}.login-subtitle{font-size:clamp(15px,3vw,20px)}.login-motto{color:#70e8f2;font-style:italic}.login-panel{max-width:480px;margin:16px auto 10px;padding:clamp(18px,4vw,30px);border:1px solid #ffffff55;border-radius:22px;background:#ffffff13;backdrop-filter:blur(14px);box-shadow:0 15px 35px #050d2040}.login-panel h2{text-align:center;margin:0;font-size:26px}.login-hint,.login-security{text-align:center;color:#d0e3f4}.login-panel label{display:block;margin-top:12px}.login-panel input{display:block;width:100%;min-width:0;min-height:54px;box-sizing:border-box;background:#ffffff17;color:white;border:1px solid #ffffff70;border-radius:14px;padding:14px 15px;font-size:16px;line-height:1.4;flex:1 1 auto}.login-panel input:focus{outline:3px solid #39dce8;outline-offset:1px}.login-panel input::placeholder{color:#d4e2f1}.password-wrap{display:flex;align-items:stretch;gap:8px;width:100%;min-width:0;min-height:54px}.password-wrap input{flex:1 1 0;width:0;min-width:0}.password-toggle{border:1px solid #ffffff55;background:#ffffff18;color:white;padding:10px 14px;border-radius:12px;cursor:pointer}.login-submit{width:100%;margin-top:18px;border:0;border-radius:15px;padding:14px;background:linear-gradient(100deg,#5ce7b0,#22c9e5 55%,#6697ff);color:#08223d;font-weight:800;font-size:17px;box-shadow:0 7px 22px #31d5cf44;cursor:pointer}.login-submit span{margin-inline-start:10px}.login-feature-row{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:22px 0 12px}.login-feature-row span{border:1px solid #ffffff35;background:#ffffff10;border-radius:12px;padding:9px 13px}.login-rights{text-align:center;color:#d6e5f3;border-top:1px solid #ffffff24;padding-top:13px;font-size:12px}.login-rights span{color:#45c7e8;padding:0 5px}@keyframes orbit{to{transform:translate3d(-18px,22px,0) scale(1.08)}}@keyframes pulse{50%{transform:scale(1.08);filter:drop-shadow(0 0 12px #5ce7b0)}}@keyframes heartbeat{0%,100%{transform:scale(1)}14%{transform:scale(1.22)}28%{transform:scale(1)}42%{transform:scale(1.14)}56%{transform:scale(1)}}@keyframes ecg-trace{0%{stroke-dashoffset:260}85%,100%{stroke-dashoffset:0}}@media(prefers-reduced-motion:reduce){.login-hero:before,.login-hero:after,.login-emblem,.login-heartbeat,.login-ecg-line{animation:none}.login-ecg-line{stroke-dashoffset:0}}@media(max-width:520px){.login-hero{margin:4px;padding:14px;border-radius:18px}.login-feature-row span{font-size:12px;padding:7px}.login-rights span{padding:0 2px}}</style>""",setup_required=setup_required)
 
 def _smtp_setting(name, default=""):
  # Prefer current product-specific names, but accept older deployments during migration.
