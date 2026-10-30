@@ -87,6 +87,8 @@ def test_seven_themes_use_separate_templates_and_stylesheets(tmp_path, monkeypat
         "aurore-boreale",
         "rubis",
     ]
+    common_css = client.get("/static/themes/common.css").data
+    assert b'data-interior-theme="' not in common_css
     default_page = client.get("/")
     assert default_page.status_code == 200
     assert b'data-theme-template="crystal3d"' in default_page.data
@@ -101,6 +103,9 @@ def test_seven_themes_use_separate_templates_and_stylesheets(tmp_path, monkeypat
         stylesheet = client.get(f"/static/themes/{theme}.css")
         assert stylesheet.status_code == 200
         assert b"@import url('/static/themes/common.css')" in stylesheet.data
+        if theme != "crystal3d":
+            assert f'data-interior-theme="{theme}"'.encode() in stylesheet.data
+            assert b"/* Layout " in stylesheet.data
 
 def test_login_page_and_language_selector(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
