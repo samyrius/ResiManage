@@ -91,7 +91,7 @@ def available_postgrad_years(c):
  # year, while also retaining years found in historical records.
  current=setting(c,"year")
  try:
-  current_start=int(current.split("-")[0]) if re.fullmatch(r"\\d{4}-\\d{4}",current) else date.today().year
+  current_start=int(current.split("-")[0]) if re.fullmatch(r"\d{4}-\d{4}",current) else date.today().year
  except (ValueError,IndexError):
   current_start=date.today().year
  years={f"{start}-{start+1}" for start in range(2022,max(2022,current_start)+1)}
