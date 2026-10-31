@@ -3646,7 +3646,7 @@ def test_emergency_resident_category_is_saved_and_dashboard_counts_are_separate(
 
     dashboard = client.get("/")
     assert dashboard.status_code == 200
-    assert b'Résidents actifs</span><strong>1</strong>' in dashboard.data
+    assert 'Résidents actifs</span><strong>1</strong>'.encode() in dashboard.data
     assert b'Externes accueillis' in dashboard.data
     assert b'Urgences' in dashboard.data
     assert b': 1' in dashboard.data
