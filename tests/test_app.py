@@ -2465,9 +2465,10 @@ def test_android_launcher_icon_is_bundled_from_current_brand_artwork():
     assert 'android:icon="@mipmap/ic_launcher"' in manifest
     assert 'android:roundIcon="@mipmap/ic_launcher"' in manifest
     assert 'copyRotationLauncherIcon' in gradle
-    assert 'copyRotationLauncherIconMipmap' in gradle
+    assert 'copyRotationLauncherIconMipmapPng' in gradle
     assert 'rename { "resimanage_3d_launcher.jpg" }' in gradle
-    assert 'rename { "ic_launcher.jpg" }' in gradle
+    assert 'rename { "ic_launcher.png" }' in gradle
+    assert (project_root / "static/resimanage-3d-icon.png").is_file()
     assert brand_image.is_file()
 
 def test_android_package_version_identifies_resimanage_2():
@@ -3556,6 +3557,101 @@ def test_rotation_board_route_loads_without_server_error(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert b"rotation" in response.data.lower() or b"\xd8\xac\xd8\xaf\xd9\x88\xd9\x84" in response.data
 
+def test_rotation_board_post_keeps_the_edited_cell_in_view(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        year = conn.execute("SELECT value FROM settings WHERE key='year'").fetchone()[0]
+        period_id = conn.execute(
+            "SELECT id FROM periods WHERE year_label=? ORDER BY id LIMIT 1", (year,)
+        ).fetchone()[0]
+        terrain_id = conn.execute(
+            "SELECT id FROM terrains WHERE name='Réanimation chirurgicale'"
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)",
+            ("Scroll", "Resident", 2),
+        )
+        resident_id = conn.execute(
+            "SELECT id FROM residents WHERE surname='Scroll'"
+        ).fetchone()[0]
+
+    payload = {
+        "year": year, "terrain_id": str(terrain_id), "period_id": str(period_id),
+    }
+    capacity = client.post(
+        "/rotation-board", data={**payload, "action": "capacity", "places": "3"}
+    )
+    assert capacity.status_code == 302
+    assert capacity.headers["Location"].endswith(
+        f"#board-cell-{terrain_id}-{period_id}"
+    )
+
+    assigned = client.post(
+        "/rotation-board",
+        data={**payload, "action": "assign", "resident_id": str(resident_id), "force_rules": "1"},
+    )
+    assert assigned.status_code == 302
+    assert assigned.headers["Location"].endswith(
+        f"#board-cell-{terrain_id}-{period_id}"
+    )
+
+
+def test_emergency_resident_category_is_saved_and_dashboard_counts_are_separate(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    today = rotation_app.date.today().isoformat()
+
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,resident_type) VALUES(?,?,?,?)",
+            ("Available", "Local", 2, "local"),
+        )
+        away_id = conn.execute(
+            "INSERT INTO residents(surname,firstname,year,resident_type) VALUES(?,?,?,?)",
+            ("Away", "Local", 2, "local"),
+        ).lastrowid
+        leave_id = conn.execute(
+            "INSERT INTO residents(surname,firstname,year,resident_type) VALUES(?,?,?,?)",
+            ("Leave", "Local", 2, "local"),
+        ).lastrowid
+        conn.execute(
+            "INSERT INTO external_rotations(resident_id,supervisor,destination,hospital,country,rotation_type,start_date,end_date,status,request_status) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (away_id, "Supervisor", "Destination", "Hospital", "Country", "Stage", today, today, "active", "approved"),
+        )
+        conn.execute(
+            "INSERT INTO leave_entries(resident_id,start_date,end_date,days) VALUES(?,?,?,?)",
+            (leave_id, today, today, 1),
+        )
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,resident_type) VALUES(?,?,?,?)",
+            ("Incoming", "External", 1, "external"),
+        )
+        conn.execute(
+            "UPDATE residents SET external_start_date=?,external_end_date=? WHERE surname='Incoming'",
+            (today, today),
+        )
+        conn.commit()
+
+    created = client.post("/residents", data={
+        "action": "create", "surname": "Emergency", "firstname": "Resident",
+        "year": "2", "resident_type": "emergency", "repeat_year": "0",
+    }, follow_redirects=True)
+    assert created.status_code == 200
+    with rotation_app.db() as conn:
+        category = conn.execute(
+            "SELECT resident_type FROM residents WHERE surname='Emergency'"
+        ).fetchone()["resident_type"]
+    assert category == "emergency"
+
+    dashboard = client.get("/")
+    assert dashboard.status_code == 200
+    assert b'Résidents actifs</span><strong>1</strong>' in dashboard.data
+    assert b'Externes accueillis' in dashboard.data
+    assert b'Urgences' in dashboard.data
+    assert b': 1' in dashboard.data
+
+
 def test_postgraduate_year_options_include_exam_and_decision_history(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
@@ -4237,3 +4333,87 @@ def test_android_launcher_metadata_and_keyboard_resize_are_configured():
     assert 'android:windowSoftInputMode="adjustResize"' in manifest
     assert '<string name="app_name">ResiManage</string>' in strings
     assert '@drawable/resimanage_3d_launcher' in launcher
+
+
+
+def test_period_dates_save_preserves_selected_year_and_values_on_rotation_board(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("UPDATE settings SET value=? WHERE key='year'", ("2026-2027",))
+        conn.execute(
+            "INSERT OR IGNORE INTO periods(name,year_label,start_date,end_date) VALUES(?,?,?,?)",
+            ("Période 1", "2026-2027", "2026-02-01", "2026-04-30"),
+        )
+        conn.commit()
+        period_id = conn.execute(
+            "SELECT id FROM periods WHERE year_label=? ORDER BY id LIMIT 1", ("2026-2027",)
+        ).fetchone()["id"]
+    response = client.post(
+        "/rotation-board",
+        data={
+            "action": "period_dates", "year": "2026-2027", "period_id": str(period_id),
+            "start_date": "2026-02-10", "end_date": "2026-04-25",
+        },
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/rotation-board?year=2026-2027")
+    with rotation_app.db() as conn:
+        saved = conn.execute(
+            "SELECT start_date,end_date FROM periods WHERE id=?", (period_id,)
+        ).fetchone()
+        assert (saved["start_date"], saved["end_date"]) == ("2026-02-10", "2026-04-25")
+
+
+def test_history_period_dates_use_same_previous_year_boundary_rule(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("UPDATE settings SET value=? WHERE key='year'", ("2026-2027",))
+        conn.execute(
+            "INSERT OR IGNORE INTO periods(name,year_label,start_date,end_date) VALUES(?,?,?,?)",
+            ("Période 4", "2025-2026", "2025-11-01", "2026-01-30"),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO periods(name,year_label,start_date,end_date) VALUES(?,?,?,?)",
+            ("Période 1", "2026-2027", "2026-02-01", "2026-04-30"),
+        )
+        # The shared test database may already contain this period with blank dates.
+        conn.execute(
+            "UPDATE periods SET start_date=?,end_date=? WHERE year_label=? AND name=?",
+            ("2025-11-01", "2026-01-30", "2025-2026", "Période 4"),
+        )
+        conn.execute(
+            "UPDATE periods SET start_date=?,end_date=? WHERE year_label=? AND name=?",
+            ("2026-02-01", "2026-04-30", "2026-2027", "Période 1"),
+        )
+        conn.commit()
+        current_id = conn.execute(
+            "SELECT id FROM periods WHERE year_label=? AND name=?", ("2026-2027", "Période 1")
+        ).fetchone()["id"]
+    rejected = client.post(
+        "/history",
+        data={
+            "action": "period_dates", "period_id": str(current_id),
+            "start_date": "2026-01-20", "end_date": "2026-04-30",
+        },
+    )
+    assert rejected.status_code == 302
+    with rotation_app.db() as conn:
+        unchanged = conn.execute(
+            "SELECT start_date,end_date FROM periods WHERE id=?", (current_id,)
+        ).fetchone()
+        assert (unchanged["start_date"], unchanged["end_date"]) == ("2026-02-01", "2026-04-30")
+    accepted = client.post(
+        "/history",
+        data={
+            "action": "period_dates", "period_id": str(current_id),
+            "start_date": "2026-02-02", "end_date": "2026-04-30",
+        },
+    )
+    assert accepted.status_code == 302
+    with rotation_app.db() as conn:
+        saved = conn.execute(
+            "SELECT start_date,end_date FROM periods WHERE id=?", (current_id,)
+        ).fetchone()
+        assert (saved["start_date"], saved["end_date"]) == ("2026-02-02", "2026-04-30")
