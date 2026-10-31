@@ -280,11 +280,9 @@ def init():
   c.execute("UPDATE terrains SET kind='basic' WHERE name='Gynécologie'")
   c.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",("terrain_classification_migration_20261017","1"))
  y=setting(c,"year",y)
- # Ensure every selectable postgraduate year has the same four editable periods.
- # This gives historical years their own date fields without changing assignment rules.
- for historical_year in available_postgrad_years(c):
-  for n in ["Période 1","Période 2","Période 3","Période 4"]:
-   c.execute("INSERT OR IGNORE INTO periods(year_label,name) VALUES(?,?)",(historical_year,n))
+ # Keep initialization limited to the configured current postgraduate year.
+ for n in ["Période 1","Période 2","Période 3","Période 4"]:
+  c.execute("INSERT OR IGNORE INTO periods(year_label,name) VALUES(?,?)",(y,n))
  install_sync_change_triggers(c)
  c.commit(); c.close()
 @app.before_request
@@ -1177,7 +1175,13 @@ def capacities():
 @app.route("/rotation-board", methods=["GET","POST"])
 def rotation_board():
  if guard(): return redirect("/login")
- c=db(); y=request.form.get("year",request.args.get("year",active_postgrad_year(c)))
+ c=db(); years=available_postgrad_years(c)
+ y=request.form.get("year",request.args.get("year",active_postgrad_year(c)))
+ if y not in years and years: y=years[0]
+ # Create the four date-editable periods only when this postgraduate year is opened.
+ # Historical years therefore get independent dates without changing startup data or assignment logic.
+ for period_name in ["Période 1","Période 2","Période 3","Période 4"]:
+  c.execute("INSERT OR IGNORE INTO periods(year_label,name) VALUES(?,?)",(y,period_name))
  if request.method=="POST":
   if session.get("role")!="super_admin":
    c.close(); return ("Forbidden — Super Admin only",403)
@@ -1255,8 +1259,6 @@ def rotation_board():
    c.rollback(); flash("Modification impossible : "+str(exc)[:180])
   c.close()
   return redirect("/rotation-board?year="+y.replace("&","%26").replace(" ","%20"))
- years=available_postgrad_years(c)
- if y not in years and years: y=years[0]
  periods=c.execute("SELECT * FROM periods WHERE year_label=? ORDER BY id",(y,)).fetchall()
  terrains=c.execute("SELECT * FROM terrains WHERE active=1 ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END,name").fetchall()
  assignments=c.execute("""SELECT a.resident_id,a.terrain_id,a.period_id,a.status,r.surname,r.firstname,r.year,r.resident_type,r.origin_hospital,t.name AS assigned_terrain
