@@ -1001,7 +1001,7 @@ def home():
  if guard(): return redirect("/login")
  c=db(); y=active_postgrad_year(c); rs=c.execute("SELECT * FROM residents WHERE status='active' ORDER BY year DESC,surname").fetchall()
  today=date.today().isoformat()
- available_count=c.execute("""SELECT COUNT(*) FROM residents r WHERE r.status='active' AND r.resident_type IN ('local','emergency')
+ available_count=c.execute("""SELECT COUNT(*) FROM residents r WHERE r.status='active' AND r.resident_type='local'
   AND NOT EXISTS(SELECT 1 FROM external_rotations x WHERE x.resident_id=r.id AND x.request_status='approved' AND x.status='active' AND x.start_date<=? AND x.end_date>=?)
   AND NOT EXISTS(SELECT 1 FROM leave_entries l WHERE l.resident_id=r.id AND l.start_date<=? AND l.end_date>=?)""",(today,today,today,today)).fetchone()[0]
  incoming_count=c.execute("SELECT COUNT(*) FROM residents WHERE status='active' AND resident_type='external' AND external_start_date<=? AND external_end_date>=?",(today,today)).fetchone()[0]
@@ -2163,10 +2163,10 @@ def blank_templates():
     if year not in ("1","2","3","4"): year="1"
   elif form_type=="rotation_history":
    headers=["resident","terrain","year_label","period","date_done","start_date","end_date","resident_type","origin_hospital","notes"]
-   labels=["Nom et prénom du résident (Nom Prénom)","Service de stage","Année de post-graduation (AAAA-AAAA)","Période (nom exact ou vide)","Date d’achèvement","Date de début","Date de fin","Catégorie (local/external)","Établissement d’origine","Notes / référence du document justificatif"]
+   labels=["Nom et prénom du résident (Nom Prénom)","Service de stage","Année de post-graduation (AAAA-AAAA)","Période (nom exact ou vide)","Date d’achèvement","Date de début","Date de fin","Catégorie (local/external/emergency)","Établissement d’origine","Notes / référence du document justificatif"]
   else:
    headers=["postgrad_year","period","period_start_date","period_end_date","terrain_name","capacity","resident_surname","resident_firstname","resident_type","origin_hospital","assignment_status","decision_reason"]
-   labels=["Année de post-graduation (AAAA-AAAA)","Période","Début de période","Fin de période","Service","Capacité / nombre de postes","Nom du résident","Prénom du résident","Catégorie (local/external)","Établissement d’origine","État (confirmé/en attente)","Motif / décision"]
+   labels=["Année de post-graduation (AAAA-AAAA)","Période","Début de période","Fin de période","Service","Capacité / nombre de postes","Nom du résident","Prénom du résident","Catégorie (local/external/emergency)","Établissement d’origine","État (confirmé/en attente)","Motif / décision"]
   filename={"residents_full":"residents_modele_complet","residents_by_year":"residents_modele_annee_"+year,"rotation_history":"modele_historique_stages","rotation_plan":"modele_planification_affectations"}[form_type]+extension
   output=io.BytesIO()
   try:
