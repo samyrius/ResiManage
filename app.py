@@ -818,6 +818,94 @@ html[data-interior-theme="crystal"] .rt-back-link:active{
  html[data-interior-theme] .main-nav>.nav-home .nav-icon{font-size:23px!important;transform:scale(1.12)!important}
 }
 
+
+/* Crystal 3D evolution — sculpted glass icons and physical press */
+html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-card{
+ perspective:900px!important;
+ transform-style:preserve-3d!important;
+ border:1px solid rgba(164,239,255,.82)!important;
+ background:linear-gradient(150deg,rgba(44,139,185,.98),rgba(16,39,91,.98) 58%,rgba(30,24,83,.98))!important;
+ box-shadow:0 12px 0 #030d20,0 19px 28px #000b,inset 0 2px 3px #ffffff85,inset 0 -5px 10px #020b22aa!important;
+ transition:transform .16s cubic-bezier(.2,.85,.25,1),box-shadow .16s ease,filter .16s ease!important;
+}
+html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-icon{
+ position:relative!important;z-index:0;isolation:isolate;overflow:visible!important;
+ border:1px solid #e0fbff!important;border-radius:21px!important;
+ background:linear-gradient(145deg,#ffffff 0%,#b8f2ff 17%,#64b9e7 43%,#3865ad 72%,#202b70 100%)!important;
+ box-shadow:inset 0 4px 8px #ffffffee,inset 0 -8px 12px #10265fbb,0 2px 0 #c2f5ff,0 5px 0 #263e83,0 10px 0 #07152d,0 16px 22px #000c,0 0 22px #54ddff88!important;
+ text-shadow:0 1px 0 #fff,0 2px 0 #b5eaff,0 4px 1px #2d6594,0 7px 5px #07152dcc!important;
+ transform:translateZ(14px);
+ transition:transform .16s cubic-bezier(.2,.85,.25,1),box-shadow .16s ease,filter .16s ease!important;
+}
+html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-icon:before{
+ content:"";position:absolute;inset:2px;border-radius:18px;pointer-events:none;z-index:-1;
+ background:linear-gradient(125deg,#ffffffa8 0%,#ffffff30 24%,transparent 48%,#081b4b38 100%);
+ box-shadow:inset 0 1px 2px #fff, inset 0 -2px 4px #10285a55;
+}
+html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-icon svg{
+ filter:drop-shadow(0 2px 0 #d8f8ff) drop-shadow(0 5px 2px #153d70) drop-shadow(0 8px 5px #06152d)!important;
+}
+@media(hover:hover){
+ html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-card:hover{
+  transform:translateY(-3px) rotateX(2deg)!important;filter:brightness(1.08) saturate(1.08);
+ }
+}
+html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-card:active,
+html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-card:focus-visible{
+ transform:translateY(8px) rotateX(3deg) scale(.965)!important;
+ box-shadow:0 3px 0 #030d20,0 7px 11px #000b,inset 0 3px 7px #ffffff55!important;
+}
+html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-card:active .rt-action-icon{
+ transform:translateY(4px) translateZ(2px) scale(.965)!important;
+ box-shadow:inset 0 2px 5px #ffffffa8,0 1px 0 #263e83,0 3px 0 #07152d,0 5px 9px #000b!important;
+}
+html[data-interior-theme="crystal"] .main-nav>a,
+html[data-interior-theme="crystal"] .main-nav .nav-group>summary,
+html[data-interior-theme="crystal"] .rt-back-link,
+html[data-interior-theme="crystal"] .rt-app-shell>main button{
+ transform-style:preserve-3d;
+}
+html[data-interior-theme="crystal"] .main-nav>a:active,
+html[data-interior-theme="crystal"] .main-nav .nav-group>summary:active,
+html[data-interior-theme="crystal"] .rt-back-link:active,
+html[data-interior-theme="crystal"] .rt-app-shell>main button:active{
+ transform:translateY(4px) scale(.975)!important;
+ box-shadow:inset 0 3px 6px #06152cbb,0 1px 1px #0009!important;
+}
+/* Period editor — deeper, darker labels with clear start/end hierarchy */
+.rt-period-date-grid .rt-period-date-form{
+ border-radius:16px!important;
+ box-shadow:0 6px 0 color-mix(in srgb,var(--period-border) 72%,#07152d),0 12px 20px #07152d30,inset 0 1px 0 #ffffffb8!important;
+}
+.rt-period-date-grid .rt-period-date-form>strong{
+ color:var(--period-ink)!important;font-weight:900!important;
+ border:2px solid var(--period-border)!important;
+ box-shadow:inset 0 1px 0 #ffffffb8,0 2px 4px #07152d1c!important;
+}
+.rt-period-date-grid .rt-period-date-form label{
+ color:var(--period-ink)!important;font-size:13.5px!important;font-weight:900!important;
+ text-shadow:none!important;
+}
+.rt-period-date-grid .rt-period-date-form input[type="date"]{
+ color:#071c2e!important;font-weight:850!important;border:2px solid var(--period-border)!important;
+ box-shadow:inset 0 2px 4px #07152d18,0 2px 0 #ffffff!important;
+}
+.rt-period-date-grid .rt-period-date-form button{
+ transform:translateY(0);transition:transform .13s ease,box-shadow .13s ease,filter .13s ease!important;
+}
+.rt-period-date-grid .rt-period-date-form button:active{
+ transform:translateY(4px)!important;filter:brightness(1.12);
+ box-shadow:0 1px 0 var(--period-ink),inset 0 3px 5px #0005!important;
+}
+@media(prefers-reduced-motion:reduce){
+ html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-card,
+ html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-icon,
+ html[data-interior-theme="crystal"] .main-nav>a,
+ html[data-interior-theme="crystal"] .main-nav .nav-group>summary,
+ html[data-interior-theme="crystal"] .rt-back-link,
+ html[data-interior-theme="crystal"] .rt-app-shell>main button,
+ .rt-period-date-grid .rt-period-date-form button{transition:none!important}
+}
 </style>
 </div><footer class="rt-footer">© <strong>{{L('Tous droits réservés · ResiManage · Dr Dris','All rights reserved · ResiManage · Dr Dris','جميع الحقوق محفوظة · ResiManage · Dr Dris')}}</strong></footer><script>
 document.addEventListener("toggle",function(event){var group=event.target;if(!group.matches||!group.matches(".main-nav .nav-group[open]"))return;document.querySelectorAll(".main-nav .nav-group[open]").forEach(function(other){if(other!==group)other.open=false;});},true);
