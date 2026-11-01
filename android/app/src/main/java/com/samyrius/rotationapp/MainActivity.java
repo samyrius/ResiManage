@@ -56,6 +56,17 @@ public class MainActivity extends Activity {
         getWindow().setNavigationBarColor(Color.rgb(22, 78, 131));
 
         webView = new WebView(this);
+        // Hide Android WebView's native link context menu on long-press. It exposes
+        // the embedded app's internal 127.0.0.1 URL even though it is not useful to users.
+        // Keep normal long-press behavior for text fields and selectable page text.
+        webView.setOnLongClickListener(view -> {
+            WebView.HitTestResult hit = webView.getHitTestResult();
+            if (hit == null) return false;
+            int type = hit.getType();
+            return type == WebView.HitTestResult.SRC_ANCHOR_TYPE
+                    || type == WebView.HitTestResult.IMAGE_ANCHOR_TYPE
+                    || type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE;
+        });
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
