@@ -4433,11 +4433,11 @@ def test_dashboard_icons_are_inline_valid_and_have_distinct_colours(tmp_path, mo
     assert match is not None
     markup = match.group(1)
     cards = re.findall(r'<a class="rt-action-card"', markup)
-    svgs = re.findall(r'<svg\\b[^>]*viewBox="0 0 48 48"[^>]*>.*?</svg>', markup, flags=re.DOTALL)
+    svgs = re.findall(r'<svg\b[^>]*viewBox="0 0 48 48"[^>]*>.*?</svg>', markup, flags=re.DOTALL)
     assert len(cards) == 7
     assert len(svgs) == 7
     for svg in svgs:
-        assert re.search(r'<(?:path|circle|rect|line|polyline|polygon)\\b', svg)
+        assert re.search(r'<(?:path|circle|rect|line|polyline|polygon)\b', svg)
         assert "href=" not in svg and "src=" not in svg
     # The service/building icon uses windows, not a medical cross.
     assert 'M13 16h6v6h-6zM22 16h6v6h-6zM31 16h6v6h-6z' in markup
