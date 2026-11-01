@@ -4417,3 +4417,49 @@ def test_history_period_dates_use_same_previous_year_boundary_rule(tmp_path, mon
             "SELECT start_date,end_date FROM periods WHERE id=?", (current_id,)
         ).fetchone()
         assert (saved["start_date"], saved["end_date"]) == ("2026-02-02", "2026-04-30")
+
+
+def test_dashboard_icons_are_inline_valid_and_have_distinct_colours(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.get("/")
+    assert response.status_code == 200
+    dashboard = response.data.decode("utf-8")
+    match = re.search(
+        r'<div class="rt-quick-actions rt-icon-dashboard">(.*?)</div>',
+        dashboard,
+        flags=re.DOTALL,
+    )
+    assert match is not None
+    markup = match.group(1)
+    cards = re.findall(r'<a class="rt-action-card"', markup)
+    svgs = re.findall(r'<svg\\b[^>]*viewBox="0 0 48 48"[^>]*>.*?</svg>', markup, flags=re.DOTALL)
+    assert len(cards) == 7
+    assert len(svgs) == 7
+    for svg in svgs:
+        assert re.search(r'<(?:path|circle|rect|line|polyline|polygon)\\b', svg)
+        assert "href=" not in svg and "src=" not in svg
+    # The service/building icon uses windows, not a medical cross.
+    assert 'M13 16h6v6h-6zM22 16h6v6h-6zM31 16h6v6h-6z' in markup
+    assert 'M21 14h6v5h5v6h-5v5h-6v-5h-5v-6h5z' not in markup
+    for colour in (b"#26d6bd", b"#ff985d", b"#a78bfa", b"#53c98b", b"#f5bd45", b"#42b7e8", b"#d56acb"):
+        assert colour in response.data
+
+
+def test_period_date_editor_uses_strong_contrast_for_every_theme(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with client.session_transaction() as session:
+        session["role"] = "super_admin"
+    response = client.get("/rotation-board")
+    assert response.status_code == 200
+    page = response.data
+    assert b'class="rt-period-date-grid"' in page
+    assert b'name="start_date"' in page and b'name="end_date"' in page
+    assert b'color-scheme:light!important' in page
+    assert b'-webkit-text-fill-color:#101d2b!important' in page
+    assert b'font-weight:950!important' in page
+    assert b'--period-border:#0875b9' in page
+    assert b'--period-border:#7040b0' in page
+    assert b'--period-border:#b76512' in page
+    assert b'--period-border:#21834c' in page
