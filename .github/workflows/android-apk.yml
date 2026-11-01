@@ -1,0 +1,123 @@
+name: Android APK + emulator smoke tests
+
+# Run on demand and for validation changes on the active ResiManage 2 work branch.
+on:
+  push:
+    branches:
+      - resimanage-2-work
+  pull_request:
+    branches:
+      - resimanage-2-work
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Run Python regression tests
+        env:
+          ROTATION_SECRET: ci-test-secret
+        run: pytest -q
+
+  build-debug-apk:
+    needs: python-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0 ndk;27.2.12479018"
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+      - name: Download Gradle
+        run: |
+          curl --fail --location --silent --show-error https://services.gradle.org/distributions/gradle-8.13-bin.zip --output /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp
+      - name: Build debug APK
+        working-directory: android
+        run: /tmp/gradle-8.13/bin/gradle --no-daemon --stacktrace assembleDebug
+      - name: Upload APK for emulator and manual phone testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: resimanage2-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  android-emulator-smoke:
+    needs: build-debug-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download built APK
+        uses: actions/download-artifact@v4
+        with:
+          name: resimanage2-debug-apk
+          path: test-apk
+      - name: Run app on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          script: |
+            set -eu
+            mkdir -p emulator-evidence
+            trap 'adb logcat -d -t 5000 > emulator-evidence/emulator-logcat.txt 2>&1 || true; adb exec-out screencap -p > emulator-evidence/emulator-screenshot.png 2>/dev/null || true' EXIT
+            APK_DIR="$GITHUB_WORKSPACE/test-apk"
+            echo "Workspace: $GITHUB_WORKSPACE"
+            echo "Downloaded files:"
+            find "$GITHUB_WORKSPACE" -maxdepth 4 -type f \( -name "*.apk" -o -name "*.zip" \) -print
+            APK="$(find "$APK_DIR" -type f -name "*.apk" -print -quit)"
+            if [ -z "$APK" ]; then
+              echo "No APK found under $APK_DIR; listing downloaded artifact directory:"
+              ls -la "$APK_DIR" || true
+              exit 1
+            fi
+            test -s "$APK"
+            echo "Installing APK: $APK"
+            adb install -r "$APK"
+            adb shell am force-stop com.samyrius.rotationapp
+            adb shell monkey -p com.samyrius.rotationapp 1
+            sleep 25
+            adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | grep "com.samyrius.rotationapp"
+            if adb logcat -d -t 5000 | grep -A 12 "FATAL EXCEPTION" | grep -q "com.samyrius.rotationapp"; then
+              echo "Fatal exception associated with ResiManage detected."
+              exit 1
+            fi
+      - name: Upload emulator evidence (logs and screenshot)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resimanage2-android-emulator-evidence
+          path: |
+            emulator-evidence/emulator-logcat.txt
+            emulator-evidence/emulator-screenshot.png
+          if-no-files-found: warn
+          retention-days: 14
