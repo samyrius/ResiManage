@@ -814,7 +814,7 @@ html[data-interior-theme="crystal"] .rt-back-link:active{
 .rt-icon-dashboard .rt-action-icon svg{display:block;width:44px;height:44px;overflow:visible;filter:drop-shadow(0 3px 2px #07152d99)}
 @media(max-width:680px){
  html[data-interior-theme] .main-nav>.nav-home{height:58px!important;min-height:58px!important;gap:2px!important;padding:3px 2px!important}
- html[data-interior-theme] .main-nav>.nav-home:after{content:"Accueil";display:block;color:#eafaff!important;font-size:10px!important;font-weight:800!important;line-height:1.1!important;letter-spacing:.2px;text-shadow:0 1px 3px #000!important}
+ html[data-interior-theme] .main-nav>.nav-home:after{content:"Accue\\69 l";display:block;color:#eafaff!important;font-size:10px!important;font-weight:800!important;line-height:1.1!important;letter-spacing:.2px;text-shadow:0 1px 3px #000!important}
  html[data-interior-theme] .main-nav>.nav-home .nav-icon{font-size:23px!important;transform:scale(1.12)!important}
 }
 
