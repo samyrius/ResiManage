@@ -756,6 +756,55 @@ html[data-interior-theme="crystal"] ::-webkit-scrollbar{width:9px;height:9px}
 html[data-interior-theme="crystal"] ::-webkit-scrollbar-thumb{background:linear-gradient(#40c9ed,#6458ca);border-radius:12px;border:2px solid #091b32}
 @media(max-width:680px){html[data-interior-theme="crystal"] .rt-app-shell{padding-bottom:calc(86px + env(safe-area-inset-bottom,0px))!important}html[data-interior-theme="crystal"] .rt-icon-dashboard{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:12px!important;margin:12px 0!important}html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-card{display:grid!important;place-items:center!important;min-height:104px!important;padding:12px!important;border-radius:20px!important;background:linear-gradient(145deg,rgba(36,119,163,.85),rgba(16,24,70,.94))!important;box-shadow:0 9px 0 rgba(2,12,32,.75),0 16px 26px rgba(0,0,0,.35),inset 0 2px 3px rgba(255,255,255,.45)!important}html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-icon{display:grid!important;place-items:center!important;width:66px!important;height:66px!important;min-width:66px!important;border-radius:20px!important;font-size:38px!important;background:linear-gradient(145deg,#e6fbff,#79bce4 48%,#4a55a5)!important;box-shadow:inset 0 3px 5px #fff9,0 7px 0 #07152d,0 12px 18px #0008!important;text-shadow:0 3px 3px #15334c!important}}
 .rt-back-link{position:fixed;z-index:10000;top:calc(8px + env(safe-area-inset-top,0px));left:10px;display:grid;place-items:center;width:42px;height:42px;padding:0;border-radius:13px;font-size:27px;line-height:1;text-decoration:none;background:linear-gradient(145deg,#17618a,#171c54);border:1px solid #56d9f4;box-shadow:inset 0 1px #ffffff70,0 4px 0 #061126,0 8px 16px #0008}html[dir="rtl"] .rt-back-link{left:auto;right:10px}.rt-icon-dashboard .rt-action-card{justify-content:center}
+
+/* Crystal 3D — deeper sculpted icons and tactile press feedback */
+html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-card{
+ position:relative!important;transform:translateY(0);transition:transform .14s cubic-bezier(.2,.8,.2,1),box-shadow .14s ease,filter .14s ease!important;
+ box-shadow:0 10px 0 #061126,0 17px 25px #0009,inset 0 2px 3px #ffffff75,inset 0 -3px 7px #06152c99!important;
+}
+html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-icon{
+ position:relative;isolation:isolate;overflow:visible;
+ background:linear-gradient(145deg,#f4fdff 0%,#9be9ff 20%,#428bc8 52%,#293d83 100%)!important;
+ border:1px solid #d5f8ff!important;
+ box-shadow:inset 0 4px 7px #ffffffd9,inset 0 -7px 10px #102c6c99,0 3px 0 #17265a,0 8px 0 #07152d,0 13px 20px #000b,0 0 18px #4edbff66!important;
+ text-shadow:0 1px 0 #fff,0 3px 2px #173d67,0 6px 7px #06152dcc!important;
+ filter:drop-shadow(0 2px 2px #0008);
+}
+html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-card:active,
+html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-card:focus-visible{
+ transform:translateY(6px) scale(.975)!important;filter:brightness(1.12) saturate(1.12);
+ box-shadow:0 3px 0 #061126,0 6px 10px #0009,inset 0 2px 5px #ffffff65!important;
+}
+html[data-interior-theme="crystal"] .rt-icon-dashboard .rt-action-card:active .rt-action-icon{
+ transform:translateY(2px) scale(.97);box-shadow:inset 0 2px 5px #ffffffb0,0 2px 0 #07152d,0 4px 8px #0009!important;
+}
+html[data-interior-theme="crystal"] button,
+html[data-interior-theme="crystal"] .main-nav a,
+html[data-interior-theme="crystal"] .main-nav summary,
+html[data-interior-theme="crystal"] .rt-back-link{
+ transition:transform .14s cubic-bezier(.2,.8,.2,1),box-shadow .14s ease,filter .14s ease!important;
+}
+html[data-interior-theme="crystal"] button:active,
+html[data-interior-theme="crystal"] .main-nav a:active,
+html[data-interior-theme="crystal"] .main-nav summary:active,
+html[data-interior-theme="crystal"] .rt-back-link:active{
+ transform:translateY(3px) scale(.985)!important;filter:brightness(1.12);
+ box-shadow:inset 0 2px 5px #06152c99,0 1px 2px #0008!important;
+}
+/* Period date editor: each period has its own high-contrast identity */
+.rt-period-date-grid .rt-period-date-form{border-width:1px 1px 1px 5px;border-style:solid;border-radius:15px;padding:14px;background:linear-gradient(145deg,#fff,#f4f8fc);box-shadow:0 5px 14px #10263a18;gap:9px}
+.rt-period-date-grid .rt-period-date-form:nth-child(1){--period-ink:#087ea4;--period-bg:#e4f7ff;--period-border:#25a9d4;border-color:var(--period-border);background:linear-gradient(145deg,#f2fcff,#dff5ff)}
+.rt-period-date-grid .rt-period-date-form:nth-child(2){--period-ink:#7041b5;--period-bg:#f0e8ff;--period-border:#9a70dc;border-color:var(--period-border);background:linear-gradient(145deg,#faf7ff,#eee5ff)}
+.rt-period-date-grid .rt-period-date-form:nth-child(3){--period-ink:#a85a0a;--period-bg:#fff0dc;--period-border:#e59a3c;border-color:var(--period-border);background:linear-gradient(145deg,#fffaf2,#ffecd2)}
+.rt-period-date-grid .rt-period-date-form:nth-child(4){--period-ink:#167a43;--period-bg:#e4f8eb;--period-border:#42b978;border-color:var(--period-border);background:linear-gradient(145deg,#f4fff7,#e0f6e8)}
+.rt-period-date-grid .rt-period-date-form>strong{display:block;color:var(--period-ink)!important;font-size:16px;font-weight:800;letter-spacing:.2px;padding:8px 11px;border-radius:9px;background:var(--period-bg);border:1px solid color-mix(in srgb,var(--period-border) 42%,white);text-shadow:0 1px #fff}
+.rt-period-date-grid .rt-period-date-form label{display:grid;gap:6px;color:var(--period-ink)!important;font-size:13px;font-weight:750;line-height:1.35}
+.rt-period-date-grid .rt-period-date-form input[type="date"]{width:100%;min-height:42px;padding:8px 10px;border:1px solid color-mix(in srgb,var(--period-border) 65%,white);border-radius:9px;background:#ffffffed;color:#172b40!important;font-weight:650;accent-color:var(--period-ink);box-shadow:inset 0 1px 2px #10263a12}
+.rt-period-date-grid .rt-period-date-form button{margin-top:3px;background:linear-gradient(135deg,var(--period-ink),color-mix(in srgb,var(--period-ink) 72%,#101a35));color:#fff;border:1px solid color-mix(in srgb,var(--period-border) 70%,white);box-shadow:0 4px 0 color-mix(in srgb,var(--period-ink) 78%,#07152d),0 7px 12px #10263a24,inset 0 1px #ffffff55}
+.rt-period-date-grid .rt-period-date-form button:active{transform:translateY(3px);box-shadow:0 1px 0 var(--period-ink),inset 0 2px 4px #0004}
+@media(max-width:600px){.rt-period-date-grid .rt-period-date-form{padding:12px}.rt-period-date-grid .rt-period-date-form>strong{font-size:15px}}
+@media(prefers-reduced-motion:reduce){html[data-interior-theme="crystal"] button,html[data-interior-theme="crystal"] .rt-action-card,html[data-interior-theme="crystal"] .rt-action-icon{transition:none!important}}
+
 </style>
 </div><footer class="rt-footer">© <strong>{{L('Tous droits réservés · ResiManage · Dr Dris','All rights reserved · ResiManage · Dr Dris','جميع الحقوق محفوظة · ResiManage · Dr Dris')}}</strong></footer><script>
 document.addEventListener("toggle",function(event){var group=event.target;if(!group.matches||!group.matches(".main-nav .nav-group[open]"))return;document.querySelectorAll(".main-nav .nav-group[open]").forEach(function(other){if(other!==group)other.open=false;});},true);
