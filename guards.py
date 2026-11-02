@@ -233,7 +233,7 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
           <p>{{L('Calendrier mensuel · UMC et Réanimation chirurgicale','Monthly calendar · Emergency and surgical intensive care','تقويم شهري · الاستعجالات والإنعاش الجراحي')}}</p></div>
           <div class="rt-guards-month"><form method="get"><label>{{L('Mois affiché','Displayed month','الشهر المعروض')}}</label><select name="month" onchange="this.form.submit()">{% for item in month_options %}<option value="{{item.value}}" {% if item.value==month %}selected{% endif %}>{{item.label}}</option>{% endfor %}</select></form></div></div>
           <div class="rt-guards-stats"><div><strong>{{counts.total}}</strong><span>{{L('Affectations','Assignments','التعيينات')}}</span></div><div><strong>{{counts.validated}}</strong><span>{{L('Identités validées','Validated identities','هويات مؤكدة')}}</span></div><div class="is-warning"><strong>{{counts.unresolved}}</strong><span>{{L('À identifier','To identify','تحتاج إلى تحديد')}}</span></div></div>
-          {% if source %}<p class="rt-source-note">📚 {{L('Mois importé depuis le planning historique :','Month imported from historical roster:','شهر مستورد من جدول المناوبات التاريخي:')}} {{source.title}} · <a href="/guards/source/{{source.id}}">{{L('Voir la source','View source','عرض المصدر')}}</a></p>{% endif %}
+          {% if source_record %}<p class="rt-source-note">📚 {{L('Mois importé depuis le planning historique :','Month imported from historical roster:','شهر مستورد من جدول المناوبات التاريخي:')}} {{source_record.title}} · <a href="/guards/source/{{source_record.id}}">{{L('Voir la source','View source','عرض المصدر')}}</a></p>{% endif %}
           {% if month=='2026-10' %}<p class="rt-history-note">🔒 {{L('Planning historique importé. Les libellés d’origine sont conservés ; aucune identité n’a été attribuée automatiquement.','Historical roster imported. Original labels are preserved; no identity was assigned automatically.','تم استيراد الجدول التاريخي مع الحفاظ على التسميات الأصلية؛ لم يتم إسناد أي هوية تلقائيًا.')}}</p>{% elif counts.total==0 %}<p class="rt-draft-note">✎ {{L('Mois vierge : aucune garde n’a été générée. Ajoutez les affectations après validation du roulement.','Empty month: no shifts have been generated. Add assignments only after validating the rotation rules.','شهر فارغ: لم يتم إنشاء أي مناوبة. أضف التعيينات بعد التحقق من قواعد التناوب.')}}</p>{% endif %}
         </section>
         {% if role=='super_admin' %}<section id="guard-add" class="rt-guard-editor"><h2>{{L('Ajouter une affectation','Add an assignment','إضافة تعيين')}}</h2>
@@ -276,7 +276,7 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
         @media(max-width:680px){.rt-guard-add-form{grid-template-columns:1fr}.rt-guard-add-form button{grid-column:1}.rt-guards-stats strong{font-size:21px}.rt-guards-stats span{font-size:10px}.rt-guard-calendar-title{align-items:stretch}.rt-guard-calendar-title a{flex:1;text-align:center}}
         @media print{body{background:#fff!important;color:#111!important}header,.main-nav,.rt-back-link,.rt-footer,.rt-guards-hero,.rt-guard-editor,.rt-guard-calendar-title>a,.rt-guard-calendar-title>button,.rt-guard-person form{display:none!important}.rt-app-shell{display:block!important;padding:0!important}main{max-width:none!important;padding:0!important}section{margin:0!important;padding:0!important;border:0!important;box-shadow:none!important;background:#fff!important}.rt-guard-calendar{min-width:0!important;font-size:9px!important}.rt-guard-calendar th,.rt-guard-calendar td{color:#111!important;background:#fff!important;border:1px solid #555!important}.rt-guard-person{background:#fff!important;color:#111!important;border:1px solid #555!important}.rt-guard-person small,.rt-guard-hours{color:#333!important}.rt-guard-calendar tbody th span,.rt-guard-calendar tbody th small{color:#333!important}}
         </style>""", month=month, month_label=_month_label(month), month_options=month_options,
-                    days=days, counts=counts, source=source, residents=residents)
+                    days=days, counts=counts, source_record=source, residents=residents)
 
     @app.route("/guards/mapping", methods=["GET", "POST"])
     def guards_mapping():
@@ -333,10 +333,6 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
           GROUP BY raw_label ORDER BY mapping_status,raw_label COLLATE NOCASE
         """, (month,)).fetchall()
         resident_by_id = {r["id"]: r for r in residents}
-        global_labels = c.execute("""
-          SELECT raw_label,COUNT(*) AS occurrences,MAX(resident_id) AS resident_id
-          FROM guard_assignments GROUP BY raw_label ORDER BY raw_label COLLATE NOCASE
-        """).fetchall()
         suggestions = {}
         by_surname = {}
         for r in residents:
@@ -369,11 +365,11 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
             return ("Source not found", 404)
         c.close()
         return page("""<section><h1>📚 {{L('Source historique','Historical source','المصدر التاريخي')}}</h1>
-          <h2>{{source.title}}</h2><p>{{L('Fichier','File','الملف')}} : {{source.filename}}</p>
-          <p>{{L('Importé le','Imported on','تاريخ الاستيراد')}} : {{source.imported_at}}</p>
-          <p>{{L('Empreinte SHA-256','SHA-256 fingerprint','بصمة SHA-256')}} : <code>{{source.source_sha256}}</code></p>
+          <h2>{{source_record.title}}</h2><p>{{L('Fichier','File','الملف')}} : {{source_record.filename}}</p>
+          <p>{{L('Importé le','Imported on','تاريخ الاستيراد')}} : {{source_record.imported_at}}</p>
+          <p>{{L('Empreinte SHA-256','SHA-256 fingerprint','بصمة SHA-256')}} : <code>{{source_record.source_sha256}}</code></p>
           <p>{{L('Les données importées sont conservées séparément des modifications du calendrier.','Imported data is preserved separately from calendar edits.','يتم الاحتفاظ بالبيانات المستوردة بشكل منفصل عن تعديلات التقويم.')}}</p>
-          <a class="button" href="/guards?month={{source.month}}">← {{L('Retour','Back','عودة')}}</a></section>""", source=source)
+          <a class="button" href="/guards?month={{source_record.month}}">← {{L('Retour','Back','عودة')}}</a></section>""", source_record=source)
 
     @app.get("/guards/export.csv")
     def guards_export():
