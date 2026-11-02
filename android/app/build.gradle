@@ -32,6 +32,14 @@ def copyRotationPythonApp = tasks.register("copyRotationPythonApp", Copy) {
     from(rootProject.file("../app.py"))
     into(layout.projectDirectory.dir("src/main/python"))
 }
+def copyGuardPythonModule = tasks.register("copyGuardPythonModule", Copy) {
+    from(rootProject.file("../guards.py"))
+    into(layout.projectDirectory.dir("src/main/python"))
+}
+def copyGuardSourceData = tasks.register("copyGuardSourceData", Copy) {
+    from(rootProject.file("../data/gardes_octobre_2026.json"))
+    into(layout.projectDirectory.dir("src/main/python/data"))
+}
 def copyRotationStaticAssets = tasks.register("copyRotationStaticAssets", Copy) {
     from(rootProject.file("../static"))
     into(layout.projectDirectory.dir("src/main/python/static"))
@@ -52,10 +60,10 @@ def copyRotationLauncherIconMipmapPng = tasks.register("copyRotationLauncherIcon
     rename { "ic_launcher.png" }
 }
 tasks.named("preBuild").configure {
-    dependsOn(copyRotationPythonApp, copyRotationStaticAssets, copyRotationLauncherIcon, copyRotationLauncherIconPng, copyRotationLauncherIconMipmapPng)
+    dependsOn(copyRotationPythonApp, copyGuardPythonModule, copyGuardSourceData, copyRotationStaticAssets, copyRotationLauncherIcon, copyRotationLauncherIconPng, copyRotationLauncherIconMipmapPng)
 }
 tasks.configureEach {
     if (name.toLowerCase().contains("python") && name != "copyRotationPythonApp" && name != "copyRotationStaticAssets") {
-        dependsOn(copyRotationPythonApp, copyRotationStaticAssets)
+        dependsOn(copyRotationPythonApp, copyGuardPythonModule, copyGuardSourceData, copyRotationStaticAssets)
     }
 }
