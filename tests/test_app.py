@@ -4434,8 +4434,8 @@ def test_dashboard_icons_are_inline_valid_and_have_distinct_colours(tmp_path, mo
     markup = match.group(1)
     cards = re.findall(r'<a class="rt-action-card"', markup)
     svgs = re.findall(r'<svg\b[^>]*viewBox="0 0 48 48"[^>]*>.*?</svg>', markup, flags=re.DOTALL)
-    assert len(cards) == 7
-    assert len(svgs) == 7
+    assert len(cards) == 8
+    assert len(svgs) == 8
     for svg in svgs:
         assert re.search(r'<(?:path|circle|rect|line|polyline|polygon)\b', svg)
         assert "href=" not in svg and "src=" not in svg
