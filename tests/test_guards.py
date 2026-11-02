@@ -130,11 +130,11 @@ def test_dems_archive_residents_cannot_be_selected_as_guard_residents(tmp_path, 
     c.close()
 
 
-def test_calendar_month_has_correct_number_of_weekend_days(tmp_path, monkeypatch):
+def test_calendar_month_highlights_friday_and_saturday_days(tmp_path, monkeypatch):
     client = _client(tmp_path, monkeypatch)
     response = client.get("/guards?month=2026-11")
     assert response.status_code == 200
-    assert response.data.count(b'class="rt-weekend"') == 9
+    assert response.data.count(b'class="rt-weekend"') == 8
 
 
 def test_csv_export_is_available_and_keeps_source_labels(tmp_path, monkeypatch):
