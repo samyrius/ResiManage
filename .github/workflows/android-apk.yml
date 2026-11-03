@@ -80,6 +80,15 @@ jobs:
         with:
           name: resimanage2-debug-apk
           path: test-apk
+      - name: Enable KVM access for the emulator
+        run: |
+          if [ ! -e /dev/kvm ]; then
+            echo "KVM device /dev/kvm is unavailable on this runner."
+            exit 1
+          fi
+          sudo chmod 666 /dev/kvm
+          ls -l /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
       - name: Run app on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
