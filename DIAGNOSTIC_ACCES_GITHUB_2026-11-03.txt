@@ -1,0 +1,3 @@
+Test temporaire d'ecriture GitHub sur une ancienne branche ResiManage.
+Objectif : verifier l'autorisation d'ecriture sur release/rotation-app-tested.
+Ce fichier est uniquement diagnostique et doit etre supprime apres verification.
