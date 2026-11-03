@@ -576,3 +576,13 @@ Cette entrée complète les exigences précédentes sans les remplacer. Elle dé
 - Correctif complémentaire poussé : le script utilise désormais le chemin relatif au répertoire de travail courant (`$PWD/test-apk`) pour retrouver l'APK.
 - Commit du correctif complémentaire : `e70ed61d2582ee32f1d7590fea3fdcaceadeda5d`.
 - État : le démarrage de l'émulateur semble désormais franchi ; l'installation et l'ouverture de ResiManage ne sont pas encore confirmées. Attendre et examiner le prochain run avant toute conclusion.
+
+
+### Second résultat Android et troisième correctif du script — 3 novembre 2026
+
+- Run Android #334 sur le commit `1f9460e175aa4615df36a45341d486660f7b8b46` : tests Python réussis, compilation APK réussie, upload réussi, accès KVM réussi et émulateur Android 35 démarré (`sys.boot_completed=1`).
+- Le job échoue ensuite avant l'installation : les journaux montrent que l'action exécute chaque ligne du champ `script` dans un shell distinct. La variable locale `APK_DIR` définie sur une ligne n'existe donc plus à la ligne suivante ; `find "$APK_DIR"` reçoit un chemin vide. Ce n'est pas un défaut de l'APK ni de l'application.
+- Correctif poussé dans `.github/workflows/android-apk.yml` : suppression de la dépendance à une variable shell entre les lignes ; le chemin du fichier APK est maintenant recherché directement dans chaque commande `test` et `adb install`. Les commandes de détection d'exception fatale et de collecte des preuves sont ramenées sur une ligne chacune.
+- Commit du correctif : `4a6201dd44f7f5a5fd443705ab9696dce145629a`.
+- Résultats complémentaires : Python CI run #1617 réussi ; Windows EXE/installer run #332 réussi.
+- État : le troisième correctif est poussé et un nouveau run Android est déclenché. L'installation, le lancement de l'activité ResiManage et l'absence d'exception fatale restent à confirmer par ce nouveau run. Ne pas déclarer le smoke-test Android réussi avant ces vérifications.
