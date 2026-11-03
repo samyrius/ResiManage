@@ -106,13 +106,17 @@ jobs:
             test -n "$(find "$PWD/test-apk" -type f -name "*.apk" -print -quit)"
             test -s "$(find "$PWD/test-apk" -type f -name "*.apk" -print -quit)"
             adb install -r "$(find "$PWD/test-apk" -type f -name "*.apk" -print -quit)"
+            adb logcat -c
             adb shell am force-stop com.samyrius.rotationapp
             adb shell monkey -p com.samyrius.rotationapp 1
             sleep 25
-            adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | grep "com.samyrius.rotationapp"
-            adb logcat -d -t 5000 > emulator-evidence/emulator-logcat.txt
+            adb shell dumpsys activity activities > emulator-evidence/activity-state.txt
+            grep -E "mResumedActivity|topResumedActivity" emulator-evidence/activity-state.txt | grep "com.samyrius.rotationapp"
+            adb forward tcp:5000 tcp:5000
+            curl --retry 10 --retry-delay 1 --retry-connrefused --fail --silent --show-error http://127.0.0.1:5000/login --output emulator-evidence/login-page.html
+            grep -Eq "Connexion|Identifiant|Mot de passe" emulator-evidence/login-page.html
+            adb logcat -d > emulator-evidence/emulator-logcat.txt
             if grep -Eq "FATAL EXCEPTION.*com.samyrius.rotationapp|TemplateNotFound:|Exception on /login" emulator-evidence/emulator-logcat.txt; then echo "ResiManage startup or login rendering error detected."; exit 1; fi
-            if ! grep -Eq "GET /login.*200" emulator-evidence/emulator-logcat.txt; then echo "ResiManage did not successfully render the login page."; exit 1; fi
             adb exec-out screencap -p > emulator-evidence/emulator-screenshot.png
       - name: Upload emulator evidence (logs and screenshot)
         if: always()
