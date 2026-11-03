@@ -566,3 +566,13 @@ Cette entrée complète les exigences précédentes sans les remplacer. Elle dé
 - Ce correctif vise la configuration du runner CI ; il ne modifie ni le code de l'application ni les données des résidents.
 - Commit du correctif : `c4272a9e89cf81cce383c9bb33cd4504d8a70191`.
 - État : modification poussée sur la branche de travail. La réussite doit encore être confirmée par un nouveau run GitHub Actions : accès KVM, démarrage de l'émulateur, installation de l'APK et ouverture effective de l'application. Tant que ce run n'a pas réussi, le correctif reste **à valider**.
+
+
+### Résultat du premier run après le correctif KVM et correctif complémentaire — 3 novembre 2026
+
+- Nouveau run #332, commit `26c9650d435bee39696956dad2f1dd98e43534f4` : le job Python passe, la compilation APK passe et l'upload de l'APK passe.
+- L'étape d'activation des permissions KVM passe également. L'émulateur démarre suffisamment pour exécuter le script de test : le problème initial de timeout au démarrage de l'émulateur est donc franchi dans ce run.
+- Le job échoue ensuite sur un défaut du script de test : la variable `GITHUB_WORKSPACE` n'est pas définie dans le contexte du script fourni à l'action, ce qui rend `APK_DIR` vide, alors que l'APK a bien été téléchargé dans `test-apk/app-debug.apk`.
+- Correctif complémentaire poussé : le script utilise désormais le chemin relatif au répertoire de travail courant (`$PWD/test-apk`) pour retrouver l'APK.
+- Commit du correctif complémentaire : `e70ed61d2582ee32f1d7590fea3fdcaceadeda5d`.
+- État : le démarrage de l'émulateur semble désormais franchi ; l'installation et l'ouverture de ResiManage ne sont pas encore confirmées. Attendre et examiner le prochain run avant toute conclusion.
