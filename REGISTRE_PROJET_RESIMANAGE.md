@@ -586,3 +586,35 @@ Cette entrée complète les exigences précédentes sans les remplacer. Elle dé
 - Commit du correctif : `4a6201dd44f7f5a5fd443705ab9696dce145629a`.
 - Résultats complémentaires : Python CI run #1617 réussi ; Windows EXE/installer run #332 réussi.
 - État : le troisième correctif est poussé et un nouveau run Android est déclenché. L'installation, le lancement de l'activité ResiManage et l'absence d'exception fatale restent à confirmer par ce nouveau run. Ne pas déclarer le smoke-test Android réussi avant ces vérifications.
+
+## 31. Incident de lancement Android sur téléphone réel — 3 novembre 2026
+
+### Retour utilisateur
+- Après installation de l'APK de test : écran blanc et « The local Server did not respond. Close and reopen the app ».
+- Après installation de l'APK corrective : « the local server could not start. System exit 1 ».
+- Le défaut persiste sur téléphone réel. L'application Android n'est pas validée.
+
+### Builds et preuves
+- Run `41647148965` : build debug APK et jobs CI rapportés précédemment réussis. APK fournie : SHA-256 `d73cd4ecb98841b9ef9133208ffcf4a44dc945bdbf74c4d68a940dd7e49335a0`.
+- Run `41655909006`, tentative 2, workflow `.github/workflows/android-apk.yml`, branche `integration/resimanage-refonte-themes-2026-11-03`, commit `d37b57bac4ea015dbb77f1661a870d62f8fd6842`, conclusion GitHub Actions `success`. Le commit vérifiait la réponse HTTP locale `/login`.
+- Artefact de preuve émulateur récupéré : ID `13239662712`, capture `emulator-screenshot.png`.
+- Une réponse HTTP 200 ne prouve pas que le WebView affiche correctement l'interface. Le retour physique et `System exit 1` montrent que le contrôle CI était insuffisant.
+
+### Constat technique et limites
+- Dans `app.py`, `BASE` dépend de `sys.executable` lorsque Python est gelé, sinon du dossier de `app.py`; la base SQLite est placée relativement à `BASE`. Cette logique doit être comparée aux chemins Android réels.
+- La branche d'intégration contient `app.py`, `guards.py`, `templates/`, `static/`, `android/` et `tests/`. La racine de `resimanage-2-work` consultée ne présentait pas `templates/` ni `guards.py`. Les deux branches ne sont pas identiques.
+- L'hypothèse précédente — ressources de templates absentes du paquet Android — n'a pas résolu le problème. Elle reste une hypothèse historique, pas une cause racine démontrée.
+- La cause exacte du code 1 n'est pas établie. Ne pas inventer une exception sans traceback/logcat.
+
+### Diagnostic obligatoire
+1. Récupérer logcat filtré par package/processus, stdout/stderr Python, traceback complet, code de sortie et horodatages.
+2. Inspecter l'APK exacte : scripts Python, `guards.py`, dépendances, `templates/`, `static/` et chemins après extraction Android.
+3. Vérifier commande de lancement, répertoire courant, variables d'environnement, port/adresse, permissions d'écriture et dépendances natives.
+4. Reproduire à froid sur émulateur avec logs avant requête HTTP; valider aussi le rendu WebView réel.
+5. Faire échouer le smoke test si le processus serveur sort avec un code non nul; collecter les logs automatiquement.
+6. Faire valider la nouvelle APK sur le téléphone réel avant de déclarer la correction terminée.
+
+### État et gouvernance
+- Incident **OUVERT / BLOQUANT**. Application Android non validée sur appareil réel.
+- PR #91 reste non fusionnée. Ne pas modifier/fusionner la branche officielle `resimanage-2-work` sans accord explicite.
+- Les 172 tests Python précédemment rapportés et le succès CI ne remplacent pas le test de démarrage Android réel.
