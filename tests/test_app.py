@@ -50,6 +50,11 @@ def setup_client(tmp_path, monkeypatch):
     return rotation_app.app.test_client()
 
 
+
+
+def read_common_theme_css():
+    return (Path(__file__).resolve().parents[1] / "static" / "themes" / "common.css").read_text(encoding="utf-8")
+
 def login(client):
     return client.post("/login", data={"password": "test-strong-password-2026"}, follow_redirects=True)
 
@@ -66,8 +71,10 @@ def test_internal_navigation_is_grouped_responsive_and_marks_current_page(tmp_pa
     assert b'href="/external-rotations"' in response.data
     assert "Stages et planification".encode() in response.data
     assert b'class="nav-home is-active"' in response.data
-    assert b'grid-template-columns:260px minmax(0,1fr)' in response.data
-    assert b'@media(max-width:680px)' in response.data
+    assert b'href="/static/themes/crystal3d.css"' in response.data
+    theme_css = read_common_theme_css()
+    assert 'grid-template-columns:260px minmax(0,1fr)' in theme_css
+    assert '@media(max-width:680px)' in theme_css
     residents = client.get("/residents")
     assert residents.status_code == 200
     assert b'href="/residents" class="is-active"' in residents.data
@@ -77,7 +84,7 @@ def test_login_page_and_language_selector(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     response = client.get("/login")
     assert response.status_code == 200
-    assert b'<html lang="fr" dir="ltr">' in response.data
+    assert re.search(rb'<html lang="fr" dir="ltr" data-theme-template="crystal3d">', response.data)
     assert "Français".encode() in response.data
     assert "English".encode() in response.data
     assert b'Identifiant ou e-mail' in response.data
@@ -88,17 +95,17 @@ def test_registration_screen_uses_selected_french_without_arabic_form_labels(tmp
     client = setup_client(tmp_path, monkeypatch)
     response = client.get("/register")
     assert response.status_code == 200
-    assert b'<html lang="fr" dir="ltr">' in response.data
+    assert re.search(rb'<html lang="fr" dir="ltr" data-theme-template="crystal3d">', response.data)
     assert 'Nom d’utilisateur'.encode('utf-8') in response.data
     assert "اسم المستخدم".encode() not in response.data
     client.get("/lang/en", headers={"Referer": "http://localhost/register"})
     english = client.get("/register")
-    assert b'<html lang="en" dir="ltr">' in english.data
+    assert re.search(rb'<html lang="en" dir="ltr" data-theme-template="crystal3d">', english.data)
     assert b'Username' in english.data
     assert "اسم المستخدم".encode() not in english.data
     client.get("/lang/ar", headers={"Referer": "http://localhost/register"})
     arabic = client.get("/register")
-    assert b'<html lang="ar" dir="rtl">' in arabic.data
+    assert re.search(rb'<html lang="ar" dir="rtl" data-theme-template="crystal3d">', arabic.data)
     assert "اسم المستخدم".encode() in arabic.data
 
 
@@ -111,8 +118,9 @@ def test_login_branding_uses_resimanage_and_navy_cyan_identity(tmp_path, monkeyp
     assert b"ResiTrack" not in response.data
     assert b"#00dff755" in response.data
     assert b"#19dfbd" in response.data
-    assert b"white-space:normal;overflow-wrap:anywhere;max-width:100%;line-height:1.3;text-align:center" in response.data
-    assert b"prefers-reduced-motion:reduce" in response.data
+    theme_css = read_common_theme_css()
+    assert "white-space:normal;overflow-wrap:anywhere;max-width:100%;line-height:1.3;text-align:center" in theme_css
+    assert "prefers-reduced-motion:reduce" in theme_css
     assert b'src="/static/resimanage-3d-icon.jpg"' in response.data
     assert 'alt="ResiManage — médecin et stéthoscope"'.encode("utf-8") in response.data
     assert "💓".encode() not in response.data
@@ -2186,11 +2194,12 @@ def test_resident_profile_photo_frame_is_large_and_responsive(tmp_path, monkeypa
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     # Desktop/tablet: scale fluidly up to 240 px; phones stack the header and use a 240 px photo.
-    assert ".rt-avatar-wrap{flex:0 0 auto;width:clamp(220px,30vw,280px)}" in html
-    assert ".rt-profile-avatar{display:block;width:100%;height:clamp(220px,30vw,280px);object-fit:cover" in html
-    assert ".rt-profile-head{align-items:stretch;flex-direction:column;gap:14px}" in html
-    assert ".rt-avatar-wrap{width:min(260px,100%);flex-basis:auto;align-self:center}" in html
-    assert ".rt-profile-avatar{height:260px;border-radius:20px}" in html
+    theme_css = read_common_theme_css()
+    assert '.rt-avatar-wrap{flex:0 0 auto;width:clamp(220px,30vw,280px)}' in theme_css
+    assert '.rt-profile-avatar{display:block;width:100%;height:clamp(220px,30vw,280px);object-fit:cover' in theme_css
+    assert '.rt-profile-head{align-items:stretch;flex-direction:column;gap:14px}' in theme_css
+    assert '.rt-avatar-wrap{width:min(260px,100%);flex-basis:auto;align-self:center}' in theme_css
+    assert '.rt-profile-avatar{height:260px;border-radius:20px}' in theme_css
 
 
 
@@ -4268,10 +4277,11 @@ def test_mobile_layout_has_touch_scroll_fallback(tmp_path, monkeypatch):
 
     response = client.get("/")
     assert response.status_code == 200
-    assert b"@media(max-width:680px){html{overflow-x:clip;overflow-y:auto" in response.data
-    assert b"touch-action:pan-y" in response.data
-    assert b"-webkit-overflow-scrolling:touch" in response.data
-    assert b".main-nav{backdrop-filter:none!important" in response.data
+    theme_css = read_common_theme_css()
+    assert "@media(max-width:680px){html{overflow-x:clip;overflow-y:auto" in theme_css
+    assert "touch-action:pan-y" in theme_css
+    assert "-webkit-overflow-scrolling:touch" in theme_css
+    assert ".main-nav{backdrop-filter:none!important" in theme_css
 
 
 def test_legacy_decisions_are_scoped_to_selected_postgraduate_year(tmp_path, monkeypatch):
@@ -4442,8 +4452,9 @@ def test_dashboard_icons_are_inline_valid_and_have_distinct_colours(tmp_path, mo
     # The service/building icon uses windows, not a medical cross.
     assert 'M13 16h6v6h-6zM22 16h6v6h-6zM31 16h6v6h-6z' in markup
     assert 'M21 14h6v5h5v6h-5v5h-6v-5h-5v-6h5z' not in markup
-    for colour in (b"#26d6bd", b"#ff985d", b"#a78bfa", b"#53c98b", b"#f5bd45", b"#42b7e8", b"#d56acb"):
-        assert colour in response.data
+    theme_css = read_common_theme_css()
+    for colour in ("#26d6bd", "#ff985d", "#a78bfa", "#53c98b", "#f5bd45", "#42b7e8", "#d56acb"):
+        assert colour in theme_css
 
 
 def test_period_date_editor_uses_strong_contrast_for_every_theme(tmp_path, monkeypatch):
@@ -4456,10 +4467,11 @@ def test_period_date_editor_uses_strong_contrast_for_every_theme(tmp_path, monke
     page = response.data
     assert b'class="rt-period-date-grid"' in page
     assert b'name="start_date"' in page and b'name="end_date"' in page
-    assert b'color-scheme:light!important' in page
-    assert b'-webkit-text-fill-color:#101d2b!important' in page
-    assert b'font-weight:950!important' in page
-    assert b'--period-border:#0875b9' in page
-    assert b'--period-border:#7040b0' in page
-    assert b'--period-border:#b76512' in page
-    assert b'--period-border:#21834c' in page
+    theme_css = read_common_theme_css()
+    assert 'color-scheme:light!important' in theme_css
+    assert '-webkit-text-fill-color:#101d2b!important' in theme_css
+    assert 'font-weight:950!important' in theme_css
+    assert '--period-border:#0875b9' in theme_css
+    assert '--period-border:#7040b0' in theme_css
+    assert '--period-border:#b76512' in theme_css
+    assert '--period-border:#21834c' in theme_css
