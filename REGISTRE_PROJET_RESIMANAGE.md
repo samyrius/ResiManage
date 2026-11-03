@@ -513,3 +513,46 @@ Les résultats des workflows Python et Windows (pas Android) ont mis en évidenc
 - Sur le commit `f9167480ed69e7cb7d174010bd644518fc9a4145`, la CI Python a réussi : **126 tests passés**. La compilation APK Android et la génération Windows doivent encore être confirmées par leurs workflows et leurs tests de démarrage.
 - Limites encore ouvertes : validation réelle de la synchronisation entre plusieurs téléphones, résolution interactive des conflits, file d’attente hors connexion complète, synchronisation des votes/archives DEMS, historique fiable de l’année d’étude du résident pour chaque année de post-graduation, et vérification visuelle sur un téléphone physique.
 
+
+
+## 29. Exigences complémentaires — tableau de garde et navigation — 3 novembre 2026
+
+Cette entrée complète les exigences précédentes sans les remplacer. Elle décrit le résultat attendu ; elle ne prouve pas que les corrections sont déjà implémentées.
+
+### Tableau de garde : édition manuelle après génération automatique
+- La génération automatique reste le point de départ du tableau, mais le résultat doit être librement modifiable.
+- L'ergonomie d'insertion, d'ajout et de modification doit être aussi simple que dans le tableau des affectations aux services.
+- Depuis le tableau, permettre d'ajouter manuellement une affectation/un résident à une date et à un poste précis, d'ajouter une ligne ou un poste, de remplacer un résident, de modifier ou supprimer une affectation et d'ajouter une date non prévue initialement.
+- Après chaque enregistrement, rester dans le tableau de garde, au même endroit et dans le même contexte de travail ; ne pas renvoyer à l'accueil ni remonter en haut de page.
+- Les modifications manuelles doivent être conservées et ne pas être écrasées silencieusement par une nouvelle génération automatique. Toute régénération doit préserver les changements manuels ou demander explicitement comment les traiter.
+
+### Jours fériés
+- Prévoir la détection automatique des jours fériés applicables au calendrier algérien, sous réserve de la source/calendrier retenu et de sa mise à jour.
+- Permettre à l'utilisateur d'ajouter manuellement un jour férié, de modifier sa date/son libellé et de supprimer une entrée erronée.
+- Les jours fériés doivent être pris en compte dans les règles de génération et de pondération des gardes selon les règles métier validées ; ne pas inventer une règle de comptage non confirmée.
+- Distinguer visuellement les jours fériés et les gardes de 24 heures. Une correction manuelle doit rester possible si une date n'est pas reconnue automatiquement.
+
+### Conservation du contexte après modification — correction transversale
+- Après toute action d'ajout, modification, suppression ou enregistrement dans n'importe quelle page (notamment tableau de garde, affectations aux services, capacités/postes et formulaires), rester sur la page courante.
+- Conserver la position exacte de défilement, la section ouverte, les filtres, la période sélectionnée et le contexte de saisie.
+- Éviter les rechargements complets et redirections vers l'accueil lorsqu'ils ne sont pas nécessaires. Si un rechargement est indispensable, restaurer le contexte et la position précédents.
+- L'enregistrement ne doit pas provoquer de saut en haut de page. Afficher un retour de réussite/erreur local sans déplacer l'utilisateur.
+
+### Bouton Retour Android — interface interne uniquement
+- Le bouton Retour intégré à l'interface ResiManage doit être absent de l'écran externe/pré-authentification et ne doit pas apparaître avant la connexion.
+- Après authentification, il est visible et fonctionne uniquement dans l'espace interne de ResiManage : retour à la vue interne précédente.
+- Depuis l'accueil interne, demander confirmation avant de quitter l'application.
+- Le bouton interne ne doit jamais naviguer vers la page externe qui précédait l'ouverture ou la connexion à ResiManage.
+- Vérifier séparément le comportement du bouton Retour système Android/WebView : il doit respecter la pile de navigation interne sans exposer ni réafficher l'environnement externe/pré-authentification.
+
+### Vérifications obligatoires avant clôture
+- Tester les opérations d'ajout/modification/suppression/enregistrement dans plusieurs pages, en haut, au milieu et en bas de longs tableaux.
+- Vérifier que la page, le défilement, les filtres et les sélections restent inchangés après chaque opération.
+- Tester le bouton Retour avant connexion, après connexion, dans plusieurs sous-pages et depuis l'accueil interne.
+- Tester l'ajout, la modification et la suppression manuels de jours fériés ainsi que leur effet sur le tableau de garde.
+- Vérifier que les modifications manuelles du tableau survivent à une régénération automatique.
+- Documenter les tests réellement exécutés et leurs résultats. Ne pas déclarer les corrections terminées sur la seule base de la modification du code.
+
+### État
+- Exigences consignées dans le registre sur la branche de travail.
+- **Implémentation, compilation APK et tests : non effectués à ce stade.** La correction ne doit pas être considérée comme terminée tant que le code n'a pas été modifié, testé et vérifié sur l'application.
