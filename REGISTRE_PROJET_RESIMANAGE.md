@@ -556,3 +556,13 @@ Cette entrée complète les exigences précédentes sans les remplacer. Elle dé
 ### État
 - Exigences consignées dans le registre sur la branche de travail.
 - **Implémentation, compilation APK et tests : non effectués à ce stade.** La correction ne doit pas être considérée comme terminée tant que le code n'a pas été modifié, testé et vérifié sur l'application.
+
+
+## 30. Diagnostic et correctif du démarrage de l'émulateur Android CI — 3 novembre 2026
+
+- Analyse du job GitHub Actions `android-emulator-smoke` du run 330 (commit testé : `4f95441c8b29b5c0554df56f417f300f1d5f0f11`) : le téléchargement de l'APK a réussi et l'émulateur Android 35 a été lancé, mais le démarrage a expiré avant l'installation ou le lancement de ResiManage.
+- Le journal identifie précisément la cause immédiate : l'utilisateur du runner n'avait pas les permissions d'accès à `/dev/kvm` (« This user doesn't have permissions to use KVM »). L'action a donc démarré l'émulateur sans accélération matérielle (`-accel off`), puis a dépassé le délai d'attente.
+- Correctif appliqué au workflow `.github/workflows/android-apk.yml` sur la branche de travail : ajout d'une étape préalable qui vérifie la présence de `/dev/kvm`, accorde au runner les droits de lecture/écriture sur ce périphérique avec `sudo chmod 666 /dev/kvm`, puis vérifie ces droits avant le démarrage de l'émulateur.
+- Ce correctif vise la configuration du runner CI ; il ne modifie ni le code de l'application ni les données des résidents.
+- Commit du correctif : `c4272a9e89cf81cce383c9bb33cd4504d8a70191`.
+- État : modification poussée sur la branche de travail. La réussite doit encore être confirmée par un nouveau run GitHub Actions : accès KVM, démarrage de l'émulateur, installation de l'APK et ouverture effective de l'application. Tant que ce run n'a pas réussi, le correctif reste **à valider**.
