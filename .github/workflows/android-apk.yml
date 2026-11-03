@@ -100,27 +100,19 @@ jobs:
             set -eu
             mkdir -p emulator-evidence
             trap 'adb logcat -d -t 5000 > emulator-evidence/emulator-logcat.txt 2>&1 || true; adb exec-out screencap -p > emulator-evidence/emulator-screenshot.png 2>/dev/null || true' EXIT
-            APK_DIR="$PWD/test-apk"
             echo "Workspace: $GITHUB_WORKSPACE"
             echo "Downloaded files:"
             find "$GITHUB_WORKSPACE" -maxdepth 4 -type f \( -name "*.apk" -o -name "*.zip" \) -print
-            APK="$(find "$APK_DIR" -type f -name "*.apk" -print -quit)"
-            if [ -z "$APK" ]; then
-              echo "No APK found under $APK_DIR; listing downloaded artifact directory:"
-              ls -la "$APK_DIR" || true
-              exit 1
-            fi
-            test -s "$APK"
-            echo "Installing APK: $APK"
-            adb install -r "$APK"
+            test -n "$(find "$PWD/test-apk" -type f -name "*.apk" -print -quit)"
+            test -s "$(find "$PWD/test-apk" -type f -name "*.apk" -print -quit)"
+            adb install -r "$(find "$PWD/test-apk" -type f -name "*.apk" -print -quit)"
             adb shell am force-stop com.samyrius.rotationapp
             adb shell monkey -p com.samyrius.rotationapp 1
             sleep 25
             adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | grep "com.samyrius.rotationapp"
-            if adb logcat -d -t 5000 | grep -A 12 "FATAL EXCEPTION" | grep -q "com.samyrius.rotationapp"; then
-              echo "Fatal exception associated with ResiManage detected."
-              exit 1
-            fi
+            if adb logcat -d -t 5000 | grep -A 12 "FATAL EXCEPTION" | grep -q "com.samyrius.rotationapp"; then echo "Fatal exception associated with ResiManage detected."; exit 1; fi
+            adb logcat -d -t 5000 > emulator-evidence/emulator-logcat.txt
+            adb exec-out screencap -p > emulator-evidence/emulator-screenshot.png
       - name: Upload emulator evidence (logs and screenshot)
         if: always()
         uses: actions/upload-artifact@v4
