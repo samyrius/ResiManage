@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from flask import Flask, request, redirect, session, render_template_string, flash, send_file, send_from_directory, jsonify
+from flask import Flask, request, redirect, session, render_template, render_template_string, flash, send_file, send_from_directory, jsonify
 import sqlite3, os, sys, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess, secrets, smtplib, time, zipfile
 import warnings
 from PIL import Image, ImageOps
@@ -1010,7 +1010,13 @@ document.addEventListener("toggle",function(event){var group=event.target;if(!gr
  context.setdefault("role",session.get("role",""))
  context.setdefault("csrf_token",csrf_token)
  inner=render_template_string(body,**context)
- return render_template_string(shell,body=inner,lang=lang,t=tr,L=L,year=selected_year,current_year=current_year,year_options=year_options,user=bool(session.get("user")),role=session.get("role",""))
+ selected_theme=request.cookies.get("resimanage_theme","crystal3d")
+ theme_aliases={"crystal":"crystal3d","futuristic":"futuriste","luxe":"luxe-elegant","nature":"naturel-moderne","emerald":"emeraude","aurora":"aurore-boreale","ruby":"rubis"}
+ selected_theme=theme_aliases.get(selected_theme,selected_theme)
+ allowed_themes={"crystal3d","futuriste","luxe-elegant","naturel-moderne","emeraude","aurore-boreale","rubis"}
+ if selected_theme not in allowed_themes:
+  selected_theme="crystal3d"
+ return render_template("themes/"+selected_theme+".html",body=inner,lang=lang,t=tr,L=L,year=selected_year,current_year=current_year,year_options=year_options,user=bool(session.get("user")),role=session.get("role",""),theme=selected_theme)
 def guard():
  username=session.get("user")
  if not username: return redirect("/login")
