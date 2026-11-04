@@ -502,3 +502,56 @@ html[data-theme-template] .msg.msg-info{border:1px solid #a7f3c0!important;backg
 @media(max-width:680px){html[data-theme-template] .msg{bottom:calc(92px + env(safe-area-inset-bottom,0px))!important;max-width:calc(100vw - 20px)!important}}
 @keyframes rm-message-arrive-bottom{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
 @media(prefers-reduced-motion:reduce){html[data-theme-template] .msg{animation:none!important}}
+
+
+/* ResiManage tactile 3D controls: dashboard tiles and fixed navigation */
+html[data-theme-template] .rt-action-card{
+ position:relative!important;isolation:isolate;perspective:900px;transform-style:preserve-3d;
+ border:1px solid #ffffffd9!important;border-radius:17px!important;
+ box-shadow:0 5px 0 #173a5860,0 11px 22px #102c4933,inset 0 1px 0 #ffffff!important;
+ transition:transform .14s ease,box-shadow .14s ease,filter .14s ease!important;
+}
+html[data-theme-template] .rt-action-card:before{
+ content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;
+ background:linear-gradient(145deg,#ffffffaa 0%,transparent 38%,#173a5812 100%);
+}
+html[data-theme-template] .rt-action-icon{
+ position:relative!important;transform:translateZ(13px) rotateX(5deg)!important;
+ border:1px solid #ffffffc9!important;
+ box-shadow:inset 0 2px 0 #ffffffd9,inset 0 -5px 9px #173a5826,0 7px 10px #102c4938!important;
+ filter:drop-shadow(0 3px 2px #102c4933);
+ text-shadow:0 2px 0 #ffffffaa,0 4px 5px #102c4966;
+ transition:transform .14s ease,filter .14s ease!important;
+}
+html[data-theme-template] .main-nav>a,
+html[data-theme-template] .main-nav .nav-group>summary{
+ position:relative!important;transform-style:preserve-3d!important;
+ border:1px solid #ffffff7a!important;
+ box-shadow:0 4px 0 #061d35a8,0 8px 14px #061d3550,inset 0 1px 0 #ffffff70!important;
+ transition:transform .12s ease,box-shadow .12s ease,filter .12s ease!important;
+}
+html[data-theme-template] .main-nav .nav-icon{
+ transform:translateZ(9px)!important;filter:drop-shadow(0 3px 2px #0008);
+ text-shadow:0 1px 0 #ffffff70,0 3px 5px #0008;
+}
+html[data-theme-template] .rt-action-card:active{
+ transform:translateY(5px) rotateX(4deg) scale(.985)!important;
+ box-shadow:0 1px 0 #173a5860,0 3px 7px #102c4933,inset 0 1px 0 #ffffff!important;
+}
+html[data-theme-template] .main-nav>a:active,
+html[data-theme-template] .main-nav .nav-group>summary:active{
+ transform:translateY(4px) rotateX(8deg) scale(.97)!important;
+ box-shadow:0 1px 0 #061d35a8,0 2px 5px #061d3550,inset 0 1px 0 #ffffff70!important;
+ filter:brightness(1.12) saturate(1.12);
+}
+@media(hover:hover){
+ html[data-theme-template] .rt-action-card:hover{transform:translateY(-3px) rotateX(2deg)!important;filter:saturate(1.08)}
+ html[data-theme-template] .main-nav>a:hover,
+ html[data-theme-template] .main-nav .nav-group>summary:hover{transform:translateY(-2px)!important;filter:brightness(1.08)}
+}
+@media(prefers-reduced-motion:reduce){
+ html[data-theme-template] .rt-action-card,
+ html[data-theme-template] .rt-action-icon,
+ html[data-theme-template] .main-nav>a,
+ html[data-theme-template] .main-nav .nav-group>summary{transition:none!important}
+}
