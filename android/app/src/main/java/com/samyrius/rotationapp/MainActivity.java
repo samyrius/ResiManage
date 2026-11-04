@@ -12,6 +12,7 @@ import android.os.Environment;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
+import android.util.Log;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
 import android.webkit.ValueCallback;
@@ -34,6 +35,13 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import java.io.ByteArrayOutputStream;
+import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URI;
@@ -44,6 +52,9 @@ import java.util.concurrent.Executors;
 public class MainActivity extends Activity {
     private static final String HOME_URL = "http://127.0.0.1:5000/login";
     private static final int FILE_CHOOSER_REQUEST = 1201;
+    private static final String STARTUP_TAG = "ResiManageStartup";
+    private volatile boolean startupFailed = false;
+    private volatile String startupFailureSummary = "";
     private WebView webView;
     private String dataDirectory;
     private SyncBridge syncBridge;
@@ -166,35 +177,57 @@ public class MainActivity extends Activity {
         });
         setContentView(webView);
 
-        if (!Python.isStarted()) {
-            Python.start(new AndroidPlatform(this));
-        }
-        Python python = Python.getInstance();
-        new Thread(() -> {
-            try {
-                python.getModule("rotation_server").callAttr("start_server", dataDirectory);
-            } catch (Throwable error) {
-                showStartupError("The local server could not start: " + error.getMessage());
+        try {
+            Log.i(STARTUP_TAG, "Starting embedded Python; data directory=" + dataDirectory);
+            if (!Python.isStarted()) {
+                Python.start(new AndroidPlatform(this));
             }
-        }, "rotation-python-server").start();
-
-        new Thread(this::waitForServer, "rotation-server-check").start();
+            Python python = Python.getInstance();
+            Log.i(STARTUP_TAG, "Embedded Python is ready; launching rotation_server.start_server");
+            new Thread(() -> {
+                try {
+                    python.getModule("rotation_server").callAttr("start_server", dataDirectory);
+                    Log.w(STARTUP_TAG, "rotation_server.start_server returned unexpectedly");
+                } catch (Throwable error) {
+                    recordStartupFailure("Python/Flask server startup", error);
+                    showStartupError("The local server could not start: " + safeMessage(error)
+                            + "\n\nA diagnostic log was saved in the app's private files folder.");
+                }
+            }, "rotation-python-server").start();
+            new Thread(this::waitForServer, "rotation-server-check").start();
+        } catch (Throwable error) {
+            recordStartupFailure("Python runtime initialization", error);
+            showStartupError("The Python runtime could not initialize: " + safeMessage(error)
+                    + "\n\nA diagnostic log was saved in the app's private files folder.");
+        }
     }
 
     private void waitForServer() {
+        long startedAt = System.currentTimeMillis();
+        Exception lastConnectionError = null;
+        int lastHttpStatus = -1;
         for (int attempt = 0; attempt < 80; attempt++) {
+            if (startupFailed) return;
             HttpURLConnection connection = null;
             try {
                 connection = (HttpURLConnection) new URL(HOME_URL).openConnection();
                 connection.setConnectTimeout(400);
                 connection.setReadTimeout(400);
-                int status = connection.getResponseCode();
-                if (status == 200 || status == 302) {
+                lastHttpStatus = connection.getResponseCode();
+                if (lastHttpStatus == 200 || lastHttpStatus == 302) {
+                    long elapsed = System.currentTimeMillis() - startedAt;
+                    Log.i(STARTUP_TAG, "Local Flask server responded with HTTP " + lastHttpStatus
+                            + " after " + elapsed + " ms; opening WebView");
                     runOnUiThread(() -> webView.loadUrl(HOME_URL));
                     return;
                 }
-            } catch (Exception ignored) {
-                // The embedded Flask server may still be starting.
+                Log.w(STARTUP_TAG, "Startup probe " + (attempt + 1) + " returned HTTP " + lastHttpStatus);
+            } catch (Exception error) {
+                lastConnectionError = error;
+                if (attempt == 0 || attempt % 10 == 9) {
+                    Log.i(STARTUP_TAG, "Startup probe " + (attempt + 1) + " not ready: "
+                            + error.getClass().getSimpleName() + ": " + safeMessage(error));
+                }
             } finally {
                 if (connection != null) connection.disconnect();
             }
@@ -205,7 +238,39 @@ public class MainActivity extends Activity {
                 return;
             }
         }
-        showStartupError("The local server did not respond. Close and reopen the app.");
+        if (startupFailed) return;
+        String detail = "Server did not respond within the startup window. Last HTTP status="
+                + lastHttpStatus + ", last connection error="
+                + (lastConnectionError == null ? "none"
+                : lastConnectionError.getClass().getSimpleName() + ": " + safeMessage(lastConnectionError));
+        recordStartupFailure("HTTP readiness probe", new Exception(detail, lastConnectionError));
+        showStartupError("The local server did not respond. " + detail
+                + "\n\nA diagnostic log was saved in the app's private files folder.");
+    }
+
+    private String safeMessage(Throwable error) {
+        String message = error == null ? null : error.getMessage();
+        return message == null || message.trim().isEmpty()
+                ? (error == null ? "Unknown error" : error.getClass().getName()) : message;
+    }
+
+    private void recordStartupFailure(String phase, Throwable error) {
+        startupFailed = true;
+        startupFailureSummary = phase + ": " + safeMessage(error);
+        StringWriter trace = new StringWriter();
+        if (error != null) error.printStackTrace(new PrintWriter(trace));
+        String timestamp = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US)
+                .format(new Date());
+        String report = "\n=== " + timestamp + " ===\nPhase: " + phase + "\n"
+                + startupFailureSummary + "\n" + trace + "\n";
+        Log.e(STARTUP_TAG, startupFailureSummary, error);
+        try (FileOutputStream stream = openFileOutput("startup-diagnostic.txt", MODE_PRIVATE | MODE_APPEND);
+             OutputStreamWriter writer = new OutputStreamWriter(stream, "UTF-8")) {
+            writer.write(report);
+            writer.flush();
+        } catch (Exception writeError) {
+            Log.e(STARTUP_TAG, "Could not save startup diagnostic file", writeError);
+        }
     }
 
 
@@ -346,7 +411,9 @@ public class MainActivity extends Activity {
     private void showStartupError(String message) {
         runOnUiThread(() -> {
             TextView error = new TextView(this);
-            error.setText(message);
+            error.setText(message + "\n\nDiagnostic file: " + getFilesDir().getAbsolutePath()
+                    + "/startup-diagnostic.txt");
+            error.setTextIsSelectable(true);
             error.setTextColor(Color.rgb(120, 20, 20));
             error.setPadding(32, 32, 32, 32);
             setContentView(error);
