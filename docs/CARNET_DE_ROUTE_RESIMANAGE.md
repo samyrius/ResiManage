@@ -554,3 +554,14 @@ Le générateur à J-5 n'est pas encore activé : le planning d'octobre conserve
 - PR #91 reste ouverte et non fusionnée ; resimanage-2-work reste inchangée.
 - L'import des résidents ne s'exécute pas automatiquement au démarrage : un Super Admin doit sélectionner explicitement le fichier HTML depuis la page Résidents. Cela évite de modifier les données locales sans action autorisée.
 - L'archive conserve les diplômés dans dems_archive ; le statut graduated les exclut des listes actives et des affectations courantes.
+
+
+### Précision sur le positionnement des messages et résultat CI — 4 novembre 2026
+
+- Les notifications sont injectées dans le contenu des modèles HTML isolés. Quand une zone d'action est identifiée, le conteneur reçoit une classe locale et les sept thèmes neutralisent explicitement le positionnement fixe inférieur ; le message reste dans le formulaire ou la cellule concernée.
+- Validation GitHub Actions sur le commit de code 0c8a38d543e839b2c54643c3a202fbdce506005d :
+  - Workflow Android — régression Python : succès, 191 tests passés en 46,47 s.
+  - Build APK debug : en cours au moment du relevé.
+  - Smoke test sur émulateur : en attente du résultat du build.
+- Le workflow Python autonome sur le commit précédent ada18b19bb1ca4263de951a22f82bb75ede9c308 a également réussi avec 191 tests passés en 72,66 s. Le commit 0c8a38d ajoute ensuite le correctif de positionnement local dans les sept feuilles CSS et la classe JS correspondante ; la régression Android sur ce dernier commit a réussi.
+- PR #91 reste ouverte et non fusionnée ; aucune modification de la branche officielle.
