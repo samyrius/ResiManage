@@ -510,3 +510,47 @@ Le générateur à J-5 n'est pas encore activé : le planning d'octobre conserve
 ### Résultat des tests — commit 24201b8
 - Workflow Python application checks : **succès, 186 tests passés** (run 41909792030).
 - Workflow Android : régression Python réussie ; build debug APK : **succès**, artefact `resimanage2-debug-apk` (run 41909792328, artefact 13361783889). Le smoke test sur émulateur est encore en cours ; le contrôle visuel sur téléphone réel reste à faire.
+
+
+## Catégories des résidents, import de la liste nominative et navigation des périodes — 4 novembre 2026
+
+### Modifications engagées sur la branche candidate
+
+- Éditeur des dates des périodes : chaque formulaire dispose désormais d'une ancre stable par période. Après sauvegarde, le navigateur revient sur la même carte de période, au lieu de remonter en haut du tableau.
+- Messages d'action : le conteneur de notification est déplacé au chargement vers la zone concernée lorsque l'action fournit une ancre ; les formulaires de la page Affectations et les actions de gestion des résidents ont également un ciblage local.
+- Sélecteur d'année depuis la page Affectations : l'année choisie ouvre directement le tableau général de répartition (/rotation-board) afin de consulter l'historique ou préparer l'année sélectionnée.
+- Listes des résidents : trois catégories distinctes sont affichées, y compris lorsqu'une catégorie ne contient encore aucun résident :
+  1. CHU Nedir Mohamed — Anesthésie-Réanimation (type local).
+  2. CHU Nedir Mohamed — Médecine d'urgence (type emergency).
+  3. Établissements externes (type external), avec établissement d'origine.
+- Super Admin : action dédiée pour déplacer un dossier entre catégories. Le changement est inscrit dans l'audit ; l'identifiant du résident et son historique de stages sont conservés. Un déplacement vers un établissement externe exige le nom de l'hôpital et des dates de présence valides.
+- Import des listes : un formulaire réservé au Super Admin accepte le fichier HTML nominatif 2025–2026. Il lit les quatre promotions actives et les notes « médecine d'urgence », puis archive la liste D.E.M.S. L'import vérifie les effectifs attendus (26, 12, 24, 11 et 18) et évite de recréer un diplômé déjà archivé.
+- Les 18 dossiers D.E.M.S sont créés ou rapprochés des dossiers existants, marqués comme diplômés / réussite DEMS et insérés dans dems_archive avec instantané de profil. Le fichier source ne fournit pas la date de réussite au DEMS : le champ de date reste vide et l'interface affiche explicitement que la date n'est pas renseignée. Aucun historique de stage antérieur n'est fabriqué.
+- Les cinq mentions « médecine d'urgence » repérées dans les promotions de 1re et 2e année sont classées dans la catégorie Urgences ; les autres résidents des quatre listes sont classés en Anesthésie-Réanimation.
+- Les établissements externes proposés restent CAC DBK, EHS Cardio DBK et un champ libre pour préciser un autre hôpital.
+
+### Données du document source vérifiées
+
+- 1re année : 26 résidents.
+- 2e année : 12 résidents.
+- 3e année : 24 résidents.
+- 4e année : 11 résidents.
+- Liste D.E.M.S : 18 diplômés.
+- Total des quatre promotions actives : 73 résidents.
+- La liste contient cinq observations « médecine d'urgence » : trois en 1re année et deux en 2e année.
+
+### Tests ajoutés / mis à jour
+
+- Transfert de catégorie par Super Admin avec conservation de l'historique et trace d'audit.
+- Import HTML : création des catégories actives, classification Urgences, archivage DEMS, absence de date inventée et idempotence.
+- Présence des trois catégories et du formulaire d'import dans la page Résidents.
+- Sélecteur d'année de la page Affectations dirigé vers le tableau général.
+- Ancre de retour vers la carte de période après enregistrement des dates.
+- Les résultats CI sont à contrôler sur le dernier commit après cette mise à jour ; aucune réussite n'est présumée avant la fin des workflows.
+
+### Gouvernance et limites
+
+- Changements réalisés uniquement sur integration/resimanage-refonte-themes-2026-11-03.
+- PR #91 reste ouverte et non fusionnée ; resimanage-2-work reste inchangée.
+- L'import des résidents ne s'exécute pas automatiquement au démarrage : un Super Admin doit sélectionner explicitement le fichier HTML depuis la page Résidents. Cela évite de modifier les données locales sans action autorisée.
+- L'archive conserve les diplômés dans dems_archive ; le statut graduated les exclut des listes actives et des affectations courantes.
