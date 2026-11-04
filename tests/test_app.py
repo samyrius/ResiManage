@@ -4682,6 +4682,9 @@ const F=[];
 def test_resident_page_exposes_three_hospital_categories_and_html_import(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES('Category','Visible',1,'active')")
+        conn.commit()
     response = client.get("/residents")
     assert response.status_code == 200
     assert "CHU Nedir Mohamed — Anesthésie-Réanimation".encode() in response.data
