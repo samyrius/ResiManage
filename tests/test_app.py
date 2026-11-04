@@ -4483,7 +4483,7 @@ def test_period_dates_save_preserves_selected_year_and_values_on_rotation_board(
         },
     )
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/rotation-board?year=2026-2027")
+    assert response.headers["Location"].endswith("/rotation-board?year=2026-2027#period-date-" + str(period_id))
     with rotation_app.db() as conn:
         saved = conn.execute(
             "SELECT start_date,end_date FROM periods WHERE id=?", (period_id,)
@@ -4591,3 +4591,120 @@ def test_period_date_editor_uses_strong_contrast_for_every_theme(tmp_path, monke
     assert '--period-border:#7040b0' in theme_css
     assert '--period-border:#b76512' in theme_css
     assert '--period-border:#21834c' in theme_css
+
+
+def test_resident_category_transfer_is_super_admin_only_and_preserves_history(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        terrain_id = conn.execute("SELECT id FROM terrains LIMIT 1").fetchone()["id"]
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status,resident_type) VALUES(?,?,?,?,?)",
+            ("Category", "Transfer", 2, "active", "local"),
+        )
+        rid = conn.execute(
+            "SELECT id FROM residents WHERE surname='Category' AND firstname='Transfer'"
+        ).fetchone()["id"]
+        conn.execute(
+            "INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+            (rid, terrain_id, "2025-2026", "Période 1", "2025-03-01"),
+        )
+        conn.commit()
+    response = client.post("/residents", data={
+        "action": "move_category", "rid": str(rid), "resident_type": "external",
+        "origin_hospital": "CAC DBK", "external_start_date": "2026-11-01",
+        "external_end_date": "2027-01-30",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        resident = conn.execute(
+            "SELECT resident_type,origin_hospital,external_start_date,external_end_date FROM residents WHERE id=?",
+            (rid,),
+        ).fetchone()
+        assert tuple(resident) == ("external", "CAC DBK", "2026-11-01", "2027-01-30")
+        assert conn.execute("SELECT COUNT(*) FROM history WHERE resident_id=?", (rid,)).fetchone()[0] == 1
+        assert conn.execute(
+            "SELECT 1 FROM audit WHERE action='resident.category_changed' AND details LIKE ?",
+            (f"%resident_id={rid}%",),
+        ).fetchone()
+
+
+def test_resident_list_html_import_creates_active_categories_and_archives_dems(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    html = '''<!doctype html><script>
+const R={
+"1ère année":["TESTSURNAME ALPHA|0550-00-00-01|","EMERGENCY BETA|0550-00-00-02|médecine d’urgence"],
+"2ème année":["SECOND GAMMA|0550-00-00-03|"],
+"3ème année":["THIRD DELTA|0550-00-00-04|"],
+"4ème année":["FOURTH EPSILON|0550-00-00-05|"],
+"D.E.M.S":["GRADUATE ZETA|0550-00-00-06|"]};
+const F=[];
+</script>'''
+    response = client.post("/residents", data={
+        "action": "import_resident_list",
+        "resident_list": (io.BytesIO(html.encode("utf-8")), "residents.html"),
+    }, content_type="multipart/form-data", follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        active = conn.execute(
+            "SELECT year,resident_type,status FROM residents WHERE surname='TESTSURNAME' AND firstname='ALPHA'"
+        ).fetchone()
+        emergency = conn.execute(
+            "SELECT year,resident_type,status FROM residents WHERE surname='EMERGENCY' AND firstname='BETA'"
+        ).fetchone()
+        graduate = conn.execute(
+            "SELECT year,status,dems_status FROM residents WHERE surname='GRADUATE' AND firstname='ZETA'"
+        ).fetchone()
+        archive = conn.execute(
+            "SELECT success_date,history_json FROM dems_archive WHERE resident_id=(SELECT id FROM residents WHERE surname='GRADUATE' AND firstname='ZETA')"
+        ).fetchone()
+        assert tuple(active) == (1, "local", "active")
+        assert tuple(emergency) == (1, "emergency", "active")
+        assert tuple(graduate) == (4, "graduated", "success")
+        assert archive is not None and archive["success_date"] == ""
+        assert "non renseignée dans la source" in archive["history_json"]
+    # Re-import is idempotent for the DEMS archive and does not duplicate residents.
+    again = client.post("/residents", data={
+        "action": "import_resident_list",
+        "resident_list": (io.BytesIO(html.encode("utf-8")), "residents.html"),
+    }, content_type="multipart/form-data", follow_redirects=True)
+    assert again.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM residents WHERE surname='GRADUATE' AND firstname='ZETA'"
+        ).fetchone()[0] == 1
+        assert conn.execute(
+            "SELECT COUNT(*) FROM dems_archive WHERE resident_id=(SELECT id FROM residents WHERE surname='GRADUATE' AND firstname='ZETA')"
+        ).fetchone()[0] == 1
+
+
+def test_resident_page_exposes_three_hospital_categories_and_html_import(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.get("/residents")
+    assert response.status_code == 200
+    assert "CHU Nedir Mohamed — Anesthésie-Réanimation".encode() in response.data
+    assert "CHU Nedir Mohamed — Médecine d’urgence".encode() in response.data
+    assert "Établissements externes".encode() in response.data
+    assert b'name="resident_list"' in response.data
+    assert b'name="action" value="move_category"' in response.data
+
+
+def test_assignment_year_selector_opens_rotation_board_for_selected_year(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.get("/assign")
+    assert response.status_code == 200
+    assert b'name="next" value="/rotation-board"' in response.data
+
+
+def test_period_editor_forms_have_stable_scroll_targets_and_local_flash_relocation(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.get("/rotation-board")
+    assert response.status_code == 200
+    assert b'id="period-date-editor"' in response.data
+    assert b'id="period-date-{{p.id}}"' in response.data
+    assert b'rt-flash-messages' in response.data
+    assert b'rt-action-context' in response.data
