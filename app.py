@@ -315,8 +315,9 @@ def purge_expired_trash(now=None):
     snapshot = json.loads(item["snapshot_json"] or "{}")
    except (ValueError, TypeError):
     snapshot = {}
-   photo_path = (snapshot.get("resident") or {}).get("photo_path", "")
-   if photo_path:
+   resident_snapshot = snapshot.get("resident") if isinstance(snapshot, dict) else None
+   photo_path = resident_snapshot.get("photo_path", "") if isinstance(resident_snapshot, dict) else ""
+   if isinstance(photo_path, str) and photo_path:
     photo_name = os.path.basename(photo_path)
     if photo_name.startswith("resident_"):
      photos_to_remove.append(
