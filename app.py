@@ -1361,9 +1361,9 @@ def residents():
      groups={}
      for match in re.finditer(r'"([^"]+)"\s*:\s*\[(.*?)\]',source.group(1),re.S):
       groups[match.group(1)]=re.findall(r'"((?:\\.|[^"\\])*)"',match.group(2))
-     expected_counts={"1ère année":26,"2ème année":12,"3ème année":24,"4ème année":11,"D.E.M.S":18}
-     if any(len(groups.get(name,[]))!=count for name,count in expected_counts.items()):
-      raise ValueError("Les cinq listes ne correspondent pas à la source 2025-2026 attendue (26, 12, 24, 11 et 18 dossiers).")
+     required_groups=("1ère année","2ème année","3ème année","4ème année","D.E.M.S")
+     if any(not groups.get(name) for name in required_groups):
+      raise ValueError("Le fichier doit contenir les quatre promotions actives et la liste D.E.M.S.")
      year_map={"1ère année":1,"2ème année":2,"3ème année":3,"4ème année":4}
      added=updated=archived=0
      for group_name,year_value in year_map.items():
