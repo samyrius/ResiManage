@@ -374,3 +374,13 @@ Le lien conditionnel « page précédente » a été ajouté directement dans ch
 - **Tests de régression ajoutés :** présence des clés de groupes, pictogrammes colorés, persistance des catégories, empilement CSS et masquage des libellés dans chaque thème ; absence du lien Retour sur l'écran de connexion.
 - **Validation :** modifications appliquées sur la branche candidate. Les workflows Python et Android doivent encore être exécutés sur le HEAD résultant. Aucun test sur téléphone physique n'est encore confirmé.
 - **Gouvernance :** PR #91 reste ouverte et non fusionnée ; la branche officielle `resimanage-2-work` n'a pas été modifiée.
+
+
+### État CI après correctif de navigation — 4 novembre 2026
+
+- **HEAD :** `f6778cb8bf37a0eb125c294a39ff38983b72977b`.
+- **Tests Python :** workflow `41837659968` terminé avec succès ; étape `Run tests` réussie.
+- **Régression Python du workflow Android :** dans le workflow `41837660235`, job `python-regression` terminé avec succès.
+- **Compilation Android :** job `build-debug-apk` encore en cours au dernier contrôle ; l'installation du SDK Android était en cours. Aucun artefact APK n'était encore disponible à ce contrôle.
+- **Émulateur :** en attente de la réussite du job de compilation.
+- **Conclusion provisoire :** correctif couvert par les tests Python réussis ; ne pas annoncer une APK disponible ni un smoke test Android avant la fin du workflow.
