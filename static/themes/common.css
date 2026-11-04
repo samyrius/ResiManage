@@ -298,3 +298,24 @@ html[data-interior-theme] .rt-icon-dashboard .rt-action-icon svg{
   .rt-footer{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))!important}
 }
 @media(min-width:681px){.rt-app-shell{padding-bottom:16px}}
+
+
+/* Keep the previous-page control visible above every theme and mobile layout. */
+.rt-back-link{
+  position:fixed!important;display:grid!important;place-items:center!important;
+  top:calc(8px + env(safe-area-inset-top,0px))!important;left:10px!important;right:auto!important;
+  z-index:10000!important;width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;
+  margin:0!important;padding:0!important;visibility:visible!important;opacity:1!important;
+  pointer-events:auto!important;clip:auto!important;clip-path:none!important;
+  color:#fff!important;font-size:30px!important;font-weight:800!important;line-height:1!important;
+  text-decoration:none!important;text-align:center!important;border-radius:13px!important;
+  background:linear-gradient(145deg,#17618a,#171c54)!important;
+  border:1px solid #56d9f4!important;
+  box-shadow:inset 0 1px #ffffff70,0 4px 0 #061126,0 8px 16px #0008!important;
+  transform:none!important;
+}
+html[dir="rtl"] .rt-back-link{left:auto!important;right:10px!important}
+.rt-back-link:focus-visible{outline:3px solid #fff!important;outline-offset:3px!important}
+@media(max-width:680px){
+  .rt-back-link{top:calc(8px + env(safe-area-inset-top,0px))!important;width:44px!important;height:44px!important}
+}
