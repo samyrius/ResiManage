@@ -152,11 +152,12 @@ def test_csv_export_is_available_and_keeps_source_labels(tmp_path, monkeypatch):
     assert b"SAID AISSA" in response.data
 
 
-def test_each_guard_day_has_its_own_multi_resident_selector_and_dems_year_is_disabled(tmp_path, monkeypatch):
+def test_each_guard_day_has_its_own_multi_resident_selector_and_only_dems_prep_is_disabled(tmp_path, monkeypatch):
     client = _client(tmp_path, monkeypatch)
     cdb = _db(tmp_path)
     cdb.execute("INSERT INTO residents(surname,firstname,year,status,resident_type) VALUES('PROMO1','ONE',1,'active','local')")
     cdb.execute("INSERT INTO residents(surname,firstname,year,status,resident_type) VALUES('PROMO4','FOUR',4,'active','local')")
+    cdb.execute("INSERT INTO residents(surname,firstname,year,status,resident_type,dems_status) VALUES('OLD4','PREPARING',4,'active','local','preparing')")
     cdb.commit()
     cdb.close()
 
@@ -164,7 +165,8 @@ def test_each_guard_day_has_its_own_multi_resident_selector_and_dems_year_is_dis
     assert response.status_code == 200
     assert response.data.count(b'name="resident_ids" multiple') == 60
     assert b'PROMO1 ONE' in response.data
-    assert b'disabled>PROMO4 FOUR' in response.data
+    assert b'PROMO4 FOUR' in response.data
+    assert b'disabled>OLD4 PREPARING' in response.data
     assert "Ajouter la sélection".encode() in response.data
 
 
@@ -282,3 +284,29 @@ def test_guard_month_pdf_export_contains_month_and_active_assignments(tmp_path, 
     assert response.status_code == 200
     assert response.mimetype == "application/pdf"
     assert response.data.startswith(b"%PDF")
+
+
+
+def test_new_fourth_year_can_be_assigned_but_dems_preparation_resident_is_rejected(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    cdb = _db(tmp_path)
+    cdb.execute("INSERT INTO residents(surname,firstname,year,status,resident_type) VALUES('NEW4','ELIGIBLE',4,'active','local')")
+    cdb.execute("INSERT INTO residents(surname,firstname,year,status,resident_type,dems_status) VALUES('OLD4','DEMS',4,'active','local','preparing')")
+    ids = {row[0]: row[1] for row in cdb.execute("SELECT surname,id FROM residents WHERE surname IN ('NEW4','OLD4')")}
+    cdb.commit()
+    cdb.close()
+
+    response = client.post("/guards?month=2026-11", data={
+        "month": "2026-11", "action": "add", "roster_date": "2026-11-04",
+        "sector": "UMC", "hours": "16H-08H", "resident_id": str(ids["NEW4"]),
+    })
+    assert response.status_code == 302
+    response = client.post("/guards?month=2026-11", data={
+        "month": "2026-11", "action": "add", "roster_date": "2026-11-05",
+        "sector": "UMC", "hours": "16H-08H", "resident_id": str(ids["OLD4"]),
+    })
+    assert response.status_code == 302
+    cdb = _db(tmp_path)
+    rows = cdb.execute("SELECT resident_id FROM guard_assignments WHERE active=1").fetchall()
+    assert [row[0] for row in rows] == [ids["NEW4"]]
+    cdb.close()
