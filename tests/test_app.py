@@ -75,6 +75,10 @@ def test_internal_navigation_is_grouped_responsive_and_marks_current_page(tmp_pa
     theme_css = read_common_theme_css()
     assert 'grid-template-columns:260px minmax(0,1fr)' in theme_css
     assert '@media(max-width:680px)' in theme_css
+    assert 'position:fixed!important;left:8px!important;right:8px!important' in theme_css
+    assert 'bottom:calc(8px + env(safe-area-inset-bottom,0px))!important' in theme_css
+    assert 'grid-template-columns:repeat(5,minmax(0,1fr))!important' in theme_css
+    assert 'position:absolute!important;left:0!important;right:0!important;bottom:calc(100% + 9px)!important' in theme_css
     residents = client.get("/residents")
     assert residents.status_code == 200
     assert b'href="/residents" class="is-active"' in residents.data
