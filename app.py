@@ -2,6 +2,7 @@
 from flask import Flask, request, redirect, session, render_template, render_template_string, flash, send_file, send_from_directory, jsonify
 import sqlite3, os, sys, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess, secrets, smtplib, time, zipfile
 import warnings
+import calendar
 from PIL import Image, ImageOps
 from datetime import datetime, date
 from werkzeug.utils import secure_filename
@@ -285,32 +286,69 @@ def init():
   c.execute("INSERT OR IGNORE INTO periods(year_label,name) VALUES(?,?)",(y,n))
  install_sync_change_triggers(c)
  c.commit(); c.close()
+def purge_expired_trash(now=None):
+ """Purge records after six calendar months and remove their resident photos."""
+ now = now or datetime.now()
+ c = db()
+ photos_to_remove = []
+ purged = 0
+ try:
+  table_exists = c.execute(
+   "SELECT 1 FROM sqlite_master WHERE type='table' AND name='trash_items'"
+  ).fetchone()
+  if not table_exists:
+   return 0
+  for item in c.execute(
+   "SELECT id,deleted_at,snapshot_json FROM trash_items"
+  ).fetchall():
+   try:
+    deleted = datetime.fromisoformat(item["deleted_at"])
+    month = deleted.month + 6
+    year = deleted.year + (month - 1) // 12
+    month = (month - 1) % 12 + 1
+    day = min(deleted.day, calendar.monthrange(year, month)[1])
+    if now < deleted.replace(year=year, month=month, day=day):
+     continue
+   except (ValueError, TypeError):
+    continue
+   try:
+    snapshot = json.loads(item["snapshot_json"] or "{}")
+   except (ValueError, TypeError):
+    snapshot = {}
+   photo_path = (snapshot.get("resident") or {}).get("photo_path", "")
+   if photo_path:
+    photo_name = os.path.basename(photo_path)
+    if photo_name.startswith("resident_"):
+     photos_to_remove.append(
+      os.path.join(os.path.dirname(os.path.abspath(DB)), "resident_photos", photo_name)
+     )
+   c.execute("DELETE FROM trash_items WHERE id=?", (item["id"],))
+   audit_event(c, "trash.expired", f"trash_id={item['id']}; purged_after_six_calendar_months")
+   purged += 1
+  c.commit()
+ finally:
+  c.close()
+ # Remove files only after the database transaction commits.
+ for photo_file in photos_to_remove:
+  if os.path.isfile(photo_file):
+   try:
+    os.remove(photo_file)
+   except OSError:
+    app.logger.warning("Could not purge expired resident photo: %s", photo_file)
+ return purged
+
 @app.before_request
 def boot():
  if not getattr(app,"_ready",False): init(); app._ready=True
- # Enforce six-calendar-month trash retention automatically, not only when a
- # Super Admin opens the trash page. Run once per process-local calendar day.
- today_key=date.today().isoformat()
- if getattr(app,"_trash_cleanup_date","") != today_key:
-  c=db()
+ # Run the single retention cleanup at most once per process-local calendar day.
+ today_key = date.today().isoformat()
+ if getattr(app, "_trash_cleanup_date", "") != today_key:
   try:
-   now=datetime.now()
-   for item in c.execute("SELECT id,deleted_at FROM trash_items").fetchall():
-    try:
-     deleted=datetime.fromisoformat(item["deleted_at"])
-     month=deleted.month+6
-     year=deleted.year+(month-1)//12
-     month=(month-1)%12+1
-     day=min(deleted.day,__import__("calendar").monthrange(year,month)[1])
-     if now>=deleted.replace(year=year,month=month,day=day):
-      c.execute("DELETE FROM trash_items WHERE id=?",(item["id"],))
-      audit_event(c,"trash.expired",f"trash_id={item['id']}; purged_after_six_calendar_months")
-    except (ValueError,TypeError):
-     continue
-   c.commit()
-   app._trash_cleanup_date=today_key
-  finally:
-   c.close()
+   purge_expired_trash()
+  except sqlite3.Error:
+   app.logger.exception("Could not purge expired trash")
+  else:
+   app._trash_cleanup_date = today_key
 
 @app.before_request
 def verify_csrf():
@@ -1033,34 +1071,6 @@ def super_guard():
  if denied: return denied
  if session.get("role")!="super_admin": return ("Forbidden — Super Admin only",403)
 
-@app.before_request
-def purge_expired_trash_automatically():
- # Expired trash is purged on normal app traffic, not only when an admin opens /trash.
- try:
-  c=db()
-  if not c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='trash_items'").fetchone():
-   c.close(); return
-  for item in c.execute("SELECT id,deleted_at,snapshot_json FROM trash_items").fetchall():
-   try:
-    deleted=datetime.fromisoformat(item["deleted_at"])
-    month=deleted.month+6; year=deleted.year+(month-1)//12; month=(month-1)%12+1
-    day=min(deleted.day,__import__("calendar").monthrange(year,month)[1])
-    if datetime.now()<deleted.replace(year=year,month=month,day=day): continue
-    snapshot=json.loads(item["snapshot_json"] or "{}")
-    photo_path=(snapshot.get("resident") or {}).get("photo_path","")
-    if photo_path:
-     photo_name=os.path.basename(photo_path)
-     photo_file=os.path.join(os.path.dirname(os.path.abspath(DB)),"resident_photos",photo_name)
-     if photo_name.startswith("resident_") and os.path.isfile(photo_file):
-      try: os.remove(photo_file)
-      except OSError: app.logger.warning("Could not purge expired resident photo: %s",photo_file)
-    c.execute("DELETE FROM trash_items WHERE id=?",(item["id"],))
-    audit_event(c,"trash.expired",f"trash_id={item['id']}; purged_after_six_calendar_months")
-   except (ValueError,TypeError,KeyError): continue
-  c.commit(); c.close()
- except sqlite3.Error:
-  try: c.close()
-  except Exception: pass
 @app.get("/lang/<lang>")
 def lang(lang):
  if lang in LANGS: session["lang"]=lang
@@ -3177,17 +3187,7 @@ def backup():
 def trash():
  if guard(): return redirect("/login")
  if session.get("role")!="super_admin": return ("Forbidden — Super Admin only",403)
- c=db(); now=datetime.now()
- for item in c.execute("SELECT id,deleted_at FROM trash_items").fetchall():
-  try:
-   deleted=datetime.fromisoformat(item["deleted_at"])
-   month=deleted.month+6; year=deleted.year+(month-1)//12; month=(month-1)%12+1
-   day=min(deleted.day,__import__("calendar").monthrange(year,month)[1])
-   if now>=deleted.replace(year=year,month=month,day=day):
-    c.execute("DELETE FROM trash_items WHERE id=?",(item["id"],))
-    audit_event(c,"trash.expired",f"trash_id={item['id']}; purged_after_six_calendar_months")
-  except (ValueError,TypeError): continue
- c.commit()
+ c=db()
  if request.method=="POST":
   action=request.form.get("action",""); tid=int(request.form.get("trash_id","0"))
   item=c.execute("SELECT * FROM trash_items WHERE id=?",(tid,)).fetchone()
