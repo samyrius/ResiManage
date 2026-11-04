@@ -292,3 +292,24 @@ L'utilisateur précise que **toutes les observations, demandes de correction, co
 ### Règle de suivi
 
 Pour chaque prochaine observation : consigner le symptôme rapporté, le diagnostic et son niveau de certitude, les fichiers touchés, la correction, les tests ajoutés/exécutés, les commits et le statut CI. Distinguer clairement « appliqué », « testé », « validé CI » et « confirmé par l'utilisateur sur appareil ». Ne jamais transformer un correctif en validation acquise sans preuve.
+
+
+## Séparation autonome des feuilles CSS des thèmes — 4 novembre 2026
+
+### Demande
+Après la séparation des sept pages HTML, l'utilisateur demande de terminer la séparation des CSS afin que chaque thème dispose de sa propre feuille de styles et puisse évoluer indépendamment.
+
+### État initial constaté
+Les sept templates HTML existaient déjà et chargeaient chacun un fichier CSS dédié. Cependant, les feuilles thématiques importaient `static/themes/common.css`. Les règles de structure, composants, formulaires, tableaux, navigation, responsive et correctifs communs restaient mutualisées : la séparation CSS était nominale, pas autonome.
+
+### Changement appliqué
+Chaque feuille `static/themes/<theme>.css` embarque désormais directement la base CSS précédemment partagée, puis conserve sa propre couche de styles et de layout. Les sept feuilles ne chargent plus `common.css` par import. Les dispositions thématiques existantes sont conservées : Crystal 3D (base), Aurore boréale (grille), Émeraude (rail latéral), Futuriste (bandeau horizontal), Luxe élégant (navigation à droite), Naturel moderne (grille aérée), Rubis (ruban horizontal). Les correctifs de barre inférieure mobile fixe et de flèche de retour sont présents dans chaque CSS autonome. `common.css` est conservé comme référence, mais n'est plus une dépendance au chargement des thèmes.
+
+### Tests
+Le test de navigation existant lit désormais le CSS autonome Crystal 3D. Un test paramétré vérifie les sept thèmes : absence d'import, présence des styles communs essentiels, cohérence template/CSS et présence des sélecteurs spécifiques aux six variantes. Les tests n'ont pas encore été exécutés ; le résultat CI sera ajouté après les workflows.
+
+### Fichiers concernés
+Les sept fichiers `static/themes/*.css` et `tests/test_app.py`.
+
+### Validation restante
+Les tests statiques ne remplacent pas le contrôle visuel des sept thèmes sur navigateur et Android : menus, défilement, navigation fixe, formulaires et tableaux restent à vérifier. Aucune fusion de PR n'est autorisée par ce changement.
