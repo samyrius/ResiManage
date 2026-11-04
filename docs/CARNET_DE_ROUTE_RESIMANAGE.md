@@ -435,3 +435,30 @@ Le catalogue de capacités disponibles comprend un workflow de modélisation Ble
 - Tests locaux non exécutés via le connecteur GitHub ; le workflow CI doit être contrôlé sur le HEAD final.
 - Vérification visuelle sur téléphone physique encore requise, notamment pour la lisibilité des cinq libellés sur différentes largeurs d'écran et le placement des messages après enregistrement.
 - PR #91 demeure ouverte et non fusionnée ; resimanage-2-work n'a pas été modifiée.
+
+
+## Correction des raccourcis du tableau de bord et des messages flash — 4 novembre 2026
+
+### Symptômes rapportés
+- Un appui sur une icône du tableau de bord donnait l'impression d'ouvrir la catégorie correspondante dans le sous-menu, imposant un second appui.
+- Les messages flash étaient jaunes et positionnés en haut du document, donc invisibles tant que l'utilisateur restait plus bas dans la page.
+
+### Cause identifiée
+- Les éléments de navigation `<details>` étaient ouverts automatiquement côté serveur dès que l'URL de destination appartenait à leur liste de routes. Même quand un raccourci du tableau de bord naviguait correctement vers `/residents`, `/assign`, `/rotation-board`, etc., le nouveau rendu rouvrait le groupe associé et son panneau pouvait recouvrir la page de destination. Le script restaurait aussi le dernier groupe de navigation mémorisé.
+- Le style flash précédent imposait `position:fixed` en haut de l'écran avec un fond jaune hérité de `.msg`.
+
+### Correctifs
+- Sept templates : suppression de l'ouverture automatique des groupes à partir de `request.path`. L'ouverture est maintenant pilotée par l'action de navigation utilisateur.
+- Sept templates : au clic sur une tuile `.rt-icon-dashboard .rt-action-card`, suppression de la clé de menu mémorisée, fermeture de tous les groupes et remise à zéro de la restauration de défilement. Le lien natif conserve sa destination et conduit directement à la page cible en un seul appui.
+- Sept feuilles CSS : remplacement du flash jaune supérieur par un message rouge contrasté, blanc sur rouge, visible en bas de la fenêtre courante (au-dessus de la barre fixe sur mobile), sans demander de remonter le document.
+- `app.py` : ajout de `role="alert"` et `aria-live="assertive"` aux messages flash pour les technologies d'assistance.
+- `tests/test_app.py` : assertions ajoutées pour l'absence d'ouverture automatique par URL, la fermeture du sous-menu mémorisé au clic sur un raccourci, et le style rouge visible dans le viewport.
+
+### Limite à distinguer
+Les messages flash sont produits après redirection et sont communs à de nombreux traitements. Ils sont maintenant affichés immédiatement dans la fenêtre visible, près du bas de l'écran, au lieu du haut du document. Les erreurs propres à un champ de formulaire qui doivent apparaître exactement à côté de ce champ nécessitent en plus une validation locale et un rendu d'erreur spécifique à ce formulaire ; ce chantier transversal n'a pas été entrepris ici afin de ne pas modifier le comportement de centaines de formulaires à l'aveugle.
+
+### Validation
+- Correctifs appliqués sur `integration/resimanage-refonte-themes-2026-11-03` uniquement.
+- Tests CI à lancer/contrôler sur le dernier commit ; aucune réussite de test n'est présumée à ce stade.
+- Vérification sur appareil réel requise pour confirmer l'absence de panneau de navigation superposé après les huit raccourcis et la visibilité des messages sur différentes tailles d'écran.
+- PR #91 reste ouverte et non fusionnée ; aucune modification de `resimanage-2-work`.
