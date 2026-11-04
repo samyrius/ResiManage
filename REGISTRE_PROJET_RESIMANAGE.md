@@ -771,3 +771,20 @@ Risques / limites :
 L'audit statique du dépôt, de l'inventaire des branches, de la candidate, des routes, du schéma, de la synchronisation, des thèmes, du module Gardes et de la chaîne Android est consigné. Il confirme que la candidate rassemble un volume important de travail utile, mais qu'elle n'est pas prête à être fusionnée : Android reste bloquant, les thèmes ne sont pas encore de véritables layouts distincts, le roulement automatique des gardes manque, la synchronisation est partielle et la branche officielle n'est pas protégée.
 
 La revue exhaustive ligne par ligne de chaque commit/fichier de toutes les branches historiques reste un lot distinct avant nettoyage ou cherry-pick. Cette limite est explicite afin de ne pas présenter une comparaison Git comme une lecture intégrale de 105 historiques.
+
+
+## Entrée 34 — 4 novembre 2026 : décision de revue exhaustive des commits de toutes les branches
+
+L'utilisateur demande l'enregistrement de l'ensemble de cette discussion et souhaite une revue de tous les commits des branches de ResiManage, pour récupérer les améliorations utiles sans perdre de fonctionnalités ni réintroduire de régressions.
+
+**Estimation indicative : 3 à 7 jours de travail concentré**, à affiner après comptage des commits uniques et mesure du volume réel :
+- 2 à 4 h pour inventaire et déduplication ;
+- 1 à 3 jours pour examiner les modifications uniques et les diffs ;
+- 1 à 2 jours pour comparer les branches divergentes ;
+- 1 à 2 jours pour vérifier les changements importants et leurs tests.
+
+**Méthode :** inventorier branches et SHAs ; dédupliquer les commits communs ; examiner les diffs uniques fichier par fichier ; comparer à `resimanage-2-work` et à la candidate ; classer chaque changement (à conserver, déjà intégré, obsolète, remplacé, à corriger, risqué ou soumis à décision métier) ; vérifier dépendances, migrations et tests ; produire un rapport traçable par branche/SHA/fichier/décision/preuve ; porter uniquement les changements utiles sur une branche candidate et tester.
+
+**Garde-fous :** aucune fusion de la PR #91 sans accord explicite ; aucune modification de la branche officielle pendant la revue ; aucune suppression de branche ni réécriture d'historique ; aucun cherry-pick massif. Les 105 branches ont été inventoriées/comparées, mais la lecture exhaustive de tous leurs commits et fichiers n'est pas encore réalisée.
+
+**Prochaine étape :** compter précisément les commits uniques parmi les 105 branches, puis ordonner la revue par domaine fonctionnel et niveau de risque. L'estimation 3–7 jours est préliminaire, non une durée garantie.
