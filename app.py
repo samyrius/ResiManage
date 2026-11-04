@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from flask import Flask, request, redirect, session, render_template, render_template_string, flash, send_file, send_from_directory, jsonify
+from flask import Flask, request, redirect, session, render_template, render_template_string, flash, send_file, send_from_directory, jsonify, has_request_context
 import sqlite3, os, sys, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess, secrets, smtplib, time, zipfile
 import warnings
 import calendar
@@ -131,9 +131,11 @@ def ensure_column(c, table, column, spec):
  existing={row[1] for row in c.execute("PRAGMA table_info("+table+")")}
  if column not in existing:
   c.execute("ALTER TABLE "+table+" ADD COLUMN "+column+" "+spec)
-def audit_event(c, action, details):
+def audit_event(c, action, details, actor=None):
+ if actor is None:
+  actor = session.get("user", "system") if has_request_context() else "system"
  c.execute("INSERT INTO audit(action,details,actor) VALUES(?,?,?)",
-           (action,str(details)[:1000],str(session.get("user","system"))))
+           (action,str(details)[:1000],str(actor)))
 
 
 # Transactional change journal groundwork for future authenticated device sync.
