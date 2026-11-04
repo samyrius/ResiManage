@@ -211,7 +211,7 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
                             AND NOT EXISTS(SELECT 1 FROM dems_archive d WHERE d.resident_id=r.id)
                         """, (resident_id,)).fetchone()
                         if not resident:
-                            raise ValueError("Seuls les résidents actifs des promotions 1 à 3 peuvent être sélectionnés pour les gardes actuelles.")
+                            raise ValueError("Seuls les résidents locaux actifs des années 1 à 4 non dispensés pour préparation DEMS peuvent être sélectionnés.")
                         duplicate = c.execute("""
                           SELECT 1 FROM guard_assignments
                           WHERE active=1 AND roster_date=? AND sector=? AND resident_id=?
