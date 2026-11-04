@@ -354,3 +354,23 @@ Le lien conditionnel « page précédente » a été ajouté directement dans ch
 - **Lien du workflow et de ses artefacts :** https://github.com/samyrius/ResiManage/actions/runs/41834000425
 - **Conclusion :** la compilation est validée et le smoke test sur émulateur est réussi pour ce commit. Cela ne remplace pas encore la vérification sur le téléphone physique de l'utilisateur, en particulier du défilement dans plusieurs écrans et de la barre d'icônes fixe.
 - **Gouvernance :** PR #91 reste ouverte et non fusionnée ; aucune modification de `resimanage-2-work`.
+
+
+### Navigation mobile : icônes seules, sous-menus empilés et retour conditionnel — 4 novembre 2026
+
+- **Observations rapportées après installation :** les libellés textuels réapparaissaient sous les icônes de la barre fixe ; les icônes de navigation manquaient de relief/couleur ; l'ouverture d'une catégorie fermait la précédente ou superposait son sous-menu ; la navigation vers une rubrique refermait les catégories déjà ouvertes ; la flèche Retour apparaissait également sur l'écran extérieur de connexion.
+- **Diagnostic confirmé dans le code :**
+  - les sept templates HTML utilisaient des pictogrammes monochromes et contenaient un script qui fermait explicitement tous les groupes après chaque navigation ;
+  - un ancien écouteur global fermait les autres éléments `details` à chaque ouverture ;
+  - les sous-menus partageaient le même point d'ancrage CSS au-dessus de la barre fixe, donc plusieurs menus ouverts se recouvraient ;
+  - la condition du lien Retour ne vérifiait que l'URL et pas l'état authentifié, ce qui autorisait son affichage sur les écrans extérieurs comme `/login`.
+- **Corrections appliquées sur les sept thèmes :**
+  - remplacement des cinq glyphes de navigation par des pictogrammes emoji colorés (accueil, résidents, planning, rapports, paramètres) ; ajout d'ombres et de relief CSS ;
+  - masquage explicite de tous les libellés de la barre mobile, y compris du libellé Accueil ajouté par pseudo-élément ;
+  - suppression de la fermeture automatique des autres groupes ; attribution de clés stables aux quatre catégories ;
+  - mémorisation de l'ordre des catégories ouvertes dans `sessionStorage`, restauration après navigation, et calcul d'un décalage vertical cumulatif afin que chaque nouveau sous-menu apparaisse au-dessus du précédent sans le recouvrir ;
+  - affichage du lien Retour uniquement si une session utilisateur est authentifiée et si la page n'est pas la racine.
+- **Fichiers modifiés :** les sept `templates/themes/*.html`, les sept `static/themes/*.css`, `tests/test_app.py`.
+- **Tests de régression ajoutés :** présence des clés de groupes, pictogrammes colorés, persistance des catégories, empilement CSS et masquage des libellés dans chaque thème ; absence du lien Retour sur l'écran de connexion.
+- **Validation :** modifications appliquées sur la branche candidate. Les workflows Python et Android doivent encore être exécutés sur le HEAD résultant. Aucun test sur téléphone physique n'est encore confirmé.
+- **Gouvernance :** PR #91 reste ouverte et non fusionnée ; la branche officielle `resimanage-2-work` n'a pas été modifiée.
