@@ -74,7 +74,7 @@ def test_each_theme_stylesheet_is_standalone(theme):
     assert ".rt-back-link" in css
     assert ".rt-action-card" in css
     assert ".rt-period-date-grid" in css
-    assert f'html[data-theme-template="{theme}"] .main-nav{{position:fixed!important' in css
+    assert re.search(rf'html\\[data-theme-template="{re.escape(theme)}"\\] \.main-nav\\s*\\{{\\s*position:fixed!important', css)
     assert f'data-theme-template="{theme}"' in template
     assert f'href="/static/themes/{theme}.css"' in template
     if theme != "crystal3d":
