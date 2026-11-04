@@ -84,6 +84,15 @@ def test_each_theme_stylesheet_is_standalone(theme):
     assert "html[data-theme-template] .main-nav .nav-group[open] .nav-menu" in css
     assert f'data-theme-template="{theme}"' in template
     assert f'href="/static/themes/{theme}.css"' in template
+    assert 'data-nav-key="residents"' in template
+    assert 'data-nav-key="planning"' in template
+    assert 'data-nav-key="reports"' in template
+    assert 'data-nav-key="settings"' in template
+    assert '🏠' in template and '👥' in template and '🗓️' in template and '📊' in template
+    assert 'resimanage-open-nav-groups' in template
+    assert 'group.open=false' not in template
+    assert 'var(--rt-menu-stack-offset,8px)' in css
+    assert 'visibility:hidden!important' in css
     if theme != "crystal3d":
         assert f'html[data-theme-template="{theme}"]' in css
 
@@ -130,6 +139,7 @@ def test_login_page_and_language_selector(tmp_path, monkeypatch):
     assert b'Identifiant ou e-mail' in response.data
     assert "اسم المستخدم أو البريد الإلكتروني".encode() not in response.data
     assert b'name="_csrf_token"' in response.data
+    assert b'class="rt-back-link"' not in response.data
 
 def test_registration_screen_uses_selected_french_without_arabic_form_labels(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
