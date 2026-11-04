@@ -75,6 +75,31 @@ def _ensure_schema(c, audit_event):
       CREATE INDEX IF NOT EXISTS idx_guard_label
         ON guard_assignments(raw_label);
     """)
+    # Additive migration: removed residents stay in the audit trail instead of disappearing.
+    columns = {row["name"] for row in c.execute("PRAGMA table_info(guard_assignments)").fetchall()}
+    for name, spec in {
+        "active": "INTEGER NOT NULL DEFAULT 1",
+        "removed_reason": "TEXT NOT NULL DEFAULT ''",
+        "removed_by": "TEXT NOT NULL DEFAULT ''",
+        "removed_at": "TEXT NOT NULL DEFAULT ''",
+    }.items():
+        if name not in columns:
+            c.execute(f"ALTER TABLE guard_assignments ADD COLUMN {name} {spec}")
+    c.executescript("""
+      CREATE TABLE IF NOT EXISTS guard_changes(
+        id INTEGER PRIMARY KEY,
+        roster_date TEXT NOT NULL,
+        sector TEXT NOT NULL,
+        change_type TEXT NOT NULL CHECK(change_type IN ('remove','replace')),
+        assignment_id INTEGER,
+        resident_label TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        actor TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_guard_changes_date
+        ON guard_changes(roster_date,sector);
+    """)
     existing = c.execute("SELECT id FROM guard_sources WHERE month='2026-10'").fetchone()
     if not existing and os.path.isfile(SOURCE_PATH):
         with open(SOURCE_PATH, "r", encoding="utf-8") as handle:
@@ -129,12 +154,65 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
             try:
                 if action == "delete":
                     assignment_id = int(request.form.get("assignment_id", "0"))
-                    row = c.execute("SELECT * FROM guard_assignments WHERE id=?", (assignment_id,)).fetchone()
+                    reason = request.form.get("reason", "").strip()
+                    if len(reason) < 5:
+                        raise ValueError("Indiquez un motif précis (au moins 5 caractères) pour retirer ce résident.")
+                    row = c.execute(
+                        "SELECT * FROM guard_assignments WHERE id=? AND active=1", (assignment_id,)
+                    ).fetchone()
                     if not row:
-                        raise ValueError("Affectation de garde introuvable.")
-                    c.execute("DELETE FROM guard_assignments WHERE id=?", (assignment_id,))
-                    audit_event(c, "guards.assignment_deleted",
-                                f"id={assignment_id}; date={row['roster_date']}; sector={row['sector']}; label={row['raw_label']}")
+                        raise ValueError("Affectation de garde introuvable ou déjà retirée.")
+                    actor = str(session.get("user", ""))
+                    c.execute("""
+                      UPDATE guard_assignments
+                      SET active=0,removed_reason=?,removed_by=?,removed_at=CURRENT_TIMESTAMP,
+                          updated_at=CURRENT_TIMESTAMP
+                      WHERE id=? AND active=1
+                    """, (reason, actor, assignment_id))
+                    c.execute("""
+                      INSERT INTO guard_changes(roster_date,sector,change_type,assignment_id,resident_label,reason,actor)
+                      VALUES(?,?,'remove',?,?,?,?)
+                    """, (row["roster_date"], row["sector"], assignment_id, row["raw_label"], reason, actor))
+                    audit_event(c, "guards.assignment_removed",
+                                f"id={assignment_id}; date={row['roster_date']}; sector={row['sector']}; label={row['raw_label']}; reason={reason}")
+                elif action == "add_many":
+                    roster_date = request.form.get("roster_date", "").strip()
+                    sector = request.form.get("sector", "").strip()
+                    parsed = date.fromisoformat(roster_date)
+                    if parsed.strftime("%Y-%m") != month:
+                        raise ValueError("La date doit appartenir au mois affiché.")
+                    if sector not in SECTORS:
+                        raise ValueError("Service invalide.")
+                    hours = "08H-08H" if parsed.weekday() in (4, 5) else "16H-08H"
+                    selected_ids = list(dict.fromkeys(request.form.getlist("resident_ids")))
+                    if not selected_ids:
+                        raise ValueError("Sélectionnez au moins un résident.")
+                    residents_to_add = []
+                    for value in selected_ids:
+                        resident_id = int(value)
+                        resident = c.execute("""
+                          SELECT r.id,r.surname,r.firstname,r.year FROM residents r
+                          WHERE r.id=? AND r.status='active' AND r.year BETWEEN 1 AND 3
+                            AND COALESCE(r.resident_type,'local')='local'
+                            AND NOT EXISTS(SELECT 1 FROM dems_archive d WHERE d.resident_id=r.id)
+                        """, (resident_id,)).fetchone()
+                        if not resident:
+                            raise ValueError("Seuls les résidents actifs des promotions 1 à 3 peuvent être sélectionnés pour les gardes actuelles.")
+                        duplicate = c.execute("""
+                          SELECT 1 FROM guard_assignments
+                          WHERE active=1 AND roster_date=? AND sector=? AND resident_id=?
+                        """, (roster_date, sector, resident_id)).fetchone()
+                        if duplicate:
+                            raise ValueError(f"{resident['surname']} {resident['firstname']} figure déjà dans ce service à cette date.")
+                        residents_to_add.append(resident)
+                    for resident in residents_to_add:
+                        canonical = (resident["surname"] + " " + resident["firstname"]).strip()
+                        c.execute("""
+                          INSERT INTO guard_assignments(roster_date,sector,raw_label,resident_id,hours,mapping_status)
+                          VALUES(?,?,?,?,?,'validated')
+                        """, (roster_date, sector, canonical, resident["id"], hours))
+                    audit_event(c, "guards.assignments_added",
+                                f"date={roster_date}; sector={sector}; resident_ids={','.join(str(x['id']) for x in residents_to_add)}")
                 elif action == "add":
                     roster_date = request.form.get("roster_date", "").strip()
                     sector = request.form.get("sector", "").strip()
@@ -152,7 +230,7 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
                         resident_id = int(resident_value)
                         resident = c.execute("""
                           SELECT r.id,r.surname,r.firstname FROM residents r
-                          WHERE r.id=? AND r.status='active' AND r.year BETWEEN 1 AND 4
+                          WHERE r.id=? AND r.status='active' AND r.year BETWEEN 1 AND 3
                             AND COALESCE(r.resident_type,'local')='local'
                             AND NOT EXISTS(SELECT 1 FROM dems_archive d WHERE d.resident_id=r.id)
                         """, (resident_id,)).fetchone()
@@ -167,7 +245,7 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
                         raise ValueError("Choisissez un résident ou saisissez un nom à identifier.")
                     duplicate = c.execute("""
                       SELECT 1 FROM guard_assignments
-                      WHERE roster_date=? AND sector=? AND
+                      WHERE active=1 AND roster_date=? AND sector=? AND
                         ((? IS NOT NULL AND resident_id=?) OR raw_label=?)
                     """, (roster_date, sector, resident_id, resident_id, raw_label)).fetchone()
                     if duplicate:
@@ -196,7 +274,7 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
           SELECT g.*,r.surname,r.firstname,r.year
           FROM guard_assignments g
           LEFT JOIN residents r ON r.id=g.resident_id
-          WHERE substr(g.roster_date,1,7)=?
+          WHERE substr(g.roster_date,1,7)=? AND g.active=1
           ORDER BY g.roster_date,CASE g.sector WHEN 'UMC' THEN 0 ELSE 1 END,
                    COALESCE(r.surname,g.raw_label),COALESCE(r.firstname,'')
         """, (month,)).fetchall()
@@ -224,7 +302,12 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
         months.add(date.today().strftime("%Y-%m"))
         months.add(month)
         month_options = [{"value": m, "label": _month_label(m)} for m in sorted(months, reverse=True)]
-        residents = _eligible_residents(c)
+        residents = [r for r in _eligible_residents(c) if r["year"] <= 3]
+        released_residents = [r for r in _eligible_residents(c) if r["year"] == 4]
+        changes = c.execute("""
+          SELECT * FROM guard_changes WHERE substr(roster_date,1,7)=?
+          ORDER BY created_at DESC,id DESC
+        """, (month,)).fetchall()
         source = c.execute("SELECT * FROM guard_sources WHERE month=?", (month,)).fetchone()
         c.close()
         return page("""<section class="rt-guards-hero">
@@ -236,25 +319,21 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
           {% if source_record %}<p class="rt-source-note">📚 {{L('Mois importé depuis le planning historique :','Month imported from historical roster:','شهر مستورد من جدول المناوبات التاريخي:')}} {{source_record.title}} · <a href="/guards/source/{{source_record.id}}">{{L('Voir la source','View source','عرض المصدر')}}</a></p>{% endif %}
           {% if month=='2026-10' %}<p class="rt-history-note">🔒 {{L('Planning historique importé. Les libellés d’origine sont conservés ; aucune identité n’a été attribuée automatiquement.','Historical roster imported. Original labels are preserved; no identity was assigned automatically.','تم استيراد الجدول التاريخي مع الحفاظ على التسميات الأصلية؛ لم يتم إسناد أي هوية تلقائيًا.')}}</p>{% elif counts.total==0 %}<p class="rt-draft-note">✎ {{L('Mois vierge : aucune garde n’a été générée. Ajoutez les affectations après validation du roulement.','Empty month: no shifts have been generated. Add assignments only after validating the rotation rules.','شهر فارغ: لم يتم إنشاء أي مناوبة. أضف التعيينات بعد التحقق من قواعد التناوب.')}}</p>{% endif %}
         </section>
-        {% if role=='super_admin' %}<section id="guard-add" class="rt-guard-editor"><h2>{{L('Ajouter une affectation','Add an assignment','إضافة تعيين')}}</h2>
-          <form method="post" class="rt-guard-add-form"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="action" value="add">
-            <label>{{L('Date','Date','التاريخ')}}<input type="date" name="roster_date" min="{{month}}-01" max="{{month}}-{{'%02d'|format(days|length)}}" required></label>
-            <label>{{L('Service','Department','المصلحة')}}<select name="sector"><option>UMC</option><option>Réanimation chirurgicale</option></select></label>
-            <label>{{L('Résident identifié (facultatif)','Identified resident (optional)','مقيم محدد (اختياري)')}}<select name="resident_id"><option value="">{{L('Saisir un libellé historique / non identifié','Enter an unresolved / historical label','أدخل تسمية غير محددة')}}</option>{% for r in residents %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}} · {{r.year}}{{L('e année','th year',' سنة')}}</option>{% endfor %}</select></label>
-            <label>{{L('Nom / libellé si non identifié','Name / label if not identified','الاسم / التسمية إن لم تكن محددة')}}<input name="raw_label" maxlength="120" placeholder="{{L('Ex. NOM ou NOM Prénom','e.g. SURNAME or SURNAME First name','مثال: اللقب والاسم')}}"></label>
-            <label>{{L('Horaire','Hours','التوقيت')}}<select name="hours"><option value="16H-08H">16H-08H</option><option value="08H-08H">08H-08H</option></select></label>
-            <button type="submit">＋ {{L('Ajouter au calendrier','Add to calendar','إضافة إلى التقويم')}}</button>
-          </form></section>{% endif %}
+        {% if role=='super_admin' %}<section class="rt-guard-editor"><h2>{{L('Règle de sélection','Selection rule','قاعدة الاختيار')}}</h2>
+          <p>{{L('Chaque journée possède son propre sélecteur dans les deux colonnes. Les résidents de 4e année restent visibles mais sont désactivés pendant leur préparation au DEMS.','Each day has its own selector in both columns. Fourth-year residents remain visible but disabled while preparing for the DEMS.','لكل يوم قائمة اختيار خاصة في كلا القسمين. يظهر مقيمو السنة الرابعة لكنهم غير قابلين للاختيار أثناء التحضير لامتحان DEMS.')}}</p></section>{% endif %}
         <section class="rt-guard-calendar-section"><div class="rt-guard-calendar-title"><h2>{{month_label}}</h2><a class="button" href="/guards/mapping?month={{month}}">👤 {{L('Identifier les résidents','Identify residents','تحديد المقيمين')}}</a><a class="button" href="/guards/export.csv?month={{month}}">⬇ CSV</a><button type="button" onclick="window.print()">🖨 {{L('Imprimer','Print','طباعة')}}</button></div>
           <div class="wrap"><table class="rt-guard-calendar"><thead><tr><th>{{L('Jour','Day','اليوم')}}</th><th>{{L('UMC','Emergency','الاستعجالات')}}</th><th>{{L('Réanimation chirurgicale','Surgical ICU','الإنعاش الجراحي')}}</th></tr></thead><tbody>
           {% for day in days %}<tr class="{% if day.weekend %}rt-weekend{% endif %}"><th><strong>{{day.day}}</strong><span>{{day.weekday}}</span><small>{{day.date[8:10]}}/{{day.date[5:7]}}/{{day.date[:4]}}</small></th>
             {% for sector,items in [('UMC',day.umc),('Réanimation chirurgicale',day.surgical)] %}<td><div class="rt-guard-cell"><div class="rt-guard-hours">{{items[0].hours if items else day.hours}}</div>
               {% for item in items %}<div class="rt-guard-person {% if item.mapping_status!='validated' %}is-unresolved{% endif %}"><span>{{(item.surname~' '~item.firstname) if item.resident_id else item.raw_label}}</span>{% if item.resident_id %}<small>{{item.year}}{{L('e année','th year',' سنة')}}</small>{% else %}<small>{{L('À identifier','Unresolved','غير محدد')}}</small>{% endif %}
-                {% if role=='super_admin' %}<form method="post"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="action" value="delete"><input type="hidden" name="assignment_id" value="{{item.id}}"><button title="{{L('Retirer','Remove','إزالة')}}" aria-label="{{L('Retirer','Remove','إزالة')}}">×</button></form>{% endif %}</div>{% endfor %}
-              {% if not items %}<span class="rt-guard-empty">{{L('Aucune affectation','No assignment','لا يوجد تعيين')}}</span>{% endif %}</div></td>{% endfor %}
+                {% if role=='super_admin' %}<details class="rt-guard-remove"><summary title="{{L('Corriger cette affectation','Correct this assignment','تصحيح هذا التعيين')}}">×</summary><form method="post"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="action" value="delete"><input type="hidden" name="assignment_id" value="{{item.id}}"><input name="reason" required minlength="5" maxlength="300" placeholder="{{L('Motif obligatoire du retrait','Required reason for removal','سبب الإزالة إلزامي')}}" aria-label="{{L('Motif du retrait','Removal reason','سبب الإزالة')}}"><button type="submit">{{L('Confirmer','Confirm','تأكيد')}}</button></form></details>{% endif %}</div>{% endfor %}
+              {% if not items %}<span class="rt-guard-empty">{{L('Aucune affectation','No assignment','لا يوجد تعيين')}}</span>{% endif %}
+              {% if role=='super_admin' %}<form method="post" class="rt-guard-day-selector"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="action" value="add_many"><input type="hidden" name="roster_date" value="{{day.date}}"><input type="hidden" name="sector" value="{{sector}}"><label>{{L('Ajouter des résidents','Add residents','إضافة مقيمين')}}<select name="resident_ids" multiple size="5" required aria-label="{{L('Sélectionner les résidents de cette journée','Select residents for this day','اختيار مقيمي هذا اليوم')}}">{% for r in residents %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}} · {{r.year}}{{L('e année','th year',' سنة')}}</option>{% endfor %}{% for r in released_residents %}<option value="" disabled>{{r.surname}} {{r.firstname}} · 4{{L('e année · dispensé DEMS','th year · DEMS leave',' سنة · إعفاء DEMS')}}</option>{% endfor %}</select></label><button type="submit">＋ {{L('Ajouter la sélection','Add selection','إضافة المحددين')}}</button></form>{% endif %}</div></td>{% endfor %}
           </tr>{% endfor %}</tbody></table></div>
-          <p class="rt-guard-footnote">{{L('Les gardes du vendredi et du samedi sont affichées en 08H–08H ; les autres jours en 16H–08H, conformément au planning d’octobre 2026. Vérifiez l’horaire avant toute nouvelle saisie.','Friday and Saturday shifts are shown as 08H–08H; other days as 16H–08H, matching the October 2026 source. Verify hours before adding new entries.','مناوبات الجمعة والسبت من 08 إلى 08؛ وبقية الأيام من 16 إلى 08، وفق جدول أكتوبر 2026. تحقق من التوقيت قبل إضافة تعيينات جديدة.')}}</p>
+          <p class="rt-guard-footnote">{{L('Les gardes du vendredi et du samedi sont affichées en 08H–08H ; les autres jours en 16H–08H, conformément au planning d’octobre 2026. Vérifiez l’horaire avant toute nouvelle saisie.','Friday and Saturday shifts are shown as 08H-08H; other days as 16H-08H, matching the October 2026 source.','مناوبات الجمعة والسبت من 08 إلى 08؛ وبقية الأيام من 16 إلى 08، وفق جدول أكتوبر 2026.')}}</p>
+          <p><a class="button" href="/guards/export.pdf?month={{month}}">⬇ {{L('Télécharger le PDF','Download PDF','تنزيل PDF')}}</a></p>
         </section>
+        {% if changes %}<section class="rt-guard-changes"><h2>{{L('Historique des correctifs','Correction history','سجل التصحيحات')}}</h2><div class="wrap"><table><tr><th>{{L('Date','Date','التاريخ')}}</th><th>{{L('Service','Sector','القسم')}}</th><th>{{L('Résident retiré','Removed resident','المقيم المحذوف')}}</th><th>{{L('Motif','Reason','السبب')}}</th><th>{{L('Auteur','By','بواسطة')}}</th><th>{{L('Horodatage','Timestamp','الوقت')}}</th></tr>{% for change in changes %}<tr><td>{{change.roster_date}}</td><td>{{change.sector}}</td><td>{{change.resident_label}}</td><td>{{change.reason}}</td><td>{{change.actor}}</td><td>{{change.created_at}}</td></tr>{% endfor %}</table></div></section>{% endif %}
         <style>
         .rt-guards-hero{background:linear-gradient(130deg,#092b50,#135b83 58%,#126c70)!important;color:#effaff!important;border:1px solid #65d8ef!important}
         .rt-guards-hero h1,.rt-guards-hero p,.rt-guards-hero label{color:#effaff!important}
@@ -273,10 +352,22 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
         .rt-guard-hours{font-size:11px;font-weight:900;color:#8deaff}.rt-guard-person{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 7px;border:1px solid #2c967d;background:#0d493e;border-radius:8px;color:#f1fffa}
         .rt-guard-person.is-unresolved{background:#563b20;border-color:#d48d42}.rt-guard-person span{font-weight:750}.rt-guard-person small{font-size:10px;color:#d8eee9}.rt-guard-person form{margin-inline-start:auto}.rt-guard-person button{padding:0 7px;min-height:24px;background:#7f2734!important;border-radius:6px}
         .rt-guard-empty{color:#a9bdca;font-size:12px;font-style:italic}.rt-guard-footnote{font-size:12px;color:#a9bdca}
+        .rt-guard-day-selector{display:grid;gap:6px;margin-top:10px;padding:9px;border:1px solid #4e9bb7;border-radius:11px;background:#06243b}
+        .rt-guard-day-selector label{display:grid;gap:5px;color:#c9f5ff;font-size:11px;font-weight:800}
+        .rt-guard-day-selector select{width:100%;min-width:0;background:#f5fbff;color:#17334b;border:1px solid #74c9df;border-radius:8px;padding:7px;min-height:110px}
+        .rt-guard-day-selector option:disabled{color:#8b9299;background:#e4e7eb}
+        .rt-guard-day-selector button{width:100%;min-height:38px;border:1px solid #7de8d1;border-radius:9px;background:linear-gradient(145deg,#147c79,#0c4b65);color:#fff;font-weight:900;box-shadow:0 5px 0 #062d43,0 9px 16px #0006;transition:transform .12s,box-shadow .12s}
+        .rt-guard-day-selector button:active{transform:translateY(4px);box-shadow:0 1px 0 #062d43,0 3px 7px #0006}
+        .rt-guard-remove{margin-inline-start:auto}.rt-guard-remove summary{cursor:pointer;list-style:none;padding:2px 8px;border-radius:6px;background:#812c3c;color:#fff;font-weight:900}
+        .rt-guard-remove form{display:grid;gap:4px;min-width:180px;padding:7px;background:#2c1720;border:1px solid #b95b6b;border-radius:8px}
+        .rt-guard-remove input{min-width:0;width:100%;font-size:11px;padding:6px}
+        .rt-guard-remove button{background:#9d273a!important;color:white;border-radius:7px;padding:5px}
+        .rt-guard-changes{border-color:#9b6336!important}
+
         @media(max-width:680px){.rt-guard-add-form{grid-template-columns:1fr}.rt-guard-add-form button{grid-column:1}.rt-guards-stats strong{font-size:21px}.rt-guards-stats span{font-size:10px}.rt-guard-calendar-title{align-items:stretch}.rt-guard-calendar-title a{flex:1;text-align:center}}
         @media print{body{background:#fff!important;color:#111!important}header,.main-nav,.rt-back-link,.rt-footer,.rt-guards-hero,.rt-guard-editor,.rt-guard-calendar-title>a,.rt-guard-calendar-title>button,.rt-guard-person form{display:none!important}.rt-app-shell{display:block!important;padding:0!important}main{max-width:none!important;padding:0!important}section{margin:0!important;padding:0!important;border:0!important;box-shadow:none!important;background:#fff!important}.rt-guard-calendar{min-width:0!important;font-size:9px!important}.rt-guard-calendar th,.rt-guard-calendar td{color:#111!important;background:#fff!important;border:1px solid #555!important}.rt-guard-person{background:#fff!important;color:#111!important;border:1px solid #555!important}.rt-guard-person small,.rt-guard-hours{color:#333!important}.rt-guard-calendar tbody th span,.rt-guard-calendar tbody th small{color:#333!important}}
         </style>""", month=month, month_label=_month_label(month), month_options=month_options,
-                    days=days, counts=counts, source_record=source, residents=residents)
+                    days=days, counts=counts, source_record=source, residents=residents, released_residents=released_residents, changes=changes)
 
     @app.route("/guards/mapping", methods=["GET", "POST"])
     def guards_mapping():
@@ -352,6 +443,102 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
           <p class="muted">{{L('La validation met à jour toutes les dates où ce libellé apparaît. Les libellés d’origine restent conservés dans l’historique.','Validation updates every date on which this label appears. Original labels remain preserved in the history.','يؤدي التأكيد إلى تحديث جميع التواريخ التي تظهر فيها التسمية. تبقى التسميات الأصلية محفوظة في السجل.')}}</p></section>
           <style>.rt-map-form{display:flex;gap:6px;align-items:center;min-width:280px}.rt-map-form select{min-width:150px}.rt-map-ok{color:#36d6a5;font-weight:800}.rt-map-pending{color:#ffb66b;font-weight:800}@media(max-width:680px){.rt-map-form{display:grid;min-width:160px}.rt-map-form button{width:100%}}</style>""",
                     month=month, labels=labels, residents=residents, suggestions=suggestions)
+
+    @app.get("/guards/export.pdf")
+    def guards_export_pdf():
+        denied = guard()
+        if denied:
+            return denied
+        c = prepare()
+        month = request.args.get("month", date.today().strftime("%Y-%m"))
+        if not _valid_month(month):
+            c.close()
+            return ("Invalid month", 400)
+        rows = c.execute("""
+          SELECT g.roster_date,g.sector,g.raw_label,g.hours,r.surname,r.firstname,r.year
+          FROM guard_assignments g LEFT JOIN residents r ON r.id=g.resident_id
+          WHERE substr(g.roster_date,1,7)=? AND g.active=1
+          ORDER BY g.roster_date,CASE g.sector WHEN 'UMC' THEN 0 ELSE 1 END,
+                   COALESCE(r.surname,g.raw_label),COALESCE(r.firstname,'')
+        """, (month,)).fetchall()
+        changes = c.execute("""
+          SELECT roster_date,sector,resident_label,reason,actor,created_at
+          FROM guard_changes WHERE substr(roster_date,1,7)=?
+          ORDER BY created_at,id
+        """, (month,)).fetchall()
+        c.close()
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import mm
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from xml.sax.saxutils import escape
+
+        output = io.BytesIO()
+        doc = SimpleDocTemplate(output, pagesize=landscape(A4),
+                                rightMargin=10*mm,leftMargin=10*mm,
+                                topMargin=10*mm,bottomMargin=10*mm)
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle("GuardTitle", parent=styles["Title"], alignment=TA_CENTER,
+                                     textColor=colors.HexColor("#123b5a"), fontSize=16, leading=20)
+        small_style = ParagraphStyle("GuardSmall", parent=styles["BodyText"], fontSize=7, leading=9)
+        heading_style = ParagraphStyle("GuardHeading", parent=styles["Heading2"], fontSize=10, leading=12)
+        grouped = {}
+        for row in rows:
+            grouped.setdefault(row["roster_date"], {"UMC": [], "Réanimation chirurgicale": [], "hours": row["hours"]})
+            name = ((row["surname"] or "") + " " + (row["firstname"] or "")).strip() or row["raw_label"]
+            grouped[row["roster_date"]][row["sector"]].append(name)
+        year, month_number = map(int, month.split("-"))
+        _, day_count = calendar.monthrange(year, month_number)
+        story = [Paragraph("LISTE DE GARDE DES RÉSIDENTS — " + escape(_month_label(month).upper()), title_style),
+                 Spacer(1, 5*mm)]
+        data = [[Paragraph("<b>DATE</b>", small_style), Paragraph("<b>HORAIRES</b>", small_style),
+                 Paragraph("<b>UMC</b>", small_style), Paragraph("<b>RÉANIMATION CHIRURGICALE</b>", small_style)]]
+        for day_number in range(1, day_count + 1):
+            d = date(year, month_number, day_number)
+            item = grouped.get(d.isoformat(), {"UMC": [], "Réanimation chirurgicale": [],
+                                                "hours": "08H-08H" if d.weekday() in (4,5) else "16H-08H"})
+            date_label = d.strftime("%d/%m/%Y") + " · " + WEEKDAYS[d.weekday()].capitalize()
+            data.append([Paragraph(escape(date_label), small_style),
+                         Paragraph(escape(item["hours"]), small_style),
+                         Paragraph("<br/>".join(escape(x) for x in item["UMC"]) or "—", small_style),
+                         Paragraph("<br/>".join(escape(x) for x in item["Réanimation chirurgicale"]) or "—", small_style)])
+        table = Table(data, colWidths=[42*mm,25*mm,95*mm,95*mm], repeatRows=1)
+        table.setStyle(TableStyle([
+            ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#123b5a")),
+            ("TEXTCOLOR",(0,0),(-1,0),colors.white),
+            ("GRID",(0,0),(-1,-1),0.35,colors.HexColor("#8da3b5")),
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,colors.HexColor("#edf4f8")]),
+            ("LEFTPADDING",(0,0),(-1,-1),5),("RIGHTPADDING",(0,0),(-1,-1),5),
+            ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
+        ]))
+        story.append(table)
+        if changes:
+            story += [Spacer(1,5*mm),Paragraph("HISTORIQUE DES CORRECTIFS",heading_style)]
+            change_data = [[Paragraph("<b>Date</b>",small_style),Paragraph("<b>Secteur</b>",small_style),
+                            Paragraph("<b>Résident retiré</b>",small_style),Paragraph("<b>Motif</b>",small_style),
+                            Paragraph("<b>Auteur</b>",small_style),Paragraph("<b>Date du correctif</b>",small_style)]]
+            for change in changes:
+                change_data.append([Paragraph(escape(change["roster_date"]),small_style),
+                                    Paragraph(escape(change["sector"]),small_style),
+                                    Paragraph(escape(change["resident_label"]),small_style),
+                                    Paragraph(escape(change["reason"]),small_style),
+                                    Paragraph(escape(change["actor"]),small_style),
+                                    Paragraph(escape(change["created_at"]),small_style)])
+            correction_table=Table(change_data,colWidths=[28*mm,38*mm,42*mm,82*mm,30*mm,37*mm],repeatRows=1)
+            correction_table.setStyle(TableStyle([
+                ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#7f2938")),
+                ("TEXTCOLOR",(0,0),(-1,0),colors.white),
+                ("GRID",(0,0),(-1,-1),0.35,colors.HexColor("#a58c90")),
+                ("VALIGN",(0,0),(-1,-1),"TOP"),("FONTSIZE",(0,0),(-1,-1),7),
+            ]))
+            story.append(correction_table)
+        doc.build(story)
+        output.seek(0)
+        return send_file(output,mimetype="application/pdf",as_attachment=True,
+                         download_name=f"gardes_{month}.pdf")
 
     @app.get("/guards/source/<int:source_id>")
     def guards_source(source_id):
