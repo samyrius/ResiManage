@@ -101,7 +101,7 @@ def test_each_theme_stylesheet_is_standalone(theme):
     assert f'data-theme-template="{theme}"' in template
     assert f'href="/static/themes/{theme}.css"' in template
     assert "get_flashed_messages(with_categories=True)" in template
-    assert "msg-error" in template and "msg-info" in template
+    assert 'class="msg msg-{{' in template
     assert 'data-nav-key="residents"' in template
     assert 'data-nav-key="planning"' in template
     assert 'data-nav-key="reports"' in template
