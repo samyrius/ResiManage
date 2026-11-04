@@ -4705,6 +4705,6 @@ def test_period_editor_forms_have_stable_scroll_targets_and_local_flash_relocati
     response = client.get("/rotation-board")
     assert response.status_code == 200
     assert b'id="period-date-editor"' in response.data
-    assert b'id="period-date-{{p.id}}"' in response.data
+    assert b'id="period-date-' in response.data
     assert b'rt-flash-messages' in response.data
     assert b'rt-action-context' in response.data
