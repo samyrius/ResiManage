@@ -263,3 +263,32 @@ Répartition indicative :
 
 ### Prochaine action
 Commencer par mesurer précisément le nombre de commits uniques sur l'ensemble des 105 branches recensées, puis établir l'ordre de revue par domaines et par risque. L'estimation de 3 à 7 jours sera affinée à partir de ce comptage.
+
+
+## Correctifs de navigation réappliqués — 4 novembre 2026
+
+L'utilisateur précise que **toutes les observations, demandes de correction, corrections réalisées et résultats de validation doivent être consignés systématiquement dans ce carnet de route**. Cette règle s'applique à la suite du projet : ne pas considérer un correctif comme terminé dans le suivi tant que son entrée documentaire n'a pas été ajoutée sur la branche candidate.
+
+### 1. Barre de navigation fixe en bas sur mobile
+
+- **Régression observée :** la barre contenant les icônes de menu n'était plus fixe au bas de l'écran.
+- **Correction portée :** dans `static/themes/common.css`, rétablissement d'une barre mobile fixe, avec cinq colonnes, prise en compte de la zone de sécurité inférieure (`safe-area-inset-bottom`), cibles tactiles et menus déroulants positionnés au-dessus de la barre.
+- **Tests ajoutés :** assertions dans `tests/test_app.py` pour vérifier le positionnement fixe, la zone de sécurité, les cinq colonnes et le positionnement du sous-menu.
+- **Commit CSS :** `e363f4e` (préfixe court communiqué lors du suivi).
+- **Commit tests :** `7a7a2030fceeda11cddcb51068affc7f7f3d9535`.
+- **Validation :** les workflows Python et Android ont été déclenchés après ce correctif, mais leur résultat final n'est pas établi dans le relevé disponible. Ne pas déclarer le correctif validé par CI avant vérification des runs.
+
+### 2. Flèche « page précédente »
+
+- **Régression observée :** la flèche de retour vers la page précédente avait disparu visuellement.
+- **Diagnostic :** le lien `.rt-back-link` et son balisage dans `app.py` étaient toujours présents ; le défaut a été traité comme un problème de visibilité/priorité CSS.
+- **Correction portée :** surcharge dans `static/themes/common.css` pour garantir l'affichage du contrôle au-dessus des thèmes et de la navigation mobile : position fixe, visibilité/opacité forcées, zone tactile 44 × 44 px, contraste renforcé, prise en charge RTL et focus clavier.
+- **Tests ajoutés :** assertions dans `tests/test_app.py` sur les règles CSS et sur la présence du lien dans la réponse HTML d'une page intérieure.
+- **Commit CSS :** `f5a3b8ab7fadef966ac6b905752ce0ce8b778a27`.
+- **Commit de test initial :** `fd6735aa157fe24f971ae307b8c76969bdf140f8` (assertion d'ordre corrigée dans le commit suivant).
+- **Commit de test corrigé / HEAD candidat au relevé :** `0c1f23c5342ef3fbcbbbcd80178cc7d6726a0ba2`.
+- **Validation :** le contenu CSS, le lien HTML et le test corrigé ont été relus sur la branche candidate. Aucun résultat de workflow associé au HEAD `0c1f23c` n'était encore disponible au dernier contrôle ; tests Python/Android à confirmer.
+
+### Règle de suivi
+
+Pour chaque prochaine observation : consigner le symptôme rapporté, le diagnostic et son niveau de certitude, les fichiers touchés, la correction, les tests ajoutés/exécutés, les commits et le statut CI. Distinguer clairement « appliqué », « testé », « validé CI » et « confirmé par l'utilisateur sur appareil ». Ne jamais transformer un correctif en validation acquise sans preuve.
