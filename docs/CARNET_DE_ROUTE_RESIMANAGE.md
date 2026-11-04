@@ -565,3 +565,105 @@ Le générateur à J-5 n'est pas encore activé : le planning d'octobre conserve
   - Smoke test sur émulateur : en attente du résultat du build.
 - Le workflow Python autonome sur le commit précédent ada18b19bb1ca4263de951a22f82bb75ede9c308 a également réussi avec 191 tests passés en 72,66 s. Le commit 0c8a38d ajoute ensuite le correctif de positionnement local dans les sept feuilles CSS et la classe JS correspondante ; la régression Android sur ce dernier commit a réussi.
 - PR #91 reste ouverte et non fusionnée ; aucune modification de la branche officielle.
+
+---
+
+## Reconstitution de l'historique antérieur — 4 novembre 2026
+
+Cette section rassemble les décisions et travaux antérieurs déjà consignés dans `docs/PROJECT_ARCHIVE.md`, `REGISTRE_PROJET_RESIMANAGE.md` et les échanges du projet. Elle évite de limiter le carnet de route aux seuls changements du 3 et 4 novembre. Les éléments sont classés selon leur niveau de preuve : exigences validées, code présent, CI réussie, ou vérification physique encore nécessaire.
+
+### 13–14 octobre 2026 — prototype, fondations métier et identité
+
+- Le prototype Flask de gestion des stages a été créé, installé et lancé sur le téléphone de l'utilisateur. La phase de création initiale est donc terminée.
+- Les bases métier ont été définies : quatre années de résidence, quatre périodes par année, priorité d'affectation 4e puis 3e, 2e et 1re année, capacité par terrain/période et interdiction d'une double affectation d'un résident sur une même période.
+- La règle de répétition a été précisée : les terrains obligatoires/de base doivent être accomplis avant répétition ; les terrains optionnels ne bloquent pas cette règle. Gynécologie n'est pas optionnelle. Les cinq terrains optionnels confirmés sont Sédation (7), Maxillo-faciale (8), Chirurgie cardiaque (11), Brûlés (18) et CAC DBK (19).
+- Les premières fondations vérifiées ont inclus les comptes individuels, les rôles Super Admin, l'audit, les profils, l'historique, les objectifs, les examens, les règles de progression de 1re année, les décisions de progression des années supérieures, l'archive DEMS, l'import avec aperçu, l'export CSV et les sauvegardes/restaurations SQLite.
+- Le 13 octobre, une version de référence a passé 25 tests automatisés après fusion du premier lot de fondations. Ces tests utilisaient des bases temporaires ; aucune base réelle de résident n'a été ajoutée au dépôt.
+- L'identité a évolué vers le nom ResiManage. Les demandes visuelles comprennent l'icône médicale 3D fournie, sans croix, le nom visible ResiManage, un écran de connexion médical, le cœur/ECG, les drapeaux de langue et une interface française, arabe et anglaise avec RTL en arabe.
+- Les demandes d'ergonomie mobile ont inclus la suppression des débordements horizontaux, des boutons accessibles, des formulaires lisibles et une navigation adaptée aux petits écrans. Les corrections CSS antérieures ont été consignées comme code modifié, mais leur validation physique doit être distinguée des tests automatisés.
+
+### 15–17 octobre 2026 — séparation des versions et amélioration des profils
+
+- Décision de conserver ResiManage 1 comme sauvegarde et de poursuivre le travail actif dans ResiManage 2. La sauvegarde `resimanage-1-backup` doit rester intacte.
+- Les changements approuvés doivent être intégrés directement au projet actif après vérification, sans accumuler inutilement les modifications en attente.
+- Les travaux profils/photos ont couvert l'acceptation PNG/JPG/WEBP, la validation réelle du contenu, la prévisualisation, la conservation de l'ancienne photo si le nouveau fichier est invalide, et l'amélioration de la présentation du profil.
+- Le benchmark UX a été consigné dans `docs/UX_BENCHMARK.md` : revue documentaire de 10 plateformes comparables et 14 sites. Il s'agit d'une étude documentaire, pas d'une validation pratique de chacune de ces interfaces.
+- Les PR et branches candidates ont été utilisées pour isoler les changements. Les résultats CI d'une ancienne tête de branche ne doivent jamais être attribués à une nouvelle tête sans vérification exacte du SHA.
+
+### 18–21 octobre 2026 — architecture locale, progression et règles métier
+
+- Décision de commencer par un fonctionnement local : PC Windows du secrétariat comme serveur/base centrale et téléphones Android comme clients, avec synchronisation sur le même réseau Wi-Fi/LAN. Aucun hébergement Internet public n'est demandé à ce stade.
+- La synchronisation doit prévoir authentification, permissions, sauvegardes, journalisation, gestion des conflits et reprise après perte de réseau. La consultation/modification hors ligne complète et la synchronisation de toutes les entités ne doivent pas être déclarées disponibles sans preuve.
+- Le projet doit pouvoir évoluer plus tard vers un serveur web central sécurisé sans rendre inutile l'architecture locale.
+- Les périodes doivent être configurables par année de post-graduation ; ne pas imposer des dates prédéfinies lorsque le responsable doit pouvoir les saisir.
+- Les intitulés institutionnels confirmés sont « Centre Hospitalo-universitaire Nedir Mohamed Tizi Ouzou », « Département d'anesthésie-réanimation » et « Chef de service Professeur Benhocine ». Remplacer partout « année universitaire » par « année de post-graduation ».
+- Les règles de progression, examens, rattrapages, DEMS, objectifs, congés annuels (30 jours par année depuis la première inscription au CHU) et conservation de l'historique doivent être appliquées sans inventer de données.
+- Les Super Admins sont Pr Benhocine et Dr Dris ; les autorisations sont contrôlées côté serveur et les opérations sensibles sont auditées.
+
+### 21–25 octobre 2026 — résidents externes, contrôle et intégrité des données
+
+- Les résidents externes venant notamment de l'EHS Cardio DBK, du CAC DBK et d'un établissement « Autre » avec nom d'hôpital libre doivent suivre les mêmes règles d'affectation et de rotation. Leur origine doit rester distincte de la spécialité et du service d'accueil.
+- Les résidents du même CHU mais d'une autre spécialité doivent également être distinguables des résidents internes d'Anesthésie-Réanimation.
+- Les corrections de validation ont progressivement couvert les identifiants mal formés, les notes d'examen, les dates futures DEMS, les objectifs, les promotions, les imports, les historiques, les capacités, les affectations, les conflits externes/locaux et les permissions.
+- Les imports doivent rester prévisualisés, confirmés explicitement et revalidés au moment de la confirmation. Aucun historique de stage ne doit être fabriqué.
+- La corbeille, les sauvegardes et l'archive DEMS doivent préserver les données et l'historique ; aucune base réelle, photo, sauvegarde, clé ou mot de passe ne doit être versionné dans Git.
+
+### 25 octobre–1er novembre 2026 — audit du dépôt et amélioration des affectations
+
+- Demande d'audit étendu du dépôt : code principal, sauvegarde, branches, PR et branche de test. Les branches doivent être comparées avant toute fusion ou suppression.
+- La sauvegarde ResiManage 1 et les repères APK d'octobre doivent être préservés. Ne pas lancer une compilation APK sans demande explicite ; cette présente demande du 4 novembre autorise une compilation de contrôle.
+- Les affectations doivent permettre de définir le nombre de postes par terrain et période directement dans le tableau, puis de choisir les résidents sans perdre le contexte.
+- Après sauvegarde d'une capacité ou d'une affectation, rester sur la même page, à la même position, avec les filtres et la période conservés ; ne pas renvoyer en haut de page.
+- Les résidents d'établissements périphériques et ceux du CHU relevant d'une autre spécialité doivent pouvoir être gérés sans mélanger leurs catégories.
+- Les demandes de correction et les comportements réellement livrés doivent être suivis séparément ; un ticket ou une branche ne constitue pas une preuve d'intégration.
+
+### 2–4 novembre 2026 — module Gardes, navigation et thèmes
+
+- Le module Gardes a été ajouté à la candidate avec deux secteurs (UMC et Réanimation chirurgicale), un historique d'octobre 2026 importé depuis une source structurée, des libellés initiaux non résolus, une validation nominative réservée au Super Admin, les modifications manuelles, un journal des correctifs, CSV et PDF mensuel paysage A4.
+- Le générateur automatique mensuel n'est pas activé : les libellés d'octobre sont encore ambigus et les quotas/règles de roulement doivent être confirmés. Ne pas inventer les gardes.
+- Les modifications manuelles doivent survivre à une régénération ; les jours fériés algériens doivent être éditables. Les règles de pondération des jours fériés restent à définir avant automatisation.
+- Les corrections récentes portent sur les sept modèles HTML/CSS, la navigation mobile, les retours visuels, les messages d'erreur rouges et les confirmations vertes, les raccourcis du tableau de bord, les sélecteurs de résidents par journée et le retour aux formulaires après enregistrement.
+- Le tableau de garde ne doit pas affecter les résidents dispensés pour préparation du DEMS. Cette règle doit toutefois tenir compte de la clarification de promotion ci-dessous et de l'état réel de chaque résident.
+- Le 4 novembre, la candidate a passé 191 tests Python sur le commit testé. Le workflow Android du run 41914073691 a ensuite réussi les trois jobs : régression Python, build debug APK et smoke test sur émulateur. Ces preuves ne remplacent pas le test physique sur le téléphone de l'utilisateur.
+
+### Clarification officielle des promotions et de la liste de garde — 4 novembre 2026
+
+La liste nominative reçue a été rédigée en octobre 2025. Les numéros d'année qu'elle affiche décrivent la situation de cette date et ne sont pas contradictoires avec la situation actuelle.
+
+| Promotion indiquée sur la liste d'octobre 2025 | Situation après la rentrée d'octobre 2026 |
+|---|---|
+| 4e année 2025 | Fin de 4e année ; préparation du DEMS, examen de fin d'études pour obtenir le diplôme de spécialiste |
+| 3e année 2025 | Nouvelle 4e année depuis octobre 2026 |
+| 2e année 2025 | Nouvelle 3e année depuis octobre 2026 |
+| 1re année 2025 | Nouvelle 2e année depuis octobre 2026 |
+| Nouvelle cohorte admise récemment | Nouvelle 1re année ; intégration prévue dans la liste de garde de décembre 2026 |
+
+- Le DEMS se déroule à la fin de la quatrième année.
+- Les résidents de l'ancienne 4e année (cohorte ayant commencé en octobre 2025) sont en fin de cursus et sont généralement dispensés de la liste de garde pendant leur préparation au DEMS.
+- Les résidents de l'ancienne 3e année sont les nouveaux 4e années depuis octobre 2026 ; ils ne doivent pas être confondus avec la cohorte qui prépare le DEMS.
+- Les anciennes 2e et 1re années deviennent respectivement 3e et 2e années en octobre 2026.
+- Une nouvelle promotion de 1re année vient d'arriver ; ses noms seront communiqués ultérieurement et elle doit rejoindre la liste de garde à partir de décembre 2026.
+- Pour novembre 2026, l'utilisateur confirme qu'il n'y a aucun résident inactif ou en congé dans la liste à préparer.
+- Ne pas déduire automatiquement l'année actuelle à partir d'un simple libellé historique sans tenir compte de la date de la liste et de la promotion d'origine. Conserver l'année d'étude historique et l'année courante comme deux informations distinctes.
+- À réception des noms de la nouvelle cohorte, les ajouter à la liste de décembre sans réécrire l'historique d'octobre/novembre.
+
+### Preuves de compilation et d'émulateur — 4 novembre 2026
+
+- PR candidate : https://github.com/samyrius/ResiManage/pull/91
+- Branche : `integration/resimanage-refonte-themes-2026-11-03`
+- Commit testé : `50fd4d398a9752bda251f7e2d0ca98110ea8db26`
+- Run Android : https://github.com/samyrius/ResiManage/actions/runs/41914073691
+- Régression Python : 191 tests réussis.
+- Build debug APK : job réussi ; artefact GitHub Actions ID `13364477136`.
+- Smoke test Android émulateur : job réussi ; capture d'écran et logcat conservés dans l'artefact ID `13363358996`.
+- Archive ZIP de l'APK : SHA-256 `b42fa54dd5c7340e6f3bae02b8880be80d0d90a00cf208482f10ed2644d00e31`.
+- APK extraite et vérifiée dans l'environnement de contrôle : SHA-256 `a9cb9be9c4ba2ece7aea069447ae9e9e2d1e3e843d691b4f2ba8e3c8c593a2d2`.
+- La capture émulateur montre l'écran de connexion ResiManage avec les choix de langue et l'identité visuelle. Cela établit le démarrage et le rendu initial sur cet émulateur, pas le fonctionnement complet de toutes les pages ni le succès sur téléphone physique.
+
+### État de fusion et prochaines étapes
+
+- PR #91 est ouverte et GitHub la signale mergeable, mais le carnet et les décisions antérieures imposent de ne pas fusionner sans accord explicite distinct.
+- La branche officielle `resimanage-2-work` est restée inchangée pendant cette vérification.
+- La sauvegarde `resimanage-1-backup` n'a pas été modifiée.
+- L'audit des 105 branches est un inventaire et une revue statique de branches représentatives ; la lecture exhaustive de chaque commit/fichier des branches anciennes reste à terminer avant tout nettoyage.
+- Prochaine étape : faire valider l'APK sur le téléphone réel, puis poursuivre les corrections métier restantes (générateur de gardes, jours fériés et règles d'équité, conservation du contexte dans toutes les pages, retour Android, synchronisation complète et validation des migrations historiques). Ne pas marquer ces éléments comme terminés avant preuves.
