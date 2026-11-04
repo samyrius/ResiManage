@@ -148,7 +148,6 @@ Comparaisons effectuées par rapport au SHA de `resimanage-2-work`. « En avance
 Les comparaisons montrent que les branches `release/*`, `security/*`, plusieurs `feature/*` et correctifs plus anciens ne doivent pas être fusionnés directement. Leur nom décrit l'intention, pas leur compatibilité avec la base actuelle. Les changements utiles doivent être identifiés au niveau des commits/fichiers et portés avec tests ciblés.
 
 ### Architecture et routes recensées
-
 - `app.py` : 3 602 lignes au SHA inspecté ; 44 routes Flask déclarées directement.
 - `guards.py` : 402 lignes ; 4 routes supplémentaires enregistrées dynamiquement : `/guards`, `/guards/mapping`, `/guards/source/<source_id>`, `/guards/export.csv`. Total recensé : 48 routes applicatives, sans compter les routes statiques Flask.
 - Principaux groupes : authentification/inscription/langue ; accueil et résidents ; services, capacités, périodes, tableau de rotation, affectations et historique ; décisions, objectifs, examens et DEMS ; utilisateurs, paramètres, audit, corbeille, export, sauvegarde/restauration ; congés et stages externes ; synchronisation appareil/API ; gardes.
@@ -296,8 +295,7 @@ Pour chaque prochaine observation : consigner le symptôme rapporté, le diagnos
 
 ## Séparation autonome des feuilles CSS des thèmes — 4 novembre 2026
 
-### Demande
-Après la séparation des sept pages HTML, l'utilisateur demande de terminer la séparation des CSS afin que chaque thème dispose de sa propre feuille de styles et puisse évoluer indépendamment.
+### DemandeAprès la séparation des sept pages HTML, l'utilisateur demande de terminer la séparation des CSS afin que chaque thème dispose de sa propre feuille de styles et puisse évoluer indépendamment.
 
 ### État initial constaté
 Les sept templates HTML existaient déjà et chargeaient chacun un fichier CSS dédié. Cependant, les feuilles thématiques importaient `static/themes/common.css`. Les règles de structure, composants, formulaires, tableaux, navigation, responsive et correctifs communs restaient mutualisées : la séparation CSS était nominale, pas autonome.
@@ -342,3 +340,17 @@ Le lien conditionnel « page précédente » a été ajouté directement dans ch
 - **Tests ajoutés :** chaque thème doit contenir les règles de défilement vertical, les neutralisations 3D, le masquage des libellés, l'affichage des icônes et le sous-menu superposé.
 - **Portée :** aucun changement de logique métier ni de code Android natif ; le fichier `MainActivity.java` est identique à celui de la référence du 1er novembre. La correction porte sur les CSS des thèmes actifs.
 - **Validation :** les workflows Python et Android doivent être vérifiés sur le commit résultant. Le succès de compilation APK et les essais sur appareil ne sont pas présumés tant que les workflows correspondants n'ont pas terminé.
+
+### Résultat de compilation et de validation Android — 4 novembre 2026
+
+- **Commit testé :** `51910a0b91e8ea1eb47174a90320d5a4b5aa3c56` sur `integration/resimanage-refonte-themes-2026-11-03`.
+- **Tests Python :** workflow `41834000015`, job `test` terminé avec succès ; installation des dépendances et étape `Run tests` terminées avec `success`.
+- **Workflow Android :** `41834000425`, état global `completed / success`.
+- **Régression Python Android :** job `python-regression` réussi.
+- **Compilation APK :** job `build-debug-apk` réussi ; étape `Build debug APK` et téléversement de l'artefact réussis.
+- **Émulateur Android :** job `android-emulator-smoke` réussi ; installation/lancement de l'application, contrôle du serveur et téléversement des preuves terminés avec succès.
+- **Artefact APK :** `resimanage2-debug-apk`, ID `13324622470`, taille 38 541 127 octets, SHA-256 `94fb7cd45bf53c497362a056759584b6a8d0be49c7edfa94d89565ca13f71d07`, disponible jusqu'au 18 novembre 2026.
+- **Preuves émulateur :** artefact `resimanage2-android-emulator-evidence`, ID `13324937456`, SHA-256 `e88613582d9b334d3084884b778ebacbf678437f2bf243f2b792c1543d3d6ecc`.
+- **Lien du workflow et de ses artefacts :** https://github.com/samyrius/ResiManage/actions/runs/41834000425
+- **Conclusion :** la compilation est validée et le smoke test sur émulateur est réussi pour ce commit. Cela ne remplace pas encore la vérification sur le téléphone physique de l'utilisateur, en particulier du défilement dans plusieurs écrans et de la barre d'icônes fixe.
+- **Gouvernance :** PR #91 reste ouverte et non fusionnée ; aucune modification de `resimanage-2-work`.
