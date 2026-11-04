@@ -55,6 +55,10 @@ def setup_client(tmp_path, monkeypatch):
 def read_theme_css(theme="crystal3d"):
     return (Path(__file__).resolve().parents[1] / "static" / "themes" / f"{theme}.css").read_text(encoding="utf-8")
 
+def read_common_theme_css():
+    """Compatibility helper: legacy style assertions now inspect standalone Crystal 3D CSS."""
+    return read_theme_css("crystal3d")
+
 @pytest.mark.parametrize("theme", [
     "crystal3d", "aurore-boreale", "emeraude", "futuriste",
     "luxe-elegant", "naturel-moderne", "rubis",
