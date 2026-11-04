@@ -509,4 +509,4 @@ Le générateur à J-5 n'est pas encore activé : le planning d'octobre conserve
 
 ### Résultat des tests — commit 24201b8
 - Workflow Python application checks : **succès, 186 tests passés** (run 41909792030).
-- Workflow Android : régression Python réussie ; le job de compilation APK debug est encore en cours au moment de cette mise à jour (run 41909792328). Le smoke test Android et le téléchargement de l'APK ne sont donc pas encore confirmés.
+- Workflow Android : régression Python réussie ; build debug APK : **succès**, artefact `resimanage2-debug-apk` (run 41909792328, artefact 13361783889). Le smoke test sur émulateur est encore en cours ; le contrôle visuel sur téléphone réel reste à faire.
