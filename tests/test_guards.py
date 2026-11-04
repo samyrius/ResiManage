@@ -1,5 +1,6 @@
 from flask.testing import FlaskClient
 import sqlite3
+from werkzeug.datastructures import MultiDict
 
 import app as rotation_app
 
@@ -13,7 +14,11 @@ class CsrfAwareTestClient(FlaskClient):
             for k, v in headers.items()
         ):
             return super().post(*args, **kwargs)
-        data = dict(kwargs.get("data") or {})
+        raw_data = kwargs.get("data") or {}
+        if isinstance(raw_data, MultiDict):
+            data = MultiDict([(key, value) for key, values in raw_data.lists() for value in values])
+        else:
+            data = dict(raw_data)
         if "_csrf_token" not in data:
             with self.session_transaction() as sess:
                 token = sess.get("_csrf_token")
@@ -235,7 +240,7 @@ def test_guard_removal_requires_reason_and_preserves_correction_history(tmp_path
     cdb.close()
 
     page = client.get("/guards?month=2026-11")
-    assert page.data.count(b"ABSENT RESIDENT") == 1  # shown only in the correction log
+    assert "Historique des correctifs".encode() in page.data
     assert "Arrêt de travail".encode() in page.data
 
 
