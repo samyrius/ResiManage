@@ -145,3 +145,135 @@ def test_csv_export_is_available_and_keeps_source_labels(tmp_path, monkeypatch):
     assert response.mimetype == "text/csv"
     assert b"BERKANE.A" in response.data
     assert b"SAID AISSA" in response.data
+
+
+def test_each_guard_day_has_its_own_multi_resident_selector_and_dems_year_is_disabled(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    cdb = _db(tmp_path)
+    cdb.execute("INSERT INTO residents(surname,firstname,year,status,resident_type) VALUES('PROMO1','ONE',1,'active','local')")
+    cdb.execute("INSERT INTO residents(surname,firstname,year,status,resident_type) VALUES('PROMO4','FOUR',4,'active','local')")
+    cdb.commit()
+    cdb.close()
+
+    response = client.get("/guards?month=2026-11")
+    assert response.status_code == 200
+    assert response.data.count(b'name="resident_ids" multiple') == 60
+    assert b'PROMO1 ONE' in response.data
+    assert b'disabled>PROMO4 FOUR' in response.data
+    assert b'Ajouter la sélection' in response.data
+
+
+def test_guard_day_selector_adds_multiple_residents_atomically(tmp_path, monkeypatch):
+    from werkzeug.datastructures import MultiDict
+
+    client = _client(tmp_path, monkeypatch)
+    cdb = _db(tmp_path)
+    for surname, year in (("ONE", 1), ("TWO", 2), ("THREE", 3), ("FOUR", 4)):
+        cdb.execute(
+            "INSERT INTO residents(surname,firstname,year,status,resident_type) VALUES(?,?,?,'active','local')",
+            (surname, "TEST", year),
+        )
+    cdb.commit()
+    ids = {row[0]: row[1] for row in cdb.execute("SELECT surname,id FROM residents WHERE surname IN ('ONE','TWO','THREE','FOUR')")}
+    cdb.close()
+
+    response = client.post("/guards?month=2026-11", data=MultiDict([
+        ("month", "2026-11"), ("action", "add_many"), ("roster_date", "2026-11-02"),
+        ("sector", "UMC"), ("resident_ids", str(ids["ONE"])), ("resident_ids", str(ids["TWO"])),
+    ]))
+    assert response.status_code == 302
+    cdb = _db(tmp_path)
+    rows = cdb.execute(
+        "SELECT raw_label,resident_id,hours,mapping_status FROM guard_assignments WHERE roster_date='2026-11-02' AND sector='UMC' AND active=1"
+    ).fetchall()
+    assert len(rows) == 2
+    assert {row[0] for row in rows} == {"ONE TEST", "TWO TEST"}
+    assert all(row[2] == "16H-08H" and row[3] == "validated" for row in rows)
+    cdb.close()
+
+    # A duplicate in a multi-select submission rejects the whole batch.
+    response = client.post("/guards?month=2026-11", data=MultiDict([
+        ("month", "2026-11"), ("action", "add_many"), ("roster_date", "2026-11-02"),
+        ("sector", "UMC"), ("resident_ids", str(ids["ONE"])), ("resident_ids", str(ids["THREE"])),
+    ]))
+    assert response.status_code == 302
+    cdb = _db(tmp_path)
+    active_names = {
+        row[0] for row in cdb.execute(
+            "SELECT raw_label FROM guard_assignments WHERE roster_date='2026-11-02' AND sector='UMC' AND active=1"
+        )
+    }
+    assert active_names == {"ONE TEST", "TWO TEST"}
+    cdb.close()
+
+
+def test_guard_removal_requires_reason_and_preserves_correction_history(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    cdb = _db(tmp_path)
+    cdb.execute("INSERT INTO residents(surname,firstname,year,status,resident_type) VALUES('ABSENT','RESIDENT',1,'active','local')")
+    resident_id = cdb.execute("SELECT id FROM residents WHERE surname='ABSENT'").fetchone()[0]
+    cdb.commit()
+    cdb.close()
+    client.post("/guards?month=2026-11", data={
+        "month": "2026-11", "action": "add", "roster_date": "2026-11-02",
+        "sector": "UMC", "hours": "16H-08H", "resident_id": str(resident_id),
+    })
+    cdb = _db(tmp_path)
+    assignment_id = cdb.execute("SELECT id FROM guard_assignments WHERE resident_id=? AND active=1", (resident_id,)).fetchone()[0]
+    cdb.close()
+
+    response = client.post("/guards?month=2026-11", data={
+        "month": "2026-11", "action": "delete", "assignment_id": str(assignment_id),
+        "reason": "Arrêt de travail",
+    })
+    assert response.status_code == 302
+    cdb = _db(tmp_path)
+    row = cdb.execute("SELECT active,removed_reason,removed_by FROM guard_assignments WHERE id=?", (assignment_id,)).fetchone()
+    change = cdb.execute("SELECT change_type,resident_label,reason FROM guard_changes WHERE assignment_id=?", (assignment_id,)).fetchone()
+    assert row[0] == 0 and row[1] == "Arrêt de travail" and row[2] == "admin"
+    assert change == ("remove", "ABSENT RESIDENT", "Arrêt de travail")
+    cdb.close()
+
+    page = client.get("/guards?month=2026-11")
+    assert b"ABSENT RESIDENT" not in page.data
+    assert "Arrêt de travail".encode() in page.data
+
+
+def test_guard_removal_without_reason_is_rejected(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    cdb = _db(tmp_path)
+    cdb.execute("INSERT INTO residents(surname,firstname,year,status,resident_type) VALUES('NO','REASON',2,'active','local')")
+    resident_id = cdb.execute("SELECT id FROM residents WHERE surname='NO'").fetchone()[0]
+    cdb.commit()
+    cdb.close()
+    client.post("/guards?month=2026-11", data={
+        "month": "2026-11", "action": "add", "roster_date": "2026-11-03",
+        "sector": "UMC", "resident_id": str(resident_id),
+    })
+    cdb = _db(tmp_path)
+    assignment_id = cdb.execute("SELECT id FROM guard_assignments WHERE resident_id=? AND active=1", (resident_id,)).fetchone()[0]
+    cdb.close()
+    client.post("/guards?month=2026-11", data={
+        "month": "2026-11", "action": "delete", "assignment_id": str(assignment_id), "reason": "",
+    })
+    cdb = _db(tmp_path)
+    assert cdb.execute("SELECT active FROM guard_assignments WHERE id=?", (assignment_id,)).fetchone()[0] == 1
+    assert cdb.execute("SELECT COUNT(*) FROM guard_changes WHERE assignment_id=?", (assignment_id,)).fetchone()[0] == 0
+    cdb.close()
+
+
+def test_guard_month_pdf_export_contains_month_and_active_assignments(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    cdb = _db(tmp_path)
+    cdb.execute("INSERT INTO residents(surname,firstname,year,status,resident_type) VALUES('PDF','RESIDENT',2,'active','local')")
+    resident_id = cdb.execute("SELECT id FROM residents WHERE surname='PDF'").fetchone()[0]
+    cdb.commit()
+    cdb.close()
+    client.post("/guards?month=2026-11", data={
+        "month": "2026-11", "action": "add", "roster_date": "2026-11-02",
+        "sector": "UMC", "resident_id": str(resident_id),
+    })
+    response = client.get("/guards/export.pdf?month=2026-11")
+    assert response.status_code == 200
+    assert response.mimetype == "application/pdf"
+    assert response.data.startswith(b"%PDF")
