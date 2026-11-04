@@ -59,6 +59,21 @@ def read_common_theme_css():
     """Compatibility helper: legacy style assertions now inspect standalone Crystal 3D CSS."""
     return read_theme_css("crystal3d")
 
+def test_flash_messages_are_categorized_as_error_or_info():
+    from flask import get_flashed_messages
+
+    with rotation_app.app.test_request_context("/"):
+        rotation_app.flash("Saisie invalide.")
+        rotation_app.flash("Dossier archivé.")
+        messages = get_flashed_messages(with_categories=True)
+
+    assert messages == [
+        ("error", "Saisie invalide."),
+        ("info", "Dossier archivé."),
+    ]
+
+
+
 @pytest.mark.parametrize("theme", [
     "crystal3d", "aurore-boreale", "emeraude", "futuriste",
     "luxe-elegant", "naturel-moderne", "rubis",
@@ -101,6 +116,9 @@ def test_each_theme_stylesheet_is_standalone(theme):
     assert 'html[data-theme-template] .msg' in css
     assert 'top:auto!important;bottom:calc(18px + env(safe-area-inset-bottom,0px))!important' in css
     assert 'background:linear-gradient(145deg,#b91c1c,#7f1111)!important;color:#fff!important' in css
+    assert 'html[data-theme-template] .msg.msg-error' in css
+    assert 'html[data-theme-template] .msg.msg-info' in css
+    assert 'background:linear-gradient(145deg,#15803d,#14532d)!important;color:#fff!important' in css
     assert 'visibility:hidden!important' in css
     if theme != "crystal3d":
         assert f'html[data-theme-template="{theme}"]' in css
