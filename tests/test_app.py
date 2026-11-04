@@ -83,7 +83,7 @@ def test_internal_navigation_is_grouped_responsive_and_marks_current_page(tmp_pa
     assert 'visibility:visible!important;opacity:1!important;' in theme_css
     residents = client.get("/residents")
     assert residents.status_code == 200
-    assert b'href="javascript:history.back()" class="rt-back-link"' in residents.data
+    assert b'class="rt-back-link" href="javascript:history.back()"' in residents.data
     assert b'href="/residents" class="is-active"' in residents.data
 
 
