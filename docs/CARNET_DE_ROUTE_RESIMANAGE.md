@@ -484,3 +484,25 @@ La catégorisation automatique couvre les messages existants à partir de marque
 - À exécuter sur le commit final : tests Python, build APK debug et smoke test Android.
 - Vérification visuelle sur téléphone réel à effectuer pour les deux types de messages et les sept thèmes.
 - PR #91 reste ouverte et non fusionnée ; branche officielle inchangée.
+
+
+## Tableau de garde : sélection par journée, correctifs et PDF — 4 novembre 2026
+
+### Réalisé sur la branche candidate
+- Sélecteur multiple indépendant dans chaque journée et chaque secteur ; les ajouts multiples sont validés atomiquement.
+- Les résidents actifs locaux des promotions 1 à 3 sont sélectionnables. Les résidents de 4e année restent visibles mais désactivés pendant leur dispense DEMS ; les libellés historiques d'octobre et le rapprochement des identités ne sont pas supprimés.
+- Retrait désormais motivé et traçable : les affectations ne sont plus effacées, elles sont marquées inactives avec motif, auteur et date ; un journal des correctifs est conservé.
+- Calendrier actif et export CSV excluent les gardes retirées. Nouveau PDF mensuel paysage A4 avec le calendrier et l'historique des correctifs.
+- Les icônes de l'accueil et de la barre inférieure bénéficient d'un relief CSS renforcé, d'ombres multicouches, d'une légère perspective et d'un enfoncement à l'appui dans les sept thèmes.
+
+### Plugin 3D
+La compétence Contour3D est disponible dans l'environnement, mais aucun exécuteur Blender ni outil de création de maillage 3D n'est exposé pour ce dépôt dans cette session. Le rendu 3D des commandes est donc renforcé en CSS, sans prétendre avoir créé des modèles Blender natifs.
+
+### Génération mensuelle automatique : non activée
+Le générateur à J-5 n'est pas encore activé : le planning d'octobre conserve 70 libellés distincts, dont plusieurs ambigus ou sans correspondance nominative fiable. Les quotas exacts par promotion et la règle de composition quotidienne UMC / Réanimation chirurgicale doivent être confirmés avant de générer une liste nominative. Aucune rotation arbitraire ni répartition supposée n'est introduite.
+
+### Vérifications à exécuter
+- Tests du module de garde : sélecteurs journaliers, ajout multiple atomique, dispense 4e année, motif obligatoire, conservation du journal, export PDF.
+- Tests complets Python, puis build APK et smoke test Android.
+- Vérification manuelle sur mobile de la sélection multiple et de l'enfoncement des boutons.
+- PR #91 reste ouverte et non fusionnée ; branche officielle inchangée.
