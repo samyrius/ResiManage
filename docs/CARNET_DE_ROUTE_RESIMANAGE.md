@@ -462,3 +462,25 @@ Les messages flash sont produits après redirection et sont communs à de nombre
 - Tests CI à lancer/contrôler sur le dernier commit ; aucune réussite de test n'est présumée à ce stade.
 - Vérification sur appareil réel requise pour confirmer l'absence de panneau de navigation superposé après les huit raccourcis et la visibilité des messages sur différentes tailles d'écran.
 - PR #91 reste ouverte et non fusionnée ; aucune modification de `resimanage-2-work`.
+
+
+## Distinction visuelle des messages d'erreur et d'information — 4 novembre 2026
+
+### Comportement demandé
+- Les erreurs de validation, les refus techniques et les opérations impossibles doivent apparaître en rouge.
+- Les confirmations et informations doivent apparaître en vert.
+- Les messages restent fixés dans la fenêtre courante, en bas de l'écran, avec un décalage au-dessus de la navigation mobile.
+
+### Implémentation
+- app.py : les messages flash reçoivent désormais une catégorie Flask (error ou info). Les appels existants sont classés à partir de marqueurs d'erreur français, anglais et arabes ; un appel peut aussi imposer explicitement sa catégorie.
+- Les sept templates récupèrent les catégories et appliquent des classes et rôles accessibles distincts : alerte assertive pour une erreur, statut informatif pour une confirmation.
+- Les sept feuilles CSS affichent les erreurs en rouge et les informations en vert, sans changer le positionnement inférieur ni l'animation.
+- tests/test_app.py : ajout d'un test de catégorisation et d'assertions de présence des deux styles dans chaque thème.
+
+### Point de vigilance
+La catégorisation automatique couvre les messages existants à partir de marqueurs multilingues. Les nouveaux messages dont la formulation est ambiguë doivent préciser leur catégorie au moment de l'appel (error ou info) afin de garantir le résultat attendu.
+
+### Validation
+- À exécuter sur le commit final : tests Python, build APK debug et smoke test Android.
+- Vérification visuelle sur téléphone réel à effectuer pour les deux types de messages et les sept thèmes.
+- PR #91 reste ouverte et non fusionnée ; branche officielle inchangée.
