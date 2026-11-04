@@ -667,3 +667,39 @@ La liste nominative reçue a été rédigée en octobre 2025. Les numéros d'ann
 - La sauvegarde `resimanage-1-backup` n'a pas été modifiée.
 - L'audit des 105 branches est un inventaire et une revue statique de branches représentatives ; la lecture exhaustive de chaque commit/fichier des branches anciennes reste à terminer avant tout nettoyage.
 - Prochaine étape : faire valider l'APK sur le téléphone réel, puis poursuivre les corrections métier restantes (générateur de gardes, jours fériés et règles d'équité, conservation du contexte dans toutes les pages, retour Android, synchronisation complète et validation des migrations historiques). Ne pas marquer ces éléments comme terminés avant preuves.
+
+---
+
+## Dispense DEMS par cohorte : correction métier appliquée — 4 novembre 2026
+
+### Problème corrigé
+
+La première version du module Gardes excluait automatiquement tous les résidents de 4e année. Cette règle confondait la cohorte qui termine la 4e année et prépare le DEMS avec la nouvelle cohorte promue en 4e année en octobre 2026.
+
+### Implémentation
+
+- Le statut existant `residents.dems_status` porte désormais la valeur `preparing` lorsqu'un résident est en préparation DEMS ; aucune nouvelle colonne ni migration destructive n'est nécessaire.
+- Depuis la rubrique DEMS, un Super Admin peut marquer individuellement un résident actif de 4e année comme « en préparation DEMS » ou lui rendre son admissibilité aux gardes.
+- Chaque changement est consigné dans le journal d'audit (`dems.preparation_status_changed`).
+- Le sélecteur des gardes accepte désormais les résidents locaux actifs des années 1 à 4, sauf ceux explicitement marqués `preparing` ou déjà archivés au DEMS.
+- La validation serveur des ajouts individuels, multiples et des rapprochements nominaux applique la même règle ; masquer une option dans l'interface ne suffit pas.
+- La liste des candidats au vote DEMS ne présente que les résidents marqués en préparation DEMS. Les nouveaux 4e années ne sont donc pas proposés par erreur.
+- La dispense reste distincte du statut inactif et des congés. Marquer une préparation DEMS ne transforme pas le résident en inactif.
+- Aucun résident n'a été marqué automatiquement à partir de son seul numéro d'année. Le Super Admin devra identifier les membres de l'ancienne cohorte 4e année et leur appliquer le statut depuis la rubrique DEMS. Les nouveaux 4e années sont admissibles par défaut.
+
+### Tests et compilation
+
+- Commit code validé : `74560794c42243c03bf3d3bccede5e4294bcad6e`.
+- Tests Python : 193 réussis dans le workflow de régression autonome et dans le job de régression Android.
+- Workflow Android : https://github.com/samyrius/ResiManage/actions/runs/41918864436
+- Build debug APK : job réussi.
+- Artefact APK GitHub Actions : `13366910443`.
+- APK extraite et vérifiée : SHA-256 `4f8eb7bf4a3989944a13d6b8a261eb69f910bf2c10125eb74037b77c7ea08d09`.
+- Au moment de cette mise à jour, le smoke test sur émulateur est encore en cours ; ne pas le déclarer réussi avant son résultat final.
+- Le test sur le téléphone physique reste nécessaire après installation.
+
+### Gouvernance
+
+- Modifications appliquées sur la branche candidate `integration/resimanage-refonte-themes-2026-11-03`.
+- PR #91 reste ouverte et non fusionnée ; aucune fusion automatique n'a été effectuée.
+- `main`, `resimanage-2-work` et `resimanage-1-backup` n'ont pas été modifiées par ce lot.
