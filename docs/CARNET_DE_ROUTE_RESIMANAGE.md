@@ -506,3 +506,7 @@ Le générateur à J-5 n'est pas encore activé : le planning d'octobre conserve
 - Tests complets Python, puis build APK et smoke test Android.
 - Vérification manuelle sur mobile de la sélection multiple et de l'enfoncement des boutons.
 - PR #91 reste ouverte et non fusionnée ; branche officielle inchangée.
+
+### Résultat des tests — commit 24201b8
+- Workflow Python application checks : **succès, 186 tests passés** (run 41909792030).
+- Workflow Android : régression Python réussie ; le job de compilation APK debug est encore en cours au moment de cette mise à jour (run 41909792328). Le smoke test Android et le téléchargement de l'APK ne sont donc pas encore confirmés.
