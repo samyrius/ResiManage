@@ -533,7 +533,7 @@ def test_dems_archive_keeps_resident_and_history(tmp_path, monkeypatch):
     for username in ("benhocine", "drdris"):
         client.post("/users", data={"username": username, "password": "strong-test-password-2026", "role": "super_admin"}, follow_redirects=True)
     with rotation_app.db() as conn:
-        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES(?,?,4)", ("Graduate", "Resident"))
+        conn.execute("INSERT INTO residents(surname,firstname,year,dems_status) VALUES(?,?,4,'preparing')", ("Graduate", "Resident"))
         rid = conn.execute("SELECT id FROM residents WHERE surname='Graduate'").fetchone()[0]
         tid = conn.execute("SELECT id FROM terrains WHERE name='Urologie'").fetchone()[0]
         conn.execute("INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
@@ -1223,7 +1223,7 @@ def test_dems_archive_is_blocked_if_either_official_rejects(tmp_path, monkeypatc
         }, follow_redirects=True)
     with rotation_app.db() as conn:
         conn.execute(
-            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,4,'active')",
+            "INSERT INTO residents(surname,firstname,year,status,dems_status) VALUES(?,?,4,'active','preparing')",
             ("DEMSReject", "Resident"),
         )
         rid = conn.execute(
@@ -1247,7 +1247,7 @@ def test_dems_archive_is_blocked_if_either_official_rejects(tmp_path, monkeypatc
         resident = conn.execute(
             "SELECT status,dems_status FROM residents WHERE id=?", (rid,)
         ).fetchone()
-        assert tuple(resident) == ("active", "")
+        assert tuple(resident) == ("active", "preparing")
         assert conn.execute(
             "SELECT COUNT(*) FROM dems_archive WHERE resident_id=?", (rid,)
         ).fetchone()[0] == 0
@@ -2184,7 +2184,7 @@ def test_dems_rejects_future_exam_date_without_vote_or_audit(tmp_path, monkeypat
         }, follow_redirects=True)
     with rotation_app.db() as conn:
         conn.execute(
-            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,4)",
+            "INSERT INTO residents(surname,firstname,year,dems_status) VALUES(?,?,4,'preparing')",
             ("FutureDEMS", "Resident"),
         )
         rid = conn.execute(
@@ -4711,3 +4711,30 @@ def test_period_editor_forms_have_stable_scroll_targets_and_local_flash_relocati
     assert b'id="period-date-' in response.data
     assert b'rt-flash-messages' in response.data
     assert b'rt-action-context' in response.data
+
+
+
+def test_dems_preparation_flag_is_individual_and_audited(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute("INSERT INTO residents(surname,firstname,year) VALUES('NEW','FOUR',4)")
+        rid = conn.execute("SELECT id FROM residents WHERE surname='NEW'").fetchone()[0]
+        conn.commit()
+    with client.session_transaction() as sess:
+        sess["user"] = "admin"
+        sess["role"] = "super_admin"
+    response = client.post("/dems", data={
+        "action": "set_preparation", "resident": str(rid), "preparing": "1",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT dems_status FROM residents WHERE id=?", (rid,)).fetchone()[0] == "preparing"
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='dems.preparation_status_changed'").fetchone()[0] == 1
+    response = client.post("/dems", data={
+        "action": "set_preparation", "resident": str(rid), "preparing": "0",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT dems_status FROM residents WHERE id=?", (rid,)).fetchone()[0] == ""
+        assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='dems.preparation_status_changed'").fetchone()[0] == 2
