@@ -80,7 +80,8 @@ def test_each_theme_stylesheet_is_standalone(theme):
     assert "transform-style:flat!important" in css
     assert "html[data-theme-template] .main-nav>a>span:not(.nav-icon)" in css
     assert "html[data-theme-template] .main-nav .nav-icon" in css
-    assert "font-size:0!important" in css
+    assert "font-size:10px!important" in css
+    assert "text-overflow:ellipsis!important" in css
     assert "html[data-theme-template] .main-nav .nav-group[open] .nav-menu" in css
     assert f'data-theme-template="{theme}"' in template
     assert f'href="/static/themes/{theme}.css"' in template
@@ -120,7 +121,9 @@ def test_internal_navigation_is_grouped_responsive_and_marks_current_page(tmp_pa
     assert 'position:fixed!important;left:8px!important;right:8px!important' in theme_css
     assert 'bottom:calc(8px + env(safe-area-inset-bottom,0px))!important' in theme_css
     assert 'grid-template-columns:repeat(5,minmax(0,1fr))!important' in theme_css
-    assert 'position:absolute!important;left:0!important;right:0!important;bottom:calc(100% + 9px)!important' in theme_css
+    assert "bottom:calc(76px + env(safe-area-inset-bottom,0px))!important" in theme_css
+    assert "font-size:10px!important" in theme_css
+    assert "text-overflow:ellipsis!important" in theme_css
     assert '.rt-back-link{\n  position:fixed!important;display:grid!important;place-items:center!important;' in theme_css
     assert 'visibility:visible!important;opacity:1!important;' in theme_css
     residents = client.get("/residents")
