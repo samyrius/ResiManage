@@ -322,3 +322,13 @@ Le premier workflow Python a mis en évidence deux points dans les tests :
 - le lien de retour existait dans une ancienne chaîne HTML de `app.py`, mais cette chaîne n'est pas le template effectivement rendu par la nouvelle architecture à sept templates. Le lien n'apparaissait donc pas dans la réponse HTML réelle.
 
 Le lien conditionnel « page précédente » a été ajouté directement dans chacun des sept templates actifs, juste après `</head>`. Le test de navigation vérifie désormais ce balisage réellement rendu sur une page intérieure. Ce correctif rétablit le comportement demandé précédemment et évite de se fier à une chaîne HTML non utilisée.
+
+
+### Préparation de l'APK de test — 4 novembre 2026
+
+- **Demande :** produire une APK Android installable pour tester la version candidate.
+- **Blocage constaté :** les workflows Python et Android associés au commit précédent ont échoué dans le job de tests Python : 173 tests réussis et 7 échecs, tous sur l'assertion qui cherchait une chaîne CSS compacte exacte. Le CSS réel applique bien le sélecteur de navigation mobile, mais le bloc est formaté sur plusieurs lignes ; l'assertion ne tolérait pas cet espacement.
+- **Correction appliquée :** remplacement de la comparaison textuelle stricte par une expression régulière qui accepte les espaces et retours à la ligne tout en vérifiant le sélecteur du thème et la déclaration `position:fixed!important`. Aucun CSS de production n'a été modifié pour masquer l'échec.
+- **Commits de correction :** `fed26bd026d4881caa35d67526865e1a7b75edc7` puis `c94d48078c2d6b51702f34459465a9236b5d2b8c` (correction de l'échappement de l'expression régulière).
+- **Validation en cours :** les workflows déclenchés sur la PR #91 doivent être vérifiés sur le HEAD exact `c94d480`. Le run Android précédent avait ignoré les jobs de compilation APK et d'émulateur, car le job Python requis avait échoué ; aucun artefact APK n'avait donc été produit à ce stade.
+- **Règle :** ne fournir un lien APK qu'après confirmation de la réussite de la compilation et de la présence d'un artefact téléchargeable. Ne pas confondre compilation APK, test sur émulateur et essai sur téléphone physique.
