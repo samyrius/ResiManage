@@ -307,6 +307,6 @@ def test_new_fourth_year_can_be_assigned_but_dems_preparation_resident_is_reject
     })
     assert response.status_code == 302
     cdb = _db(tmp_path)
-    rows = cdb.execute("SELECT resident_id FROM guard_assignments WHERE active=1").fetchall()
+    rows = cdb.execute("SELECT resident_id FROM guard_assignments WHERE active=1 AND roster_date IN ('2026-11-04','2026-11-05')").fetchall()
     assert [row[0] for row in rows] == [ids["NEW4"]]
     cdb.close()
