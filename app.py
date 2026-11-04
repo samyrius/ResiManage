@@ -32,14 +32,16 @@ _FLASH_ERROR_MARKERS = (
  "must be", "must have", "must contain", "expired", "too many", "unsupported",
  "not installed", "not available", "not saved", "fix the", "choose a valid",
  "select whether", "enter a valid", "check the", "error:", "capacity complete",
- "duplicate", "overlap", "requires a reason", "unable to",
+ "duplicate", "overlap", "requires a reason", "unable to", "capacity full", "already assigned",
+ "select a valid", "choose ", "select ", "enter ", "not active", "not authorized", "forbidden",
  "invalide", "incorrect", "échec", "impossible", "introuvable", "n'a pas",
  "ne peut", "ne peuvent", "doit ", "doivent", "obligatoire", "expiré",
  "expirée", "trop de", "manquant", "manquante", "déjà enregistré",
  "déjà affecté", "capacité complète", "choisissez", "saisissez",
- "vérifiez", "exige un motif", "a échoué", "n'a pas pu",
+ "vérifiez", "exige un motif", "a échoué", "n'a pas pu", "existe déjà", "pas disponible",
+ "non autorisé", "non autorisée", "non valide",
  "غير صالح", "غير صحيحة", "غير صحيح", "لا يمكن", "يجب", "انتهى",
- "انتهت", "تعذر", "فشل", "مفقود", "اختر", "أدخل"
+ "انتهت", "تعذر", "فشل", "مفقود", "اختر", "أدخل", "غير موجود", "لا توجد"
 )
 
 def flash(message, category=None):
