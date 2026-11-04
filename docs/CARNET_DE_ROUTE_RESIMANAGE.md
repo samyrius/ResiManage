@@ -384,3 +384,14 @@ Le lien conditionnel « page précédente » a été ajouté directement dans ch
 - **Compilation Android :** job `build-debug-apk` encore en cours au dernier contrôle ; l'installation du SDK Android était en cours. Aucun artefact APK n'était encore disponible à ce contrôle.
 - **Émulateur :** en attente de la réussite du job de compilation.
 - **Conclusion provisoire :** correctif couvert par les tests Python réussis ; ne pas annoncer une APK disponible ni un smoke test Android avant la fin du workflow.
+
+
+### Résultat de compilation APK après corrections de navigation — 4 novembre 2026
+
+- **Commit source compilé :** `305f2843fb62fd107adda87ef78c715dd5803d1a` (inclut les corrections des sept thèmes et les tests de régression).
+- **Tests Python :** workflow `41838031034` terminé avec succès ; job `test` réussi.
+- **Build Android :** workflow `41838031211`, job `build-debug-apk` terminé avec succès ; étape `Build debug APK` réussie.
+- **Artefact généré :** `resimanage2-debug-apk`, ID `13325938987`, taille `38,552,051` octets ; non expiré au moment du contrôle.
+- **Émulateur Android :** job `android-emulator-smoke` toujours en cours au dernier contrôle ; l'étape `Run app on Android emulator` n'avait pas encore rendu son résultat. Ne pas annoncer le smoke test comme réussi avant sa conclusion.
+- **Lien de suivi et téléchargement de l'artefact :** https://github.com/samyrius/ResiManage/actions/runs/41838031211
+- **Vérification sur téléphone physique :** à effectuer après installation de l'APK.
