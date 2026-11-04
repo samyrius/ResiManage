@@ -395,3 +395,43 @@ Le lien conditionnel « page précédente » a été ajouté directement dans ch
 - **Émulateur Android :** job `android-emulator-smoke` toujours en cours au dernier contrôle ; l'étape `Run app on Android emulator` n'avait pas encore rendu son résultat. Ne pas annoncer le smoke test comme réussi avant sa conclusion.
 - **Lien de suivi et téléchargement de l'artefact :** https://github.com/samyrius/ResiManage/actions/runs/41838031211
 - **Vérification sur téléphone physique :** à effectuer après installation de l'APK.
+
+
+## Ajustement de la navigation mobile et des retours visuels — 4 novembre 2026
+
+### Observations de l'utilisateur
+- La flèche « page précédente » apparaît encore sur l'interface extérieure.
+- Les cinq commandes fixes du bas doivent afficher un libellé court, sans débordement de leur bouton.
+- Les sous-menus se recouvrent ou passent derrière d'autres menus selon le sens d'ouverture ; un seul doit rester ouvert, toujours au premier plan.
+- Les raccourcis du tableau de bord semblent parfois ramener visuellement vers la barre fixe au lieu de présenter la page de destination.
+- Les messages flash s'affichent dans le haut du document et obligent à remonter la page pour les lire.
+- L'utilisateur demande un rendu 3D plus marqué et une animation tactile crédible des icônes.
+
+### Diagnostic dans la candidate
+- Les templates conservaient un mécanisme d'empilement multi-menus avec état sauvegardé sous forme de liste ; ce comportement contredisait la règle désormais demandée d'un seul sous-menu actif.
+- Les styles mobiles masquaient les libellés de la barre fixe et certaines couches CSS de thème pouvaient replacer les sous-menus dans le flux normal.
+- Les raccourcis du tableau de bord possèdent des destinations explicites (/residents, /assign, /rotation-board, /terrains, /import, /leave, /external-rotations, /guards). Le comportement de restauration de défilement pouvait néanmoins conserver une position précédente ; un retour explicite en haut est maintenant demandé pour ces liens.
+- Le conteneur global des messages flash était rendu avant le contenu de page, sans positionnement dans le viewport.
+
+### Correctifs appliqués sur les sept thèmes
+- Dans les sept templates : ouverture exclusive d'un seul groupe de navigation ; fermeture des autres à l'ouverture ; conservation/restauration d'une seule clé de menu ; le menu actif reçoit un niveau d'affichage supérieur.
+- Dans les sept CSS : barre mobile en cinq colonnes avec pictogramme et libellé compact, texte tronqué proprement si nécessaire, sélecteur de langue masqué dans la barre fixe, boutons avec ombrage multicouche, relief, et enfoncement (translateY/scale) à l'appui.
+- Dans les sept CSS : sous-menu en panneau fixe au-dessus de la barre, largeur disponible, défilement interne et z-index élevé ; son positionnement ne dépend plus du sens gauche-droite ou droite-gauche.
+- Dans les sept templates : les raccourcis du tableau de bord demandent une restauration de défilement à zéro lors de la navigation vers leur vraie destination.
+- Dans les sept templates : exclusion explicite des pages /login et /register pour le lien de retour, en plus de la racine.
+- Dans les sept CSS : les messages flash deviennent des notifications visibles dans le viewport courant, sans exiger de remonter au début du document.
+
+### Outil 3D
+Le catalogue de capacités disponibles comprend un workflow de modélisation Blender/Contour3D. Il est destiné à créer ou modifier des objets 3D natifs ; il ne constitue pas une bibliothèque d'icônes d'interface directement branchée à l'application. Pour cette correction, le relief et l'animation d'appui sont réalisés en CSS sur les pictogrammes/SVG existants, afin de conserver des boutons légers, accessibles et réactifs. Aucun fichier Blender ni nouvel asset 3D externe n'a été créé.
+
+### Fichiers et tests
+- Sept templates templates/themes/*.html.
+- Sept feuilles static/themes/*.css.
+- tests/test_app.py : assertions mises à jour pour l'unicité du sous-menu, les libellés compacts, le panneau au premier plan et les notifications dans le viewport.
+- Les destinations des huit raccourcis du tableau de bord sont conservées ; leur navigation doit être vérifiée par les tests et sur appareil.
+
+### Statut de validation
+- Modifications de code appliquées sur la branche candidate uniquement.
+- Tests locaux non exécutés via le connecteur GitHub ; le workflow CI doit être contrôlé sur le HEAD final.
+- Vérification visuelle sur téléphone physique encore requise, notamment pour la lisibilité des cinq libellés sur différentes largeurs d'écran et le placement des messages après enregistrement.
+- PR #91 demeure ouverte et non fusionnée ; resimanage-2-work n'a pas été modifiée.
