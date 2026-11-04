@@ -235,7 +235,7 @@ def test_guard_removal_requires_reason_and_preserves_correction_history(tmp_path
     cdb.close()
 
     page = client.get("/guards?month=2026-11")
-    assert b"ABSENT RESIDENT" not in page.data
+    assert page.data.count(b"ABSENT RESIDENT") == 1  # shown only in the correction log
     assert "Arrêt de travail".encode() in page.data
 
 
