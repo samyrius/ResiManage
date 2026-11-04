@@ -227,3 +227,39 @@ Risques / limites :
 L'audit statique du dépôt, de l'inventaire des branches, de la candidate, des routes, du schéma, de la synchronisation, des thèmes, du module Gardes et de la chaîne Android est consigné. Il confirme que la candidate rassemble un volume important de travail utile, mais qu'elle n'est pas prête à être fusionnée : Android reste bloquant, les thèmes ne sont pas encore de véritables layouts distincts, le roulement automatique des gardes manque, la synchronisation est partielle et la branche officielle n'est pas protégée.
 
 La revue exhaustive ligne par ligne de chaque commit/fichier de toutes les branches historiques reste un lot distinct avant nettoyage ou cherry-pick. Cette limite est explicite afin de ne pas présenter une comparaison Git comme une lecture intégrale de 105 historiques.
+
+
+## Décision du 4 novembre 2026 — Revue exhaustive des commits de toutes les branches
+
+### Demande et objectif
+L'utilisateur demande que l'ensemble des éléments de cette discussion soit enregistré. Il souhaite une revue de tous les commits de toutes les branches du dépôt afin de retrouver les fonctionnalités, corrections et améliorations utiles, sans perdre de travail historique et sans réintroduire de régressions.
+
+### Estimation de durée
+Estimation préliminaire : **3 à 7 jours de travail concentré**, à réviser après mesure du nombre réel de commits uniques et du volume des diffs. Cette estimation n'est pas une durée garantie ni le résultat d'un audit déjà exécuté.
+
+Répartition indicative :
+- 2 à 4 heures : inventorier les commits de toutes les branches, calculer les commits uniques et repérer les doublons ;
+- 1 à 3 jours : examiner les modifications uniques, fichiers et diffs ;
+- 1 à 2 jours : comparer les branches divergentes et repérer fonctionnalités perdues, améliorations et conflits ;
+- 1 à 2 jours : vérifier les changements importants, tests associés et risques de régression.
+
+### Méthode de travail retenue
+1. Établir l'inventaire complet des branches et des commits accessibles, avec SHA et relations d'ascendance.
+2. Dédupliquer les commits communs entre branches ; ne pas recompter comme travaux différents les mêmes commits partagés.
+3. Examiner les commits uniques et leurs diffs fichier par fichier, en regroupant les changements par domaine fonctionnel.
+4. Comparer les changements avec la branche de référence `resimanage-2-work` et la candidate `integration/resimanage-refonte-themes-2026-11-03`.
+5. Classer chaque changement : à conserver, déjà intégré, obsolète, remplacé, à corriger, dangereux ou nécessitant une décision métier.
+6. Pour chaque amélioration candidate, identifier dépendances, migrations, impacts de données et tests nécessaires.
+7. Produire un rapport traçable : branche, SHA, fichiers touchés, comportement apporté, décision et preuve de validation.
+8. Porter uniquement les changements utiles sur une branche candidate dédiée, puis exécuter les tests ciblés et de régression.
+
+### Garde-fous
+- Ne pas fusionner la PR #91 sans accord explicite.
+- Ne pas modifier la branche officielle `resimanage-2-work` pendant cette revue.
+- Ne supprimer aucune branche et ne réécrire aucun historique.
+- Ne pas cherry-pick en masse les branches divergentes.
+- Ne pas prétendre que les 105 branches ont déjà été lues intégralement : jusqu'ici elles ont été inventoriées et comparées, mais la revue exhaustive de tous les commits et de tous les fichiers reste à faire.
+- L'audit doit être fondé sur les diffs et les preuves, pas seulement sur les messages de commit ou les noms de branches.
+
+### Prochaine action
+Commencer par mesurer précisément le nombre de commits uniques sur l'ensemble des 105 branches recensées, puis établir l'ordre de revue par domaines et par risque. L'estimation de 3 à 7 jours sera affinée à partir de ce comptage.
