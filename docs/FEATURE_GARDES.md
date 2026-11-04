@@ -14,7 +14,7 @@ L’import est idempotent : il est effectué une seule fois par base, et un inst
 - Chaque libellé importé reste non résolu au départ. Aucun nom n’est automatiquement transformé en résident.
 - Une suggestion exacte de nom peut être affichée à titre indicatif ; seul le Super Admin peut confirmer le rapprochement.
 - La validation d’un libellé met à jour ses occurrences, sans effacer le libellé d’origine conservé dans la source.
-- Les choix d’affectation sont limités aux résidents locaux actifs des promotions 1 à 4. Les résidents archivés dans le DEMS sont exclus.
+- Les choix d’affectation sont limités aux résidents locaux actifs des années 1 à 4. Les résidents archivés dans le DEMS et ceux explicitement marqués « préparation DEMS » sont exclus.
 - Les libellés ambigus ou absents de la liste restent à traiter manuellement.
 
 ## Génération future
@@ -25,13 +25,13 @@ Le schéma guard_sources / guard_assignments est ajouté à la base existante de
 Le module Python et la source JSON sont inclus dans les tâches de préparation Android. La source JSON est également ajoutée aux données embarquées du paquet Windows.
 
 ## Tests
-tests/test_guards.py couvre l’import idempotent, les 233 affectations, les 70 libellés, les horaires du week-end, le calendrier mensuel vide, les modifications manuelles, la validation des correspondances, l’exclusion du DEMS et l’export CSV.
+tests/test_guards.py couvre l’import idempotent, les 233 affectations, les 70 libellés, les horaires du week-end, le calendrier mensuel vide, les modifications manuelles, la validation des correspondances, l’éligibilité des nouveaux 4e années et l’exclusion individuelle des préparants DEMS, ainsi que les exports CSV/PDF.
 
 
 ## Évolution du calendrier — sélecteurs journaliers et correctifs motivés
 
-- Chaque cellule UMC et Réanimation chirurgicale dispose désormais de son propre sélecteur multiple, limité aux résidents locaux actifs de 1re à 3e année.
-- Les résidents de 4e année restent visibles dans le sélecteur mais désactivés pour les nouvelles gardes, conformément à la dispense DEMS actuellement indiquée. L'historique d'octobre et son rapprochement nominatif restent consultables.
+- Chaque cellule UMC et Réanimation chirurgicale dispose de son propre sélecteur multiple, ouvert aux résidents locaux actifs de 1re à 4e année.
+- La dispense de garde pour préparation DEMS est un statut individuel géré par un Super Admin depuis la rubrique DEMS. Seuls les résidents explicitement marqués « en préparation DEMS » sont désactivés ; les nouveaux 4e années sont admissibles par défaut. L'historique d'octobre et son rapprochement nominatif restent consultables.
 - Le retrait d'une affectation n'efface plus sa trace : un motif d'au moins cinq caractères est obligatoire ; la ligne passe inactive et le correctif conserve le résident, la date, le secteur, le motif, l'auteur et l'horodatage.
 - Les affectations retirées ne figurent plus dans le calendrier actif ni dans les exports CSV/PDF. Le journal des correctifs est visible sur le mois et inclus dans le PDF.
 - Un export PDF mensuel paysage A4 est disponible à côté du calendrier.
@@ -39,4 +39,4 @@ tests/test_guards.py couvre l’import idempotent, les 233 affectations, les 70 
 
 ## Génération automatique : étape bloquée volontairement
 
-Le générateur mensuel n'est pas activé tant que les règles de composition et de roulement ne sont pas confirmées. Le planning d'octobre contient des libellés non résolus et ambigus ; il ne peut pas être converti sans risque en identités ni servir à inférer les quotas de promotion. La génération devra créer un brouillon cinq jours avant la fin du mois, calculer l'équité séparément par promotion, exclure les 4e années actuellement dispensées, puis conserver les corrections humaines avec leur motif. Le PDF du brouillon devra rester rééditable pendant tout le mois.
+Le générateur mensuel n'est pas activé tant que les règles de composition et de roulement ne sont pas confirmées. Le planning d'octobre contient des libellés non résolus et ambigus ; il ne peut pas être converti sans risque en identités ni servir à inférer les quotas de promotion. La génération devra créer un brouillon cinq jours avant la fin du mois, calculer l'équité séparément par promotion, exclure uniquement les résidents explicitement marqués en préparation DEMS, puis conserver les corrections humaines avec leur motif. Le PDF du brouillon devra rester rééditable pendant tout le mois.
