@@ -160,7 +160,7 @@ def test_each_guard_day_has_its_own_multi_resident_selector_and_dems_year_is_dis
     assert response.data.count(b'name="resident_ids" multiple') == 60
     assert b'PROMO1 ONE' in response.data
     assert b'disabled>PROMO4 FOUR' in response.data
-    assert b'Ajouter la sélection' in response.data
+    assert "Ajouter la sélection".encode() in response.data
 
 
 def test_guard_day_selector_adds_multiple_residents_atomically(tmp_path, monkeypatch):
