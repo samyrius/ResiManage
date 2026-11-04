@@ -75,6 +75,13 @@ def test_each_theme_stylesheet_is_standalone(theme):
     assert ".rt-action-card" in css
     assert ".rt-period-date-grid" in css
     assert re.search(rf'html\[data-theme-template="{re.escape(theme)}"\] \.main-nav\s*\{{\s*position:fixed!important', css)
+    assert "overflow-y:auto!important" in css
+    assert "touch-action:pan-y!important" in css
+    assert "transform-style:flat!important" in css
+    assert "html[data-theme-template] .main-nav>a>span:not(.nav-icon)" in css
+    assert "html[data-theme-template] .main-nav .nav-icon" in css
+    assert "font-size:0!important" in css
+    assert "html[data-theme-template] .main-nav .nav-group[open] .nav-menu" in css
     assert f'data-theme-template="{theme}"' in template
     assert f'href="/static/themes/{theme}.css"' in template
     if theme != "crystal3d":
