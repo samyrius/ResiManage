@@ -4081,22 +4081,57 @@ def test_human_readable_blank_form_headers_map_to_import_columns(tmp_path, monke
     book.close()
 
 
-def test_expired_trash_is_purged_on_normal_app_request(tmp_path, monkeypatch):
+def test_expired_trash_is_purged_on_normal_app_request_and_photo_removed(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
+    photo_dir = tmp_path / "resident_photos"
+    photo_dir.mkdir()
+    expired_photo = photo_dir / "resident_expired.webp"
+    recent_photo = photo_dir / "resident_recent.webp"
+    expired_photo.write_bytes(b"expired-photo")
+    recent_photo.write_bytes(b"recent-photo")
     expired = (datetime.now() - timedelta(days=220)).replace(microsecond=0).isoformat()
+    recent = (datetime.now() - timedelta(days=30)).replace(microsecond=0).isoformat()
     with rotation_app.db() as conn:
         conn.execute(
             "INSERT INTO trash_items(entity_type,entity_id,label,reason,snapshot_json,deleted_at,deleted_by) VALUES(?,?,?,?,?,?,?)",
-            ("resident", "99999", "Expired test record", "test retention", json.dumps({"resident": {}}), expired, "admin"),
+            ("resident", "99999", "Expired test record", "test retention",
+             json.dumps({"resident": {"photo_path": "resident_photos/resident_expired.webp"}}), expired, "admin"),
         )
-        trash_id = conn.execute("SELECT id FROM trash_items WHERE label='Expired test record'").fetchone()[0]
+        expired_id = conn.execute("SELECT id FROM trash_items WHERE label='Expired test record'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO trash_items(entity_type,entity_id,label,reason,snapshot_json,deleted_at,deleted_by) VALUES(?,?,?,?,?,?,?)",
+            ("resident", "99998", "Recent test record", "test retention",
+             json.dumps({"resident": {"photo_path": "resident_photos/resident_recent.webp"}}), recent, "admin"),
+        )
+        recent_id = conn.execute("SELECT id FROM trash_items WHERE label='Recent test record'").fetchone()[0]
     rotation_app.app._trash_cleanup_date = ""
     response = client.get("/")
     assert response.status_code == 200
     with rotation_app.db() as conn:
+        assert conn.execute("SELECT 1 FROM trash_items WHERE id=?", (expired_id,)).fetchone() is None
+        assert conn.execute("SELECT 1 FROM trash_items WHERE id=?", (recent_id,)).fetchone() is not None
+        assert conn.execute("SELECT 1 FROM audit WHERE action='trash.expired' AND details LIKE ?", (f"%trash_id={expired_id}%",)).fetchone() is not None
+    assert not expired_photo.exists()
+    assert recent_photo.exists()
+
+
+def test_trash_retention_uses_six_calendar_months(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO trash_items(entity_type,entity_id,label,reason,snapshot_json,deleted_at,deleted_by) VALUES(?,?,?,?,?,?,?)",
+            ("resident", "99997", "Month-end test record", "test retention",
+             json.dumps({"resident": {}}), "2025-08-31T10:00:00", "admin"),
+        )
+        trash_id = conn.execute("SELECT id FROM trash_items WHERE label='Month-end test record'").fetchone()[0]
+    assert rotation_app.purge_expired_trash(now=datetime(2026, 2, 27, 10, 0, 0)) == 0
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT 1 FROM trash_items WHERE id=?", (trash_id,)).fetchone() is not None
+    assert rotation_app.purge_expired_trash(now=datetime(2026, 2, 28, 10, 0, 0)) == 1
+    with rotation_app.db() as conn:
         assert conn.execute("SELECT 1 FROM trash_items WHERE id=?", (trash_id,)).fetchone() is None
-        assert conn.execute("SELECT 1 FROM audit WHERE action='trash.expired' AND details LIKE ?", (f"%trash_id={trash_id}%",)).fetchone() is not None
 
 
 def test_deleted_exam_result_stays_in_trash_and_can_be_restored(tmp_path, monkeypatch):
