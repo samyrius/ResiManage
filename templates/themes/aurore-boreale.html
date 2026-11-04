@@ -47,6 +47,7 @@
       try{sessionStorage.removeItem("resimanage-scroll-to-content");sessionStorage.setItem(resetScrollKey,"1");}catch(e){}
     }
   },true);
+  document.addEventListener("click",function(event){var quick=event.target.closest(".rt-icon-dashboard .rt-action-card");if(quick){try{sessionStorage.removeItem("resimanage-scroll-to-content");sessionStorage.setItem(resetScrollKey,"1");}catch(e){}}},true);
   nav.addEventListener("toggle",function(event){
     var group=event.target;
     if(!group.matches||!group.matches(".nav-group[data-nav-key]"))return;
