@@ -331,3 +331,26 @@ html[data-theme-template="rubis"] .main-nav>.nav-group{flex:0 1 180px!important}
 html[data-theme-template="rubis"] .rt-app-shell>main{max-width:1180px!important;margin:0 auto!important}
 html[data-theme-template="rubis"] .rt-app-shell>main section{border-radius:4px 18px 4px 18px!important}
 @media(max-width:680px){html[data-theme-template="rubis"] .rt-app-shell{padding:8px!important}html[data-theme-template="rubis"] .main-nav{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;justify-content:stretch!important;gap:7px!important}html[data-theme-template="rubis"] .main-nav>.nav-home{grid-column:1/-1}html[data-theme-template="rubis"] .main-nav>.nav-group{width:100%!important}}
+
+
+/* Mobile navigation contract: retain the fixed bottom bar in this theme. */
+@media(max-width:680px){
+  html[data-theme-template="rubis"] .rt-app-shell{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))!important}
+  html[data-theme-template="rubis"] .main-nav{
+    position:fixed!important;left:8px!important;right:8px!important;
+    top:auto!important;bottom:calc(8px + env(safe-area-inset-bottom,0px))!important;
+    z-index:1000!important;display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;
+    align-items:center!important;gap:3px!important;width:auto!important;margin:0!important;
+    padding:6px 5px!important;transform:none!important;
+  }
+  html[data-theme-template="rubis"] .main-nav>.nav-home,
+  html[data-theme-template="rubis"] .main-nav>.nav-group{grid-column:auto!important;width:auto!important;min-width:0!important}
+  html[data-theme-template="rubis"] .main-nav .nav-group[open] .nav-menu{
+    position:absolute!important;left:0!important;right:0!important;top:auto!important;
+    bottom:calc(100% + 9px)!important;max-height:min(50dvh,340px)!important;overflow-y:auto!important;
+  }
+  html[data-theme-template="rubis"] .rt-back-link{
+    position:fixed!important;display:grid!important;visibility:visible!important;opacity:1!important;
+    z-index:10000!important;width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;
+  }
+}
