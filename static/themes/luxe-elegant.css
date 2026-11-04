@@ -354,3 +354,85 @@ html[data-theme-template="luxe-elegant"] .rt-app-shell>main section{border-radiu
     z-index:10000!important;width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;
   }
 }
+
+
+/* Restored Nov 1 mobile scroll + icon-only fixed navigation contract. */
+@media(max-width:680px){
+  html{
+    overflow-x:clip!important;overflow-y:auto!important;
+    scroll-behavior:auto!important;touch-action:pan-y!important;
+    transform:none!important;filter:none!important;perspective:none!important;
+  }
+  body{
+    overflow-x:clip!important;min-height:100%!important;height:auto!important;
+    touch-action:pan-y!important;transform:none!important;filter:none!important;
+    perspective:none!important;
+  }
+  .rt-app-shell{
+    display:block!important;
+    padding:8px 8px calc(92px + env(safe-area-inset-bottom,0px))!important;
+    transform:none!important;transform-style:flat!important;
+    filter:none!important;perspective:none!important;
+    overflow:visible!important;
+  }
+  .rt-app-shell>main{
+    display:block!important;width:100%!important;min-width:0!important;padding:0!important;
+  }
+  html[data-theme-template] .main-nav{
+    position:fixed!important;top:auto!important;bottom:0!important;
+    left:0!important;right:0!important;width:100%!important;max-width:none!important;
+    z-index:1200!important;margin:0!important;box-sizing:border-box!important;
+    padding:7px 6px calc(7px + env(safe-area-inset-bottom,0px))!important;
+    display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;
+    align-items:stretch!important;gap:4px!important;border-radius:16px 16px 0 0!important;
+    border-bottom:0!important;backdrop-filter:none!important;
+    -webkit-backdrop-filter:none!important;transform:none!important;
+    transform-style:flat!important;filter:none!important;perspective:none!important;
+    overflow:visible!important;touch-action:pan-y!important;
+  }
+  html[data-theme-template] .main-nav>.nav-home,
+  html[data-theme-template] .main-nav>.nav-group{
+    grid-column:auto!important;min-width:0!important;width:100%!important;
+    align-self:stretch!important;position:static!important;
+  }
+  html[data-theme-template] .main-nav>a,
+  html[data-theme-template] .main-nav .nav-group>summary{
+    box-sizing:border-box!important;min-width:0!important;width:100%!important;
+    height:54px!important;min-height:54px!important;padding:4px 1px!important;
+    display:flex!important;flex-direction:column!important;align-items:center!important;
+    justify-content:center!important;text-align:center!important;font-size:0!important;
+    line-height:1!important;white-space:nowrap!important;overflow:hidden!important;
+    border-radius:12px!important;transform:none!important;
+  }
+  html[data-theme-template] .main-nav>a>span:not(.nav-icon),
+  html[data-theme-template] .main-nav .nav-group>summary>span:not(.nav-icon){
+    display:none!important;
+  }
+  html[data-theme-template] .main-nav .nav-icon{
+    display:flex!important;flex:0 0 auto!important;align-items:center!important;
+    justify-content:center!important;min-width:0!important;width:30px!important;
+    height:30px!important;margin:0!important;font-size:25px!important;
+    line-height:1!important;
+  }
+  html[data-theme-template] .main-nav .nav-group[open]{
+    position:static!important;z-index:1201!important;
+  }
+  html[data-theme-template] .main-nav .nav-group[open] .nav-menu{
+    position:absolute!important;left:6px!important;right:6px!important;
+    top:auto!important;bottom:calc(100% + 8px)!important;
+    display:flex!important;flex-direction:column!important;gap:4px!important;
+    width:auto!important;min-width:0!important;max-width:none!important;
+    max-height:min(55vh,420px)!important;overflow-x:hidden!important;overflow-y:auto!important;
+    overscroll-behavior:contain!important;-webkit-overflow-scrolling:touch!important;
+    margin:0!important;padding:8px!important;
+  }
+  html[data-theme-template] .main-nav .nav-menu a{
+    display:flex!important;align-items:center!important;min-height:44px!important;
+    font-size:14px!important;white-space:normal!important;touch-action:manipulation!important;
+  }
+  html[data-theme-template] .main-nav .rt-language{
+    position:absolute!important;left:auto!important;right:8px!important;
+    bottom:calc(100% + 8px)!important;display:flex!important;align-items:center!important;
+    gap:4px!important;padding:4px!important;
+  }
+}
