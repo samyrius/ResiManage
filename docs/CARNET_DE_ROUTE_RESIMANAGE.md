@@ -313,3 +313,12 @@ Les sept fichiers `static/themes/*.css` et `tests/test_app.py`.
 
 ### Validation restante
 Les tests statiques ne remplacent pas le contrôle visuel des sept thèmes sur navigateur et Android : menus, défilement, navigation fixe, formulaires et tableaux restent à vérifier. Aucune fusion de PR n'est autorisée par ce changement.
+
+
+### CI : réparation du lien de retour dans les templates actifs — 4 novembre 2026
+
+Le premier workflow Python a mis en évidence deux points dans les tests :
+- plusieurs tests historiques utilisaient encore le helper `read_common_theme_css()`. Un alias de compatibilité a été conservé ; il lit maintenant la feuille autonome Crystal 3D.
+- le lien de retour existait dans une ancienne chaîne HTML de `app.py`, mais cette chaîne n'est pas le template effectivement rendu par la nouvelle architecture à sept templates. Le lien n'apparaissait donc pas dans la réponse HTML réelle.
+
+Le lien conditionnel « page précédente » a été ajouté directement dans chacun des sept templates actifs, juste après `</head>`. Le test de navigation vérifie désormais ce balisage réellement rendu sur une page intérieure. Ce correctif rétablit le comportement demandé précédemment et évite de se fier à une chaîne HTML non utilisée.
