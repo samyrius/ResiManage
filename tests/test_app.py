@@ -91,8 +91,12 @@ def test_each_theme_stylesheet_is_standalone(theme):
     assert 'data-nav-key="settings"' in template
     assert '🏠' in template and '👥' in template and '🗓️' in template and '📊' in template
     assert 'resimanage-open-nav-groups' in template
-    assert 'group.open=false' not in template
-    assert 'var(--rt-menu-stack-offset,8px)' in css
+    assert 'resimanage-reset-scroll-on-route' in template
+    assert 'groups.forEach(function(group){group.open=group===current;})' in template or 'groups.forEach(function(g){g.open=g===current;})' in template
+    assert 'other.open=false' in template or 'o.open=false' in template
+    assert 'bottom:calc(76px + env(safe-area-inset-bottom,0px))!important' in css
+    assert 'max-height:min(56dvh,440px)!important' in css
+    assert 'html[data-theme-template] .msg' in css
     assert 'visibility:hidden!important' in css
     if theme != "crystal3d":
         assert f'html[data-theme-template="{theme}"]' in css
