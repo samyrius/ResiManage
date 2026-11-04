@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from flask import Flask, request, redirect, session, render_template, render_template_string, flash as flask_flash, send_file, send_from_directory, jsonify, has_request_context
+from flask import Flask, request, redirect, session, render_template, render_template_string, flash as flask_flash, get_flashed_messages, send_file, send_from_directory, jsonify, has_request_context
 import sqlite3, os, sys, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess, secrets, smtplib, time, zipfile
 import warnings
 import calendar
@@ -1078,6 +1078,8 @@ document.addEventListener("toggle",function(event){var group=event.target;if(!gr
  context.setdefault("role",session.get("role",""))
  context.setdefault("csrf_token",csrf_token)
  inner=render_template_string(body,**context)
+ flash_html=render_template_string("""<div id="rt-flash-messages">{% for category, message in messages %}<p class="msg msg-{{ 'error' if category in ['error','danger'] else 'info' }}" role="{{ 'alert' if category in ['error','danger'] else 'status' }}" aria-live="{{ 'assertive' if category in ['error','danger'] else 'polite' }}">{{message}}</p>{% endfor %}</div><div id="rt-action-context" data-action="{{request.form.get('action','')}}" data-rid="{{request.form.get('rid','')}}"></div><script>(function(){var box=document.getElementById("rt-flash-messages");if(!box||!box.children.length)return;var target=null;try{target=location.hash?document.getElementById(decodeURIComponent(location.hash.slice(1))):null;}catch(e){}var ctx=document.getElementById("rt-action-context");if(!target&&ctx){var action=ctx.dataset.action||"",rid=ctx.dataset.rid||"";if(action){var forms=Array.from(document.querySelectorAll("form"));target=forms.find(function(form){var a=form.querySelector('input[name="action"]'),r=form.querySelector('input[name="rid"]');return a&&a.value===action&&(!rid||(r&&r.value===rid));})||null;}}if(!target&&location.pathname==="/assign")target=document.getElementById("assignment-form");if(!target&&location.pathname==="/residents")target=document.querySelector(".rt-add-resident")||document.querySelector("main section");if(target){target.insertBefore(box,target.firstChild);target.scrollIntoView({block:"start",behavior:"auto"});}})();</script>""",messages=get_flashed_messages(with_categories=True))
+ inner=flash_html+inner
  selected_theme=request.cookies.get("resimanage_theme","crystal3d")
  theme_aliases={"crystal":"crystal3d","futuristic":"futuriste","luxe":"luxe-elegant","nature":"naturel-moderne","emerald":"emeraude","aurora":"aurore-boreale","ruby":"rubis"}
  selected_theme=theme_aliases.get(selected_theme,selected_theme)
