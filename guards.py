@@ -34,8 +34,21 @@ def _eligible_residents(c):
         FROM residents r
         WHERE r.status='active' AND r.year BETWEEN 1 AND 4
           AND COALESCE(r.resident_type,'local')='local'
+          AND COALESCE(r.dems_status,'')<>'preparing'
           AND NOT EXISTS (SELECT 1 FROM dems_archive d WHERE d.resident_id=r.id)
         ORDER BY r.year DESC,r.surname COLLATE NOCASE,r.firstname COLLATE NOCASE
+    """).fetchall()
+
+
+def _dems_preparation_residents(c):
+    return c.execute("""
+        SELECT r.id,r.surname,r.firstname,r.year,r.dems_status
+        FROM residents r
+        WHERE r.status='active' AND r.year=4
+          AND COALESCE(r.resident_type,'local')='local'
+          AND COALESCE(r.dems_status,'')='preparing'
+          AND NOT EXISTS (SELECT 1 FROM dems_archive d WHERE d.resident_id=r.id)
+        ORDER BY r.surname COLLATE NOCASE,r.firstname COLLATE NOCASE
     """).fetchall()
 
 
@@ -192,8 +205,9 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
                         resident_id = int(value)
                         resident = c.execute("""
                           SELECT r.id,r.surname,r.firstname,r.year FROM residents r
-                          WHERE r.id=? AND r.status='active' AND r.year BETWEEN 1 AND 3
+                          WHERE r.id=? AND r.status='active' AND r.year BETWEEN 1 AND 4
                             AND COALESCE(r.resident_type,'local')='local'
+                            AND COALESCE(r.dems_status,'')<>'preparing'
                             AND NOT EXISTS(SELECT 1 FROM dems_archive d WHERE d.resident_id=r.id)
                         """, (resident_id,)).fetchone()
                         if not resident:
@@ -230,8 +244,9 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
                         resident_id = int(resident_value)
                         resident = c.execute("""
                           SELECT r.id,r.surname,r.firstname FROM residents r
-                          WHERE r.id=? AND r.status='active' AND r.year BETWEEN 1 AND 3
+                          WHERE r.id=? AND r.status='active' AND r.year BETWEEN 1 AND 4
                             AND COALESCE(r.resident_type,'local')='local'
+                            AND COALESCE(r.dems_status,'')<>'preparing'
                             AND NOT EXISTS(SELECT 1 FROM dems_archive d WHERE d.resident_id=r.id)
                         """, (resident_id,)).fetchone()
                         if not resident:
@@ -302,8 +317,8 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
         months.add(date.today().strftime("%Y-%m"))
         months.add(month)
         month_options = [{"value": m, "label": _month_label(m)} for m in sorted(months, reverse=True)]
-        residents = [r for r in _eligible_residents(c) if r["year"] <= 3]
-        released_residents = [r for r in _eligible_residents(c) if r["year"] == 4]
+        residents = list(_eligible_residents(c))
+        released_residents = list(_dems_preparation_residents(c))
         changes = c.execute("""
           SELECT * FROM guard_changes WHERE substr(roster_date,1,7)=?
           ORDER BY created_at DESC,id DESC
@@ -320,7 +335,7 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
           {% if month=='2026-10' %}<p class="rt-history-note">🔒 {{L('Planning historique importé. Les libellés d’origine sont conservés ; aucune identité n’a été attribuée automatiquement.','Historical roster imported. Original labels are preserved; no identity was assigned automatically.','تم استيراد الجدول التاريخي مع الحفاظ على التسميات الأصلية؛ لم يتم إسناد أي هوية تلقائيًا.')}}</p>{% elif counts.total==0 %}<p class="rt-draft-note">✎ {{L('Mois vierge : aucune garde n’a été générée. Ajoutez les affectations après validation du roulement.','Empty month: no shifts have been generated. Add assignments only after validating the rotation rules.','شهر فارغ: لم يتم إنشاء أي مناوبة. أضف التعيينات بعد التحقق من قواعد التناوب.')}}</p>{% endif %}
         </section>
         {% if role=='super_admin' %}<section class="rt-guard-editor"><h2>{{L('Règle de sélection','Selection rule','قاعدة الاختيار')}}</h2>
-          <p>{{L('Chaque journée possède son propre sélecteur dans les deux colonnes. Les résidents de 4e année restent visibles mais sont désactivés pendant leur préparation au DEMS.','Each day has its own selector in both columns. Fourth-year residents remain visible but disabled while preparing for the DEMS.','لكل يوم قائمة اختيار خاصة في كلا القسمين. يظهر مقيمو السنة الرابعة لكنهم غير قابلين للاختيار أثناء التحضير لامتحان DEMS.')}}</p></section>{% endif %}
+          <p>{{L('Chaque journée possède son propre sélecteur. Les résidents actifs des années 1 à 4 sont admissibles ; seuls ceux explicitement marqués en préparation DEMS sont dispensés.','Each day has its own selector. Active residents in years 1–4 are eligible; only those explicitly marked as preparing for DEMS are exempt.','لكل يوم قائمة اختيار خاصة. المقيمون النشطون من السنة 1 إلى 4 مؤهلون؛ ويُعفى فقط من تم تحديدهم صراحة للتحضير لـ DEMS.')}}</p></section>{% endif %}
         <section class="rt-guard-calendar-section"><div class="rt-guard-calendar-title"><h2>{{month_label}}</h2><a class="button" href="/guards/mapping?month={{month}}">👤 {{L('Identifier les résidents','Identify residents','تحديد المقيمين')}}</a><a class="button" href="/guards/export.csv?month={{month}}">⬇ CSV</a><button type="button" onclick="window.print()">🖨 {{L('Imprimer','Print','طباعة')}}</button></div>
           <div class="wrap"><table class="rt-guard-calendar"><thead><tr><th>{{L('Jour','Day','اليوم')}}</th><th>{{L('UMC','Emergency','الاستعجالات')}}</th><th>{{L('Réanimation chirurgicale','Surgical ICU','الإنعاش الجراحي')}}</th></tr></thead><tbody>
           {% for day in days %}<tr class="{% if day.weekend %}rt-weekend{% endif %}"><th><strong>{{day.day}}</strong><span>{{day.weekday}}</span><small>{{day.date[8:10]}}/{{day.date[5:7]}}/{{day.date[:4]}}</small></th>
@@ -393,6 +408,7 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
                       SELECT r.id,r.surname,r.firstname FROM residents r
                       WHERE r.id=? AND r.status='active' AND r.year BETWEEN 1 AND 4
                         AND COALESCE(r.resident_type,'local')='local'
+                        AND COALESCE(r.dems_status,'')<>'preparing'
                         AND NOT EXISTS(SELECT 1 FROM dems_archive d WHERE d.resident_id=r.id)
                     """, (resident_id,)).fetchone()
                     if not eligible:
