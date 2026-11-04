@@ -52,8 +52,29 @@ def setup_client(tmp_path, monkeypatch):
 
 
 
-def read_common_theme_css():
-    return (Path(__file__).resolve().parents[1] / "static" / "themes" / "common.css").read_text(encoding="utf-8")
+def read_theme_css(theme="crystal3d"):
+    return (Path(__file__).resolve().parents[1] / "static" / "themes" / f"{theme}.css").read_text(encoding="utf-8")
+
+@pytest.mark.parametrize("theme", [
+    "crystal3d", "aurore-boreale", "emeraude", "futuriste",
+    "luxe-elegant", "naturel-moderne", "rubis",
+])
+def test_each_theme_stylesheet_is_standalone(theme):
+    root = Path(__file__).resolve().parents[1]
+    css = read_theme_css(theme)
+    template = (root / "templates" / "themes" / f"{theme}.html").read_text(encoding="utf-8")
+
+    assert "@import" not in css
+    assert ".rt-app-shell" in css
+    assert ".main-nav" in css
+    assert ".rt-back-link" in css
+    assert ".rt-action-card" in css
+    assert ".rt-period-date-grid" in css
+    assert f'data-theme-template="{theme}"' in template
+    assert f'href="/static/themes/{theme}.css"' in template
+    if theme != "crystal3d":
+        assert f'html[data-theme-template="{theme}"]' in css
+
 
 def login(client):
     return client.post("/login", data={"password": "test-strong-password-2026"}, follow_redirects=True)
@@ -72,7 +93,7 @@ def test_internal_navigation_is_grouped_responsive_and_marks_current_page(tmp_pa
     assert "Stages et planification".encode() in response.data
     assert b'class="nav-home is-active"' in response.data
     assert b'href="/static/themes/crystal3d.css"' in response.data
-    theme_css = read_common_theme_css()
+    theme_css = read_theme_css("crystal3d")
     assert 'grid-template-columns:260px minmax(0,1fr)' in theme_css
     assert '@media(max-width:680px)' in theme_css
     assert 'position:fixed!important;left:8px!important;right:8px!important' in theme_css
