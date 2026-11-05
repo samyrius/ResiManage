@@ -958,3 +958,36 @@ Piste de conception à valider par prototype :
 
 ### Décision de méthode
 Cette orientation est une proposition de conception issue du retour utilisateur, pas encore une implémentation validée. Préparer d'abord une maquette/prototype centré sur le tableau unique et le faire évaluer avant de modifier davantage les règles métier ou de lancer une nouvelle APK. Ne pas fusionner la branche candidate dans la branche officielle sans autorisation explicite.
+
+
+## Validation utilisateur du tableau centralisé — 5 novembre 2026
+
+### Décisions confirmées
+L'utilisateur valide le principe d'un **tableau central unique** et précise qu'aucune page secondaire ne doit être nécessaire pour les opérations de planification.
+
+- Le tableau doit être à la fois la vue générale et l'espace de travail : affecter, retirer ou déplacer un résident directement dans la cellule service/période concernée.
+- Les dates des quatre périodes doivent être modifiables directement depuis ce même écran, sans ouvrir une autre page.
+- Les autres paramètres de planification nécessaires doivent également être accessibles depuis le tableau, dans une zone compacte et intégrée.
+- Ne pas conserver un second tableau permanent de résidents ou de capacités à côté de la matrice.
+
+### Capacités de service : mode optionnel
+Ajouter un interrupteur global « Gestion des capacités » directement sur le tableau :
+- **Activé** : le nombre de places doit être renseigné pour chaque service/période concerné ; les contrôles de capacité s'appliquent et le tableau indique les places utilisées/restantes et les dépassements.
+- **Désactivé** : la capacité n'est pas obligatoire et ne bloque pas les affectations manuelles ; l'utilisateur peut affecter librement les résidents.
+- Dans les deux modes, conserver les contrôles métier indépendants de la capacité : résident admissible/actif, absence de doublon et détection des conflits ou indisponibilités.
+- Ne pas supprimer les données ni la structure de capacité existantes. Elles doivent rester compatibles avec un futur module d'automatisation des affectations (notamment la répartition automatique selon les places disponibles).
+- Le comportement de la désactivation doit être strictement limité au contrôle de capacité ; elle ne doit jamais désactiver les autres validations.
+
+### Principes d'interface à respecter
+- Une seule matrice : lignes = services actifs, colonnes = périodes.
+- En-tête compact intégré au tableau : dates des périodes éditables, interrupteur de capacité, recherche et filtres utiles.
+- Chaque cellule montre les résidents affectés (nom et promotion) et, lorsque le mode capacité est activé, la capacité, l'effectif et le nombre de places restantes.
+- Les actions d'ajout/retrait/déplacement se font dans la cellule, avec un éditeur local ou une petite fenêtre contextuelle qui ne remplace pas la vue d'ensemble.
+- Enregistrer une modification ne doit pas renvoyer l'utilisateur en haut de page ni lui faire perdre sa position dans le tableau.
+- Prévoir un affichage adapté aux tablettes et mobiles ; sur petit écran, la matrice peut défiler horizontalement, mais le nom du service et les repères de période doivent rester compréhensibles.
+
+### Périmètre et garde-fous
+- Cette décision remplace l'approche de la page /planning à période unique et de ses tableaux séparés comme cible UX. La version précédente est considérée comme un essai non satisfaisant, pas comme une interface finale.
+- Conserver les routes historiques et les données existantes pendant la phase de prototype ; aucune suppression de données ni migration destructive.
+- Première étape : inspecter le modèle de données et les règles actuelles, puis construire un prototype de la matrice unique et le faire évaluer avant d'engager les changements métier et de produire une nouvelle APK.
+- Travail sur la branche candidate uniquement. La branche officielle `resimanage-2-work` ne doit pas être modifiée et la PR #91 ne doit pas être fusionnée sans autorisation explicite.
