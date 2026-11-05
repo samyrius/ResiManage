@@ -4891,6 +4891,9 @@ def test_resident_profile_summary_api_returns_stage_history_and_assignments(tmp_
     assert data["history"][0]["terrain"] == terrain["name"]
     assert data["history"][0]["date_done"] == "2026-10-01"
     assert data["assignments"][0]["status"] == "confirmed"
+    assert "exams" in data and "leaves" in data
+    assert "external_rotations" in data and "objectives" in data
+    assert set(data["leave_balance"]) == {"earned", "used", "remaining"}
 
 
 def test_touch_move_api_validates_and_moves_assignment_between_services(tmp_path, monkeypatch):
@@ -4931,6 +4934,42 @@ def test_touch_move_api_validates_and_moves_assignment_between_services(tmp_path
         assert conn.execute(
             "SELECT COUNT(*) FROM audit WHERE action='assignment.drag_moved'"
         ).fetchone()[0] == 1
+
+    # A full destination under enforced capacity rejects the move and preserves its source.
+    with rotation_app.db() as conn:
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES('MoveRejected','Resident',1,'active')"
+        )
+        rejected_id = conn.execute(
+            "SELECT id FROM residents WHERE surname='MoveRejected'"
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",
+            (rejected_id, terrains[0]["id"], period["id"]),
+        )
+        conn.execute(
+            "INSERT INTO settings(key,value) VALUES('rotation_capacity_enforced','1') "
+            "ON CONFLICT(key) DO UPDATE SET value='1'"
+        )
+        conn.execute(
+            "INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,0)",
+            (year, terrains[1]["id"], period["id"]),
+        )
+        conn.commit()
+    rejected = client.post("/api/rotation-board/move", data={
+        "resident_id": str(rejected_id),
+        "source_terrain_id": str(terrains[0]["id"]),
+        "source_period_id": str(period["id"]),
+        "target_terrain_id": str(terrains[1]["id"]),
+        "target_period_id": str(period["id"]),
+    })
+    assert rejected.status_code == 400
+    with rotation_app.db() as conn:
+        still_source = conn.execute(
+            "SELECT terrain_id FROM assignments WHERE resident_id=? AND period_id=?",
+            (rejected_id, period["id"]),
+        ).fetchone()
+        assert still_source["terrain_id"] == terrains[0]["id"]
 
 
 def test_capacity_disabled_allows_manual_assignment_without_capacity(tmp_path, monkeypatch):
