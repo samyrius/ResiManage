@@ -383,7 +383,7 @@ def test_bulk_planning_rolls_back_capacities_when_assignment_is_invalid(tmp_path
     )
     assert response.status_code == 200
     assert f'name="capacity_{terrain_id}" value="7"'.encode() in response.data
-    assert b"Enregistrement groupé annulé" in response.data
+    assert "Enregistrement groupé annulé".encode() in response.data
     with rotation_app.db() as conn:
         capacity = conn.execute(
             "SELECT places FROM capacities WHERE year_label=? AND terrain_id=? AND period_id=?",
