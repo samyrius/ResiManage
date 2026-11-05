@@ -1776,9 +1776,91 @@ def check(c,rid,tid,pid,y):
  if h and done<total:return False,tr("history_block")+f" ({h['year_label']} / {h['period']} / {h['date_done']})",None
  if t["mandatory_year"] and t["mandatory_year"]!=r["year"]:return True,tr("mismatch"),"pending"
  return True,(tr("history_repeat") if h else tr("done")),"confirmed"
+@app.route("/planning",methods=["GET","POST"])
+def bulk_planning():
+ if guard(): return redirect("/login")
+ c=db()
+ years=available_postgrad_years(c)
+ y=request.values.get("year",active_postgrad_year(c))
+ if y not in years and years: y=years[0]
+ for period_name in ["Période 1","Période 2","Période 3","Période 4"]:
+  c.execute("INSERT OR IGNORE INTO periods(year_label,name) VALUES(?,?)",(y,period_name))
+ periods=c.execute("SELECT * FROM periods WHERE year_label=? ORDER BY id",(y,)).fetchall()
+ selected_period_id=request.values.get("period_id",type=int)
+ if selected_period_id not in {p["id"] for p in periods}:
+  selected_period_id=periods[0]["id"] if periods else 0
+ is_admin=session.get("role")=="super_admin"
+ if request.method=="POST":
+  if not is_admin:
+   c.close(); return ("Forbidden — Super Admin only",403)
+  try:
+   period=c.execute("SELECT id FROM periods WHERE id=? AND year_label=?",(selected_period_id,y)).fetchone()
+   if not period: raise ValueError("Période invalide pour l’année sélectionnée.")
+   terrains_for_save=c.execute("SELECT id,name FROM terrains WHERE active=1 ORDER BY name").fetchall()
+   capacity_count=0
+   assignment_count=0
+   for terrain in terrains_for_save:
+    raw=request.form.get("capacity_"+str(terrain["id"]),"").strip()
+    if raw=="": continue
+    places=int(raw)
+    if places<0: raise ValueError("La capacité de "+terrain["name"]+" ne peut pas être négative.")
+    used=c.execute("SELECT COUNT(*) FROM assignments WHERE terrain_id=? AND period_id=? AND status IN ('confirmed','pending')",(terrain["id"],selected_period_id)).fetchone()[0]
+    if places<used: raise ValueError("Capacité trop basse pour "+terrain["name"]+" : "+str(used)+" affectation(s) déjà enregistrée(s).")
+    c.execute("INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,?) ON CONFLICT(year_label,terrain_id,period_id) DO UPDATE SET places=excluded.places",(y,terrain["id"],selected_period_id,places))
+    audit_event(c,"capacity.updated","year="+y+"; terrain_id="+str(terrain["id"])+"; period_id="+str(selected_period_id)+"; places="+str(places)+"; source=bulk_planning")
+    capacity_count+=1
+   for terrain in terrains_for_save:
+    for raw_id in request.form.getlist("resident_ids_"+str(terrain["id"])):
+     rid=int(raw_id)
+     ok,msg,status=check(c,rid,terrain["id"],selected_period_id,y)
+     if not ok: raise ValueError(terrain["name"]+" — "+str(msg))
+     old=c.execute("SELECT id,status FROM assignments WHERE resident_id=? AND period_id=?",(rid,selected_period_id)).fetchone()
+     if old and old["status"] not in ("rejected","cancelled"):
+      raise ValueError("Un résident sélectionné est déjà affecté pendant cette période.")
+     if old:
+      c.execute("UPDATE assignments SET terrain_id=?,status=? WHERE id=?",(terrain["id"],status,old["id"]))
+      audit_event(c,"assignment.replaced","assignment_id="+str(old["id"])+"; resident_id="+str(rid)+"; terrain_id="+str(terrain["id"])+"; period_id="+str(selected_period_id)+"; status="+str(status)+"; source=bulk_planning")
+     else:
+      c.execute("INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,?)",(rid,terrain["id"],selected_period_id,status))
+      audit_event(c,"assignment.created","resident_id="+str(rid)+"; terrain_id="+str(terrain["id"])+"; period_id="+str(selected_period_id)+"; status="+str(status)+"; source=bulk_planning")
+     assignment_count+=1
+   c.commit()
+   flash(L(str(capacity_count)+" capacité(s) et "+str(assignment_count)+" affectation(s) enregistrée(s).","Saved "+str(capacity_count)+" capacities and "+str(assignment_count)+" assignments.","تم حفظ "+str(capacity_count)+" سعة و"+str(assignment_count)+" تعيين."))
+   c.close()
+   return redirect("/planning?year="+y.replace("&","%26").replace(" ","%20")+"&period_id="+str(selected_period_id))
+  except Exception as exc:
+   c.rollback()
+   flash("Enregistrement groupé annulé : "+str(exc)[:220])
+   c.close()
+   return redirect("/planning?year="+y.replace("&","%26").replace(" ","%20")+"&period_id="+str(selected_period_id))
+ terrains=c.execute("SELECT id,name,kind FROM terrains WHERE active=1 ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END,name").fetchall()
+ capacities=c.execute("SELECT terrain_id,places FROM capacities WHERE year_label=? AND period_id=?",(y,selected_period_id)).fetchall()
+ capmap={row["terrain_id"]:row["places"] for row in capacities}
+ assignments=c.execute("""SELECT a.resident_id,a.terrain_id,a.status,r.surname,r.firstname,r.year,r.resident_type,r.origin_hospital
+ FROM assignments a JOIN residents r ON r.id=a.resident_id
+ WHERE a.period_id=? AND a.status IN ('confirmed','pending')
+ ORDER BY r.year DESC,r.surname,r.firstname""",(selected_period_id,)).fetchall()
+ assigned_by_terrain={}
+ for row in assignments: assigned_by_terrain.setdefault(row["terrain_id"],[]).append(row)
+ workbench=[]
+ for terrain in terrains:
+  names=assigned_by_terrain.get(terrain["id"],[])
+  capacity=capmap.get(terrain["id"])
+  workbench.append({"id":terrain["id"],"name":terrain["name"],"kind":terrain["kind"],"capacity":capacity,"used":len(names),"remaining":max(0,capacity-len(names)) if capacity is not None else None,"names":names})
+ residents=c.execute("SELECT id,surname,firstname,year,resident_type,origin_hospital FROM residents WHERE status='active' ORDER BY year DESC,surname,firstname").fetchall()
+ resident_choices=[]
+ for resident in residents:
+  label=str(resident["surname"] or "")+" "+str(resident["firstname"] or "")+" — A"+str(resident["year"])+" · #"+str(resident["id"])
+  if resident["resident_type"]=="external" and resident["origin_hospital"]: label+=" · "+str(resident["origin_hospital"])
+  resident_choices.append({"id":resident["id"],"label":label})
+ current_year_label=setting(c,"year")
+ c.close()
+ return page("""<section class="rt-bulk-page"><div class="rt-bulk-page-head"><div><h2>{{L('Planification des affectations','Assignment planning','تخطيط التعيينات')}}</h2><p>{{L('Configurez les places et répartissez les résidents sur tous les services, puis validez une seule fois.','Set places and allocate residents across all departments, then save once.','حدد المقاعد ووزع المقيمين على جميع المصالح ثم احفظ مرة واحدة.')}}</p></div><a class="rt-bulk-overview-link" href="/rotation-board?year={{year|urlencode}}&period_id={{selected_period_id}}">{{L('Voir le tableau général','Open overview board','عرض الجدول العام')}}</a></div><form method="get" class="rt-bulk-filters"><label>{{L('Année de post-graduation','Postgraduate year','سنة ما بعد التدرج')}}<select name="year">{% for yy in years %}<option value="{{yy}}" {% if yy==year %}selected{% endif %}>{{yy}}{% if yy==current_year_label %} — {{L('en cours','current','الحالية')}}{% endif %}</option>{% endfor %}</select></label><label>{{L('Période','Period','الفترة')}}<select name="period_id">{% for p in periods %}<option value="{{p.id}}" {% if p.id==selected_period_id %}selected{% endif %}>{{period_label(p.name)}}</option>{% endfor %}</select></label><button type="submit">{{L('Afficher','Display','عرض')}}</button></form>{% if is_admin %}<form method="post" id="rt-bulk-form"><input type="hidden" name="year" value="{{year}}"><input type="hidden" name="period_id" value="{{selected_period_id}}"><datalist id="rt-resident-options">{% for resident in resident_choices %}<option value="{{resident.label}}" data-resident-id="{{resident.id}}"></option>{% endfor %}</datalist><div class="rt-bulk-table-wrap"><table class="rt-bulk-table"><thead><tr><th>{{L('Service','Department','المصلحة')}}</th><th>{{L('Places','Places','المقاعد')}}</th><th>{{L('Occupées / restantes','Used / remaining','المستعمل / المتبقي')}}</th><th>{{L('Résidents affectés ou à ajouter','Assigned or to add','المقيمون المعينون أو المراد إضافتهم')}}</th></tr></thead><tbody>{% for item in workbench %}<tr data-terrain-id="{{item.id}}"><th>{{item.name}}{% if item.kind=='optional' %}<small class="rt-bulk-kind">{{L('Optionnel','Optional','اختياري')}}</small>{% endif %}</th><td><input class="rt-bulk-capacity" type="number" min="0" step="1" name="capacity_{{item.id}}" value="{{item.capacity if item.capacity is not none else ''}}" placeholder="—" aria-label="{{L('Capacité pour','Capacity for','السعة لـ')}} {{item.name}}"></td><td><strong>{{item.used}}</strong> / {{item.capacity if item.capacity is not none else '—'}}<small class="rt-bulk-remaining">{% if item.remaining is not none %}{{item.remaining}} {{L('restantes','remaining','متبقية')}}{% else %}{{L('Capacité à définir','Capacity not set','السعة غير محددة')}}{% endif %}</small></td><td><div class="rt-bulk-picker"><div class="rt-bulk-add-line"><input type="text" list="rt-resident-options" class="rt-bulk-resident-input" placeholder="{{L('Rechercher un résident…','Search a resident…','ابحث عن مقيم…')}}" autocomplete="off"><button type="button" class="rt-bulk-add-button">{{L('Ajouter','Add','إضافة')}}</button></div><div class="rt-bulk-chips">{% for resident in item.names %}<span class="rt-bulk-existing">{{resident.surname}} {{resident.firstname}} <small>(A{{resident.year}}{% if resident.status=='pending' %} · {{L('En attente','Pending','قيد الانتظار')}}{% endif %})</small></span>{% endfor %}</div></div></td></tr>{% endfor %}</tbody></table></div><div class="rt-bulk-footer"><span>{{L('Les règles de capacité, les doublons, les stages déjà effectués et les stages externes sont vérifiés. Si une affectation est invalide, le lot entier est annulé.','Capacity, duplicates, completed rotations and external rotations are checked. If an assignment is invalid, the entire batch is cancelled.','يتم التحقق من السعة والتكرار والتربصات المنجزة والتربصات الخارجية. إذا كان أحد التعيينات غير صالح يتم إلغاء الدفعة كاملة.')}}</span><button type="submit">{{L('Enregistrer toutes les modifications','Save all changes','حفظ جميع التعديلات')}}</button></div></form>{% else %}<p>{{L('La modification groupée est réservée au Super Admin.','Bulk editing is reserved for Super Admins.','التعديل الجماعي متاح للمسؤول العام فقط.')}}</p>{% endif %}</section><style>.rt-bulk-page{display:grid;gap:14px}.rt-bulk-page-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.rt-bulk-page-head h2{margin:0}.rt-bulk-page-head p{margin:5px 0 0;color:var(--muted,#526274)}.rt-bulk-overview-link{padding:10px 14px;border:1px solid #8aa3ba;border-radius:9px;text-decoration:none;font-weight:700}.rt-bulk-filters{display:flex;align-items:end;gap:10px;flex-wrap:wrap;padding:12px;border:1px solid #cbd8e4;border-radius:12px;background:var(--surface,#f7fbff)}.rt-bulk-filters label{display:grid;gap:5px;min-width:190px;flex:1;font-weight:700}.rt-bulk-filters select{min-height:42px}.rt-bulk-table-wrap{max-height:68vh;overflow:auto;border:1px solid #cbd8e4;border-radius:11px;background:white}.rt-bulk-table{width:100%;min-width:760px;border-collapse:separate;border-spacing:0;table-layout:fixed}.rt-bulk-table th,.rt-bulk-table td{padding:8px;border-bottom:1px solid #e0e8f0;text-align:left;vertical-align:middle}.rt-bulk-table thead th{position:sticky;top:0;z-index:2;background:#214e79;color:white}.rt-bulk-table tbody th{width:21%;background:#f4f8fc;color:#17324d}.rt-bulk-table td:nth-child(2){width:100px}.rt-bulk-table td:nth-child(3){width:135px}.rt-bulk-capacity{width:82px;min-height:42px;padding:7px;border:1px solid #8aa3ba;border-radius:8px;background:white;color:#10263a;font-weight:700}.rt-bulk-remaining,.rt-bulk-kind{display:block;font-size:11px;color:#526274}.rt-bulk-picker{display:grid;gap:6px}.rt-bulk-add-line{display:flex;gap:6px}.rt-bulk-resident-input{flex:1;min-width:0;min-height:42px;padding:7px;border:1px solid #8aa3ba;border-radius:8px;background:white;color:#10263a}.rt-bulk-add-button{white-space:nowrap;padding:7px 12px;border:0;border-radius:8px;background:#155e9a;color:white;font-weight:700}.rt-bulk-chips{display:flex;flex-wrap:wrap;gap:5px}.rt-bulk-chip,.rt-bulk-existing{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border-radius:7px;background:#e5f1fb;color:#17324d;font-size:12px}.rt-bulk-chip button{border:0;background:transparent;color:#9f1c13;font-weight:800;padding:0 3px}.rt-bulk-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px;border:1px solid #cbd8e4;border-radius:12px;background:var(--surface,#f7fbff)}.rt-bulk-footer span{max-width:680px;font-size:12px;color:#526274}.rt-bulk-footer button{min-height:46px;padding:10px 18px;border:0;border-radius:10px;background:linear-gradient(135deg,#087c82,#075e67);color:white;font-weight:800;box-shadow:0 4px 0 #064b53}@media(max-width:680px){.rt-bulk-table-wrap{max-height:62vh}.rt-bulk-table{min-width:680px}.rt-bulk-filters>*{width:100%}.rt-bulk-footer button{width:100%}}</style><script>(function(){const form=document.getElementById("rt-bulk-form");if(!form)return;const options=Array.from(document.getElementById("rt-resident-options").options);form.querySelectorAll("tr[data-terrain-id]").forEach(row=>{const input=row.querySelector(".rt-bulk-resident-input"),add=row.querySelector(".rt-bulk-add-button"),chips=row.querySelector(".rt-bulk-chips");if(!input||!add||!chips)return;add.addEventListener("click",function(){const option=options.find(item=>item.value===input.value.trim());if(!option){input.focus();return;}const rid=option.dataset.residentId;if(chips.querySelector("input[value=\u0027"+rid+"\u0027]")){input.value="";return;}const hidden=document.createElement("input");hidden.type="hidden";hidden.name="resident_ids_"+row.dataset.terrainId;hidden.value=rid;const chip=document.createElement("span");chip.className="rt-bulk-chip";chip.append(document.createTextNode(input.value));const remove=document.createElement("button");remove.type="button";remove.setAttribute("aria-label","Retirer "+input.value);remove.textContent="×";remove.addEventListener("click",function(){chip.remove();});chip.append(remove,hidden);chips.append(chip);input.value="";input.focus();});input.addEventListener("keydown",function(event){if(event.key==="Enter"){event.preventDefault();add.click();}});});form.addEventListener("submit",function(event){if(!window.confirm("Enregistrer les capacités et toutes les affectations ajoutées pour cette période ?"))event.preventDefault();});})();</script>""",year=y,years=years,current_year_label=current_year_label,periods=periods,selected_period_id=selected_period_id,workbench=workbench,resident_choices=resident_choices,is_admin=is_admin)
+
 @app.route("/assign",methods=["GET","POST"])
 def assign():
  if guard():return redirect("/login")
+ if request.method=="GET": return redirect("/planning")
  c=db(); y=active_postgrad_year(c)
  if request.method=="POST":
   if session.get("role")!="super_admin":
