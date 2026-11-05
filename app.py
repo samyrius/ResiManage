@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, request, redirect, session, render_template, render_template_string, flash as flask_flash, get_flashed_messages, send_file, send_from_directory, jsonify, has_request_context
-import sqlite3, os, sys, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess, secrets, smtplib, time, zipfile
+import sqlite3, os, sys, hashlib, hmac, io, csv, shutil, json, tempfile, re, subprocess, secrets, smtplib, time, zipfile, threading
 import warnings
 import calendar
 from PIL import Image, ImageOps
@@ -22,6 +22,7 @@ def local_secret_key():
   except FileExistsError:
    with open(path,"r",encoding="ascii") as handle: return handle.read().strip()
 app=Flask(__name__)
+_INIT_LOCK=threading.Lock()
 app.config["MAX_CONTENT_LENGTH"]=25*1024*1024
 app.secret_key=os.environ.get("ROTATION_SECRET") or local_secret_key()
 
@@ -157,7 +158,15 @@ def verify_password(password, stored):
 def ensure_column(c, table, column, spec):
  existing={row[1] for row in c.execute("PRAGMA table_info("+table+")")}
  if column not in existing:
-  c.execute("ALTER TABLE "+table+" ADD COLUMN "+column+" "+spec)
+  try:
+   c.execute("ALTER TABLE "+table+" ADD COLUMN "+column+" "+spec)
+  except sqlite3.OperationalError as exc:
+   # Another process may have added the same column after our PRAGMA check.
+   if "duplicate column name" not in str(exc).casefold():
+    raise
+   verified={row[1] for row in c.execute("PRAGMA table_info("+table+")")}
+   if column not in verified:
+    raise
 def audit_event(c, action, details, actor=None):
  if actor is None:
   actor = session.get("user", "system") if has_request_context() else "system"
@@ -369,7 +378,12 @@ def purge_expired_trash(now=None):
 
 @app.before_request
 def boot():
- if not getattr(app,"_ready",False): init(); app._ready=True
+ # Several first requests can arrive together on Android while the embedded server starts.
+ # Serialize schema initialization so additive migrations are never run concurrently.
+ with _INIT_LOCK:
+  if not getattr(app,"_ready",False):
+   init()
+   app._ready=True
  # Run the single retention cleanup at most once per process-local calendar day.
  today_key = date.today().isoformat()
  if getattr(app, "_trash_cleanup_date", "") != today_key:
