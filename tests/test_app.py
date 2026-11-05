@@ -295,102 +295,47 @@ def test_seed_has_nineteen_terrains_and_four_periods(tmp_path, monkeypatch):
         assert conn.execute("SELECT kind FROM terrains WHERE name='Chirurgie générale'").fetchone()[0] == "mandatory"
 
 
-def test_bulk_planning_shows_all_services_in_one_workbench(tmp_path, monkeypatch):
+def test_bulk_planning_shows_the_single_central_matrix_instead_of_a_second_page(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
-    response = client.get("/planning")
-    assert response.status_code == 200
-    assert b'id="rt-bulk-form"' in response.data
-    assert b'id="rt-resident-options"' in response.data
-    assert b"Enregistrer toutes les modifications".decode().encode() in response.data
+    legacy = client.get("/planning")
+    assert legacy.status_code == 302
+    assert legacy.headers["Location"].endswith("/rotation-board")
+    board = client.get("/rotation-board")
+    assert board.status_code == 200
+    assert b'class="rt-central-matrix"' in board.data
+    assert board.data.count(b'class="rt-period-head"') == 4
+    assert board.data.count(b'data-drop-cell') == 76
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM terrains WHERE active=1").fetchone()[0] == 19
-    assert response.data.count(b'class="rt-bulk-capacity"') == 19
-    assignment_page = client.get("/assign")
-    assert assignment_page.status_code == 200
-    assert b'href="/planning"' in assignment_page.data
 
-
-def test_bulk_planning_saves_multiple_capacities_and_assignment_atomically(tmp_path, monkeypatch):
+def test_legacy_bulk_planning_post_does_not_write_outside_the_central_board(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
     with rotation_app.db() as conn:
-        resident_id = conn.execute(
-            "INSERT INTO residents(surname, firstname, year, status) VALUES(?,?,?,?)",
-            ("BulkPlan", "Resident", 4, "active"),
-        ).lastrowid
-        terrain_ids = [
-            row[0] for row in conn.execute(
-                "SELECT id FROM terrains WHERE active=1 ORDER BY id LIMIT 2"
-            ).fetchall()
-        ]
+        resident_id = conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES('LegacyBulk','Resident',4,'active')").lastrowid
+        terrain_id = conn.execute("SELECT id FROM terrains WHERE active=1 ORDER BY id LIMIT 1").fetchone()[0]
         period = conn.execute("SELECT id,year_label FROM periods ORDER BY id LIMIT 1").fetchone()
-        if period is None:
-            year_label = rotation_app.active_postgrad_year(conn)
-            conn.execute("INSERT INTO periods(year_label,name) VALUES(?,?)", (year_label, "Période 1"))
-            period = conn.execute("SELECT id,year_label FROM periods ORDER BY id LIMIT 1").fetchone()
-        period_id, year_label = period["id"], period["year_label"]
-
-    response = client.post(
-        "/planning",
-        data={
-            "year": year_label,
-            "period_id": str(period_id),
-            f"capacity_{terrain_ids[0]}": "2",
-            f"capacity_{terrain_ids[1]}": "3",
-            f"resident_ids_{terrain_ids[0]}": [str(resident_id)],
-        },
-    )
+        year_label, period_id = period["year_label"], period["id"]
+    response = client.post("/planning", data={"year": year_label, "period_id": str(period_id), f"capacity_{terrain_id}": "2", f"resident_ids_{terrain_id}": [str(resident_id)]})
     assert response.status_code == 302
-    assert "/planning" in response.headers["Location"]
+    assert response.headers["Location"].endswith("/rotation-board")
     with rotation_app.db() as conn:
-        capacities = {
-            row["terrain_id"]: row["places"]
-            for row in conn.execute(
-                "SELECT terrain_id,places FROM capacities WHERE year_label=? AND period_id=?",
-                (year_label, period_id),
-            ).fetchall()
-        }
-        assignment = conn.execute(
-            "SELECT terrain_id,status FROM assignments WHERE resident_id=? AND period_id=?",
-            (resident_id, period_id),
-        ).fetchone()
-    assert capacities[terrain_ids[0]] == 2
-    assert capacities[terrain_ids[1]] == 3
-    assert assignment is not None
-    assert assignment["terrain_id"] == terrain_ids[0]
-    assert assignment["status"] in ("confirmed", "pending")
+        assert conn.execute("SELECT COUNT(*) FROM capacities WHERE year_label=? AND terrain_id=? AND period_id=?", (year_label, terrain_id, period_id)).fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM assignments WHERE resident_id=? AND period_id=?", (resident_id, period_id)).fetchone()[0] == 0
 
-
-def test_bulk_planning_rolls_back_capacities_when_assignment_is_invalid(tmp_path, monkeypatch):
+def test_legacy_bulk_planning_invalid_post_is_redirected_to_the_central_board(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
     with rotation_app.db() as conn:
-        terrain_id = conn.execute(
-            "SELECT id FROM terrains WHERE active=1 ORDER BY id LIMIT 1"
-        ).fetchone()[0]
+        terrain_id = conn.execute("SELECT id FROM terrains WHERE active=1 ORDER BY id LIMIT 1").fetchone()[0]
         period = conn.execute("SELECT id,year_label FROM periods ORDER BY id LIMIT 1").fetchone()
-        period_id, year_label = period["id"], period["year_label"]
-
-    response = client.post(
-        "/planning",
-        data={
-            "year": year_label,
-            "period_id": str(period_id),
-            f"capacity_{terrain_id}": "7",
-            f"resident_ids_{terrain_id}": ["99999999"],
-        },
-    )
-    assert response.status_code == 200
-    assert f'name="capacity_{terrain_id}" value="7"'.encode() in response.data
-    assert "Enregistrement groupé annulé".encode() in response.data
+        year_label, period_id = period["year_label"], period["id"]
+    response = client.post("/planning", data={"year": year_label, "period_id": str(period_id), f"capacity_{terrain_id}": "7", f"resident_ids_{terrain_id}": ["99999999"]})
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/rotation-board")
     with rotation_app.db() as conn:
-        capacity = conn.execute(
-            "SELECT places FROM capacities WHERE year_label=? AND terrain_id=? AND period_id=?",
-            (year_label, terrain_id, period_id),
-        ).fetchone()
-    assert capacity is None
-
+        assert conn.execute("SELECT COUNT(*) FROM capacities WHERE year_label=? AND terrain_id=? AND period_id=?", (year_label, terrain_id, period_id)).fetchone()[0] == 0
 
 def test_assignment_requires_capacity_and_blocks_same_period_duplicate(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
@@ -409,6 +354,7 @@ def test_assignment_requires_capacity_and_blocks_same_period_duplicate(tmp_path,
         second_terrain_id = conn.execute("SELECT id FROM terrains WHERE name='Urologie'").fetchone()[0]
         period_id = conn.execute("SELECT id FROM periods ORDER BY id LIMIT 1").fetchone()[0]
         year_label = conn.execute("SELECT year_label FROM periods WHERE id=?", (period_id,)).fetchone()[0]
+        conn.execute("INSERT INTO settings(key,value) VALUES('rotation_capacity_enforced','1') ON CONFLICT(key) DO UPDATE SET value='1'")
 
     response = client.post(
         "/assign",
@@ -476,6 +422,7 @@ def test_capacity_limit_is_enforced_for_two_residents(tmp_path, monkeypatch):
             "INSERT INTO capacities(year_label, terrain_id, period_id, places) VALUES(?,?,?,1)",
             (year_label, terrain_id, period_id),
         )
+        conn.execute("INSERT INTO settings(key,value) VALUES('rotation_capacity_enforced','1') ON CONFLICT(key) DO UPDATE SET value='1'")
 
     first = client.post(
         "/assign",
@@ -4420,6 +4367,7 @@ def test_inline_capacity_cannot_be_lower_than_active_assignments(tmp_path, monke
                      (resident_id, terrain_id, period_id))
         conn.execute("INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,1)",
                      (year, terrain_id, period_id))
+        conn.execute("INSERT INTO settings(key,value) VALUES('rotation_capacity_enforced','1') ON CONFLICT(key) DO UPDATE SET value='1'")
     response = client.post("/rotation-board", data={
         "action": "capacity", "year": year, "terrain_id": str(terrain_id),
         "period_id": str(period_id), "places": "0",
@@ -4687,16 +4635,15 @@ def test_dashboard_icons_are_inline_valid_and_have_distinct_colours(tmp_path, mo
         assert colour in theme_css
 
 
-def test_period_date_editor_uses_strong_contrast_for_every_theme(tmp_path, monkeypatch):
+def test_period_date_editor_is_inline_in_the_central_matrix_with_strong_theme_contrast(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
     with client.session_transaction() as session:
         session["role"] = "super_admin"
     response = client.get("/rotation-board")
     assert response.status_code == 200
-    page = response.data
-    assert b'class="rt-period-date-grid"' in page
-    assert b'name="start_date"' in page and b'name="end_date"' in page
+    assert b'class="rt-period-inline-form"' in response.data
+    assert b'name="start_date"' in response.data and b'name="end_date"' in response.data
     theme_css = read_common_theme_css()
     assert 'color-scheme:light!important' in theme_css
     assert '-webkit-text-fill-color:#101d2b!important' in theme_css
@@ -4705,7 +4652,6 @@ def test_period_date_editor_uses_strong_contrast_for_every_theme(tmp_path, monke
     assert '--period-border:#7040b0' in theme_css
     assert '--period-border:#b76512' in theme_css
     assert '--period-border:#21834c' in theme_css
-
 
 def test_resident_category_transfer_is_super_admin_only_and_preserves_history(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
@@ -4816,7 +4762,7 @@ def test_assignment_year_selector_opens_rotation_board_for_selected_year(tmp_pat
     assert b'name="next" value="/rotation-board"' in response.data
 
 
-def test_period_editor_forms_have_stable_scroll_targets_and_local_flash_relocation(tmp_path, monkeypatch):
+def test_period_editor_forms_have_stable_scroll_targets_and_temporary_toasts(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
     response = client.get("/rotation-board")
@@ -4825,8 +4771,8 @@ def test_period_editor_forms_have_stable_scroll_targets_and_local_flash_relocati
     assert b'id="period-date-' in response.data
     assert b'rt-flash-messages' in response.data
     assert b'rt-action-context' in response.data
-
-
+    assert b'Fermer le message' not in response.data
+    assert b'4200' in response.data
 
 def test_dems_preparation_flag_is_individual_and_audited(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
