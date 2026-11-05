@@ -11,6 +11,7 @@ from flask import request, redirect, flash, session, send_file
 import io
 import csv
 import html
+import base64
 
 SECTORS = ("UMC", "Réanimation chirurgicale")
 HOURS = ("16H-08H", "08H-08H")
@@ -93,10 +94,14 @@ def _ensure_schema(c, audit_event):
         document_html TEXT NOT NULL DEFAULT '',
         signature_name TEXT NOT NULL DEFAULT '',
         signature_title TEXT NOT NULL DEFAULT '',
+        signature_data TEXT NOT NULL DEFAULT '',
         updated_by TEXT NOT NULL DEFAULT '',
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     """)
+    document_columns = {row["name"] for row in c.execute("PRAGMA table_info(guard_document_settings)").fetchall()}
+    if "signature_data" not in document_columns:
+        c.execute("ALTER TABLE guard_document_settings ADD COLUMN signature_data TEXT NOT NULL DEFAULT ''")
     # Additive migration: removed residents stay in the audit trail instead of disappearing.
     columns = {row["name"] for row in c.execute("PRAGMA table_info(guard_assignments)").fetchall()}
     for name, spec in {
@@ -204,13 +209,16 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
                     document_html = _safe_rich_html(request.form.get("document_html", ""))
                     signature_name = request.form.get("signature_name", "").strip()[:120]
                     signature_title = request.form.get("signature_title", "").strip()[:160]
+                    signature_data = request.form.get("signature_data", "").strip()
+                    if signature_data and (len(signature_data) > 350000 or not re.fullmatch(r"data:image/png;base64,[A-Za-z0-9+/=]+", signature_data)):
+                        raise ValueError("Signature invalide ou trop volumineuse.")
                     c.execute("""
-                      INSERT INTO guard_document_settings(month,document_html,signature_name,signature_title,updated_by,updated_at)
-                      VALUES(?,?,?,?,?,CURRENT_TIMESTAMP)
+                      INSERT INTO guard_document_settings(month,document_html,signature_name,signature_title,signature_data,updated_by,updated_at)
+                      VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP)
                       ON CONFLICT(month) DO UPDATE SET document_html=excluded.document_html,
                         signature_name=excluded.signature_name,signature_title=excluded.signature_title,
-                        updated_by=excluded.updated_by,updated_at=CURRENT_TIMESTAMP
-                    """, (month, document_html, signature_name, signature_title, str(session.get("user", ""))))
+                        signature_data=excluded.signature_data,updated_by=excluded.updated_by,updated_at=CURRENT_TIMESTAMP
+                    """, (month, document_html, signature_name, signature_title, signature_data, str(session.get("user", ""))))
                     audit_event(c, "guards.document_edited",
                                 f"month={month}; signature={signature_name}")
                 elif action == "move":
@@ -454,7 +462,9 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
             </div>
             <div id="rt-guard-rich-editor" class="rt-guard-rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="{{L('Ajouter un titre, une note ou des consignes à la liste…','Add a title, note or instructions to the roster…','أضف عنوانًا أو ملاحظة أو تعليمات إلى القائمة…')}}">{{document_settings.document_html|safe}}</div>
             <textarea name="document_html" id="rt-guard-document-html" hidden></textarea>
-            <div class="rt-guard-signature-fields"><label>{{L('Nom du signataire','Signatory name','اسم الموقّع')}}<input name="signature_name" value="{{document_settings.signature_name}}" maxlength="120" placeholder="{{L('Nom et prénom','Full name','الاسم واللقب')}}"></label><label>{{L('Fonction / qualité','Role / title','الصفة')}}<input name="signature_title" value="{{document_settings.signature_title}}" maxlength="160" placeholder="{{L('Chef de service, responsable…','Department head, supervisor…','رئيس المصلحة، المسؤول…')}}"></label><button type="submit">💾 {{L('Enregistrer le document','Save document','حفظ المستند')}}</button></div>
+            <div class="rt-guard-signature-fields"><label>{{L('Nom du signataire','Signatory name','اسم الموقّع')}}<input name="signature_name" value="{{document_settings.signature_name}}" maxlength="120" placeholder="{{L('Nom et prénom','Full name','الاسم واللقب')}}"></label><label>{{L('Fonction / qualité','Role / title','الصفة')}}<input name="signature_title" value="{{document_settings.signature_title}}" maxlength="160" placeholder="{{L('Chef de service, responsable…','Department head, supervisor…','رئيس المصلحة، المسؤول…')}}"></label>
+            <div class="rt-guard-signature-pad-wrap"><label>{{L('Signature manuscrite','Handwritten signature','التوقيع اليدوي')}}</label><canvas id="rt-guard-signature-pad" width="720" height="180" aria-label="Zone de signature manuscrite"></canvas><input type="hidden" name="signature_data" id="rt-guard-signature-data"><button type="button" id="rt-guard-signature-clear">{{L('Effacer la signature','Clear signature','مسح التوقيع')}}</button></div>
+            <button type="submit">💾 {{L('Enregistrer le document','Save document','حفظ المستند')}}</button></div>
           </form>
           {% else %}{% if document_settings.document_html %}<div class="rt-guard-rich-preview">{{document_settings.document_html|safe}}</div>{% endif %}{% if document_settings.signature_name %}<p class="rt-guard-signature-preview">{{document_settings.signature_name}} · {{document_settings.signature_title}}</p>{% endif %}{% endif %}
         </section>
@@ -476,7 +486,15 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
         (function(){
           var editor=document.getElementById('rt-guard-rich-editor'),form=document.getElementById('rt-guard-document-form');
           if(editor&&form){
-            form.addEventListener('submit',function(){document.getElementById('rt-guard-document-html').value=editor.innerHTML;});
+            var signaturePad=document.getElementById('rt-guard-signature-pad'),signatureData=document.getElementById('rt-guard-signature-data'),signatureCtx=signaturePad.getContext('2d'),drawing=false,hasInk=false;
+            signatureCtx.strokeStyle='#172b3c';signatureCtx.lineWidth=3;signatureCtx.lineCap='round';signatureCtx.lineJoin='round';
+            function signaturePoint(e){var rect=signaturePad.getBoundingClientRect();return {x:(e.clientX-rect.left)*signaturePad.width/rect.width,y:(e.clientY-rect.top)*signaturePad.height/rect.height};}
+            signaturePad.addEventListener('pointerdown',function(e){drawing=true;hasInk=true;signaturePad.setPointerCapture(e.pointerId);var p=signaturePoint(e);signatureCtx.beginPath();signatureCtx.moveTo(p.x,p.y);e.preventDefault();});
+            signaturePad.addEventListener('pointermove',function(e){if(!drawing)return;var p=signaturePoint(e);signatureCtx.lineTo(p.x,p.y);signatureCtx.stroke();e.preventDefault();});
+            function stopSignature(){drawing=false;}
+            signaturePad.addEventListener('pointerup',stopSignature);signaturePad.addEventListener('pointercancel',stopSignature);
+            document.getElementById('rt-guard-signature-clear').addEventListener('click',function(){signatureCtx.clearRect(0,0,signaturePad.width,signaturePad.height);hasInk=false;signatureData.value='';});
+            form.addEventListener('submit',function(){document.getElementById('rt-guard-document-html').value=editor.innerHTML;if(hasInk)signatureData.value=signaturePad.toDataURL('image/png');});
             document.querySelectorAll('.rt-guard-toolbar [data-cmd]').forEach(function(button){button.addEventListener('click',function(){editor.focus();document.execCommand(button.dataset.cmd,false,null);});});
             var size=document.getElementById('rt-guard-font-size'),family=document.getElementById('rt-guard-font-family'),color=document.getElementById('rt-guard-font-color');
             size.addEventListener('change',function(){editor.focus();document.execCommand('fontSize',false,size.value);});
@@ -523,6 +541,9 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
         .rt-guard-signature-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px;align-items:end}
         .rt-guard-signature-fields button{grid-column:1/-1}
         .rt-guard-signature-preview{text-align:end;font-weight:800}
+        .rt-guard-signature-pad-wrap{grid-column:1/-1;display:grid;gap:5px}
+        #rt-guard-signature-pad{width:100%;max-width:560px;height:130px;background:#fff;border:1px dashed #4e94b7;border-radius:9px;touch-action:none}
+        #rt-guard-signature-clear{justify-self:start;min-height:32px;padding:4px 10px}
         .rt-guard-profile-backdrop{position:fixed;inset:0;z-index:5000;display:grid;place-items:center;padding:14px;background:#020b16c9}
         .rt-guard-profile-backdrop[hidden]{display:none}
         .rt-guard-profile-dialog{width:min(720px,96vw);max-height:88vh;overflow:auto;padding:20px;background:#f7fbff;color:#17334b;border-radius:18px;box-shadow:0 22px 70px #0009}
@@ -674,7 +695,7 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import mm
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as PDFImage
         from xml.sax.saxutils import escape
 
         output = io.BytesIO()
@@ -719,10 +740,19 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
             ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
         ]))
         story.append(table)
-        if document_settings and (document_settings["signature_name"] or document_settings["signature_title"]):
-            story += [Spacer(1, 12*mm), Paragraph("Signature et cachet", heading_style),
-                      Paragraph(escape(document_settings["signature_name"]) + (" — " + escape(document_settings["signature_title"]) if document_settings["signature_title"] else ""), small_style),
-                      Spacer(1, 14*mm), Paragraph("Signature : __________________________________________", small_style)]
+        if document_settings and (document_settings["signature_name"] or document_settings["signature_title"] or document_settings["signature_data"]):
+            story += [Spacer(1, 10*mm), Paragraph("SIGNATURE ET CACHET", heading_style),
+                      Paragraph(escape(document_settings["signature_name"]) + (" — " + escape(document_settings["signature_title"]) if document_settings["signature_title"] else ""), small_style)]
+            if document_settings["signature_data"]:
+                try:
+                    encoded = document_settings["signature_data"].split(",", 1)[1]
+                    signature_image = PDFImage(io.BytesIO(base64.b64decode(encoded, validate=True)),
+                                               width=48*mm, height=18*mm, kind="proportional")
+                    story.append(signature_image)
+                except Exception:
+                    story.append(Paragraph("Signature : __________________________________________", small_style))
+            else:
+                story.append(Paragraph("Signature : __________________________________________", small_style))
         if changes:
             story += [Spacer(1,5*mm),Paragraph("HISTORIQUE DES CORRECTIFS",heading_style)]
             change_data = [[Paragraph("<b>Date</b>",small_style),Paragraph("<b>Secteur</b>",small_style),
