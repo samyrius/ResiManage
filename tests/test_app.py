@@ -102,17 +102,13 @@ def test_each_theme_stylesheet_is_standalone(theme):
     assert f'href="/static/themes/{theme}.css"' in template
     assert "get_flashed_messages(with_categories=True)" in template
     assert 'class="msg msg-{{' in template
-    assert 'data-nav-key="residents"' in template
-    assert 'data-nav-key="planning"' in template
-    assert 'data-nav-key="reports"' in template
-    assert 'data-nav-key="settings"' in template
-    assert '🏠' in template and '👥' in template and '🗓️' in template and '📊' in template
-    assert 'resimanage-open-nav-groups' in template
-    assert 'resimanage-reset-scroll-on-route' in template
-    assert '{% if request.path in [' not in template
-    assert 'sessionStorage.removeItem(stateKey);groups.forEach(function(group){group.open=false;});' in template
-    assert 'groups.forEach(function(group){group.open=group===current;})' in template or 'groups.forEach(function(g){g.open=g===current;})' in template
-    assert 'other.open=false' in template or 'o.open=false' in template
+    assert 'href="/plus"' in template
+    assert 'href="/guards"' in template
+    assert 'class="nav-primary' in template
+    assert 'data-nav-key=' not in template
+    assert '<details class="nav-group"' not in template
+    assert 'rt-help-collapsed' in template
+    assert 'resimanage-open-nav-groups' not in template
     assert 'bottom:calc(76px + env(safe-area-inset-bottom,0px))!important' in css
     assert 'max-height:min(56dvh,440px)!important' in css
     assert 'html[data-theme-template] .msg' in css
@@ -140,7 +136,8 @@ def test_internal_navigation_is_grouped_responsive_and_marks_current_page(tmp_pa
     assert 'aria-label="Navigation principale"'.encode() in response.data
     assert b'href="/leave"' in response.data
     assert b'href="/external-rotations"' in response.data
-    assert "Stages et planification".encode() in response.data
+    assert b'href="/plus"' in response.data
+    assert b'href="/guards"' in response.data
     assert b'class="nav-home is-active"' in response.data
     assert b'href="/static/themes/crystal3d.css"' in response.data
     theme_css = read_theme_css("crystal3d")
@@ -156,8 +153,8 @@ def test_internal_navigation_is_grouped_responsive_and_marks_current_page(tmp_pa
     assert 'visibility:visible!important;opacity:1!important;' in theme_css
     residents = client.get("/residents")
     assert residents.status_code == 200
-    assert b'class="rt-back-link" href="javascript:history.back()"' in residents.data
-    assert b'href="/residents" class="is-active"' in residents.data
+    assert b'class="rt-back-link"' not in residents.data
+    assert b'class="nav-primary is-active" href="/residents"' in residents.data
 
 
 def test_login_page_and_language_selector(tmp_path, monkeypatch):
@@ -4739,3 +4736,21 @@ def test_dems_preparation_flag_is_individual_and_audited(tmp_path, monkeypatch):
     with rotation_app.db() as conn:
         assert conn.execute("SELECT dems_status FROM residents WHERE id=?", (rid,)).fetchone()[0] == ""
         assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='dems.preparation_status_changed'").fetchone()[0] == 2
+
+
+def test_quick_access_launcher_has_five_direct_tabs_and_search(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.get("/plus")
+    assert response.status_code == 200
+    html = response.data.decode("utf-8")
+    nav = re.search(r'<nav class="main-nav".*?</nav>', html, re.S).group(0)
+    assert nav.count('class="nav-home') == 1
+    assert nav.count('class="nav-primary') == 4
+    assert '<details class="nav-group"' not in nav
+    assert 'id="rt-module-search"' in html
+    assert 'href="/capacities"' in html
+    assert 'href="/external-rotations"' in html
+    assert 'href="/guards"' in nav
+    assert 'rt-launcher-link' in html
+    assert 'rt-module-no-results' in html
