@@ -3768,7 +3768,7 @@ def quick_access():
  if guard(): return redirect("/login")
  return page("""<section class="rt-launcher">
   <div class="rt-launcher-head"><div><span class="rt-launcher-kicker">{{L('ACCÈS DIRECT','QUICK ACCESS','وصول مباشر')}}</span><h2>{{L('Outils','Tools','الأدوات')}}</h2></div></div>
-  <label class="rt-launcher-search"><span aria-hidden="true">⌕</span><input id="rt-module-search" type="search" aria-label="{{L('Rechercher une fonction','Search functions','ابحث عن وظيفة')}}" placeholder="{{L('Rechercher un résident, un service ou une fonction…','Search a resident, service or function…','ابحث عن مقيم أو مصلحة أو وظيفة…')}}" autocomplete="off"></label>
+  <label class="rt-launcher-search"><span aria-hidden="true">⌕</span><input id="rt-module-search" type="search" aria-label="{{L('Rechercher une fonction','Search functions','ابحث عن وظيفة')}}" placeholder="{{L('Rechercher une fonction ou un service…','Search for a function or service…','ابحث عن وظيفة أو مصلحة…')}}" autocomplete="off"></label>
   <nav class="rt-tool-categories" aria-label="{{L('Catégories des outils','Tool categories','فئات الأدوات')}}">
     <button type="button" class="rt-tool-category is-active" data-category="residents" aria-pressed="true">{{L('Résidents','Residents','المقيمون')}}</button>
     <button type="button" class="rt-tool-category" data-category="stages" aria-pressed="false">{{L('Stages','Rotations','التربصات')}}</button>
