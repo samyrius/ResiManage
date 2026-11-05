@@ -4891,3 +4891,123 @@ def test_tools_launcher_shows_one_category_and_searches_all_tools(tmp_path, monk
     assert 'Rechercher une fonction ou un service' in html
     assert "toLocaleLowerCase().normalize('NFD')" in html
     assert "selected='residents'" in html
+
+
+def test_central_matrix_shows_four_periods_inline_dates_and_profile_controls(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+
+    response = client.get("/rotation-board")
+    assert response.status_code == 200
+    html = response.data.decode("utf-8")
+    assert html.count('class="rt-period-head"') == 4
+    assert 'class="rt-central-matrix"' in html
+    assert 'id="capacity-mode"' in html
+    assert 'name="start_date"' in html and 'name="end_date"' in html
+    assert 'data-drop-cell' in html
+    assert 'class="rt-resident-profile"' in html
+    assert 'id="rt-resident-profile-modal"' in html
+    assert 'Long-press a name to move it' in html or 'appui prolongé' in html.lower()
+
+
+def test_resident_profile_summary_api_returns_stage_history_and_assignments(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        year = conn.execute("SELECT value FROM settings WHERE key='year'").fetchone()[0]
+        period = conn.execute(
+            "SELECT id,name FROM periods WHERE year_label=? ORDER BY id LIMIT 1", (year,)
+        ).fetchone()
+        terrain = conn.execute("SELECT id,name FROM terrains WHERE active=1 ORDER BY id LIMIT 1").fetchone()
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES('Profile','History',2,'active')"
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Profile'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO history(resident_id,terrain_id,year_label,period,date_done) VALUES(?,?,?,?,?)",
+            (rid, terrain["id"], year, period["name"], "2026-10-01"),
+        )
+        conn.execute(
+            "INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",
+            (rid, terrain["id"], period["id"]),
+        )
+        conn.commit()
+
+    response = client.get(f"/api/residents/{rid}/profile")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["resident"]["surname"] == "Profile"
+    assert data["history"][0]["terrain"] == terrain["name"]
+    assert data["history"][0]["date_done"] == "2026-10-01"
+    assert data["assignments"][0]["status"] == "confirmed"
+
+
+def test_touch_move_api_validates_and_moves_assignment_between_services(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        year = conn.execute("SELECT value FROM settings WHERE key='year'").fetchone()[0]
+        period = conn.execute(
+            "SELECT id FROM periods WHERE year_label=? ORDER BY id LIMIT 1", (year,)
+        ).fetchone()
+        terrains = conn.execute("SELECT id FROM terrains WHERE active=1 ORDER BY id LIMIT 2").fetchall()
+        assert len(terrains) == 2
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES('Move','Resident',1,'active')"
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='Move'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",
+            (rid, terrains[0]["id"], period["id"]),
+        )
+        conn.commit()
+
+    response = client.post("/api/rotation-board/move", data={
+        "resident_id": str(rid),
+        "source_terrain_id": str(terrains[0]["id"]),
+        "source_period_id": str(period["id"]),
+        "target_terrain_id": str(terrains[1]["id"]),
+        "target_period_id": str(period["id"]),
+    })
+    assert response.status_code == 200
+    assert response.get_json()["ok"] is True
+    with rotation_app.db() as conn:
+        moved = conn.execute(
+            "SELECT terrain_id FROM assignments WHERE resident_id=? AND period_id=?",
+            (rid, period["id"]),
+        ).fetchone()
+        assert moved["terrain_id"] == terrains[1]["id"]
+        assert conn.execute(
+            "SELECT COUNT(*) FROM audit WHERE action='assignment.drag_moved'"
+        ).fetchone()[0] == 1
+
+
+def test_capacity_disabled_allows_manual_assignment_without_capacity(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        year = conn.execute("SELECT value FROM settings WHERE key='year'").fetchone()[0]
+        period = conn.execute(
+            "SELECT id FROM periods WHERE year_label=? ORDER BY id LIMIT 1", (year,)
+        ).fetchone()
+        terrain = conn.execute("SELECT id FROM terrains WHERE active=1 ORDER BY id LIMIT 1").fetchone()
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year,status) VALUES('NoCap','Resident',1,'active')"
+        )
+        rid = conn.execute("SELECT id FROM residents WHERE surname='NoCap'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO settings(key,value) VALUES('rotation_capacity_enforced','0') "
+            "ON CONFLICT(key) DO UPDATE SET value='0'"
+        )
+        conn.commit()
+
+    response = client.post("/rotation-board", data={
+        "action": "assign", "year": year, "terrain_id": str(terrain["id"]),
+        "period_id": str(period["id"]), "resident_id": str(rid),
+    })
+    assert response.status_code == 302
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM assignments WHERE resident_id=? AND period_id=? AND status IN ('confirmed','pending')",
+            (rid, period["id"]),
+        ).fetchone()[0] == 1
