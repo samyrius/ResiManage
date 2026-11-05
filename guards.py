@@ -231,6 +231,16 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
                     row = c.execute("SELECT * FROM guard_assignments WHERE id=? AND active=1", (assignment_id,)).fetchone()
                     if not row:
                         raise ValueError("Affectation introuvable ou inactive.")
+                    if row["resident_id"] is not None:
+                        eligible = c.execute("""
+                          SELECT 1 FROM residents r
+                          WHERE r.id=? AND r.status='active' AND r.year BETWEEN 1 AND 4
+                            AND COALESCE(r.resident_type,'local')='local'
+                            AND COALESCE(r.dems_status,'')<>'preparing'
+                            AND NOT EXISTS(SELECT 1 FROM dems_archive d WHERE d.resident_id=r.id)
+                        """, (row["resident_id"],)).fetchone()
+                        if not eligible:
+                            raise ValueError("Ce résident n’est plus admissible aux nouvelles affectations de garde.")
                     duplicate = c.execute("""
                       SELECT 1 FROM guard_assignments
                       WHERE active=1 AND id<>? AND roster_date=? AND sector=?
@@ -253,6 +263,17 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
                     second = c.execute("SELECT * FROM guard_assignments WHERE id=? AND active=1", (target_id,)).fetchone()
                     if not first or not second:
                         raise ValueError("Une des deux affectations n’est plus active.")
+                    for moving in (first, second):
+                        if moving["resident_id"] is not None:
+                            eligible = c.execute("""
+                              SELECT 1 FROM residents r
+                              WHERE r.id=? AND r.status='active' AND r.year BETWEEN 1 AND 4
+                                AND COALESCE(r.resident_type,'local')='local'
+                                AND COALESCE(r.dems_status,'')<>'preparing'
+                                AND NOT EXISTS(SELECT 1 FROM dems_archive d WHERE d.resident_id=r.id)
+                            """, (moving["resident_id"],)).fetchone()
+                            if not eligible:
+                                raise ValueError("Un résident de la permutation n’est plus admissible aux gardes.")
                     if first["roster_date"][:7] != month or second["roster_date"][:7] != month:
                         raise ValueError("La permutation doit rester dans le mois affiché.")
                     for moving, target_date, target_sector, excluded_id in (
@@ -507,17 +528,17 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
           document.querySelectorAll('[data-guard-profile]').forEach(function(el){el.addEventListener('click',function(){openProfile(el.dataset.guardProfile);});el.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();openProfile(el.dataset.guardProfile);}});});
           document.getElementById('rt-guard-profile-close').addEventListener('click',function(){modal.hidden=true;});
           modal.addEventListener('click',function(e){if(e.target===modal)modal.hidden=true;});
-          var dragged=null,longTimer=null,longActive=false;
+          var dragged=null,longTimer=null,longActive=false,dragGhost=null;
           function submitMove(id,cell){var data=new FormData();data.set('month','{{month}}');data.set('action','move');data.set('assignment_id',id);data.set('target_date',cell.dataset.date);data.set('target_sector',cell.dataset.sector);post(data);}
           function submitSwap(id,target){var data=new FormData();data.set('month','{{month}}');data.set('action','swap');data.set('assignment_id',id);data.set('target_assignment_id',target);post(data);}
           function post(data){var form=document.createElement('form');form.method='post';form.action='/guards?month={{month}}';data.forEach(function(v,k){var input=document.createElement('input');input.type='hidden';input.name=k;input.value=v;form.appendChild(input);});document.body.appendChild(form);form.submit();}
           document.querySelectorAll('[data-guard-chip]').forEach(function(chip){
             chip.addEventListener('dragstart',function(e){dragged=chip; e.dataTransfer.setData('text/plain',chip.dataset.assignmentId);e.dataTransfer.effectAllowed='move';});
             chip.addEventListener('dragend',function(){dragged=null;});
-            chip.addEventListener('pointerdown',function(e){if(e.pointerType==='mouse')return;longActive=false;longTimer=window.setTimeout(function(){longActive=true;dragged=chip;chip.classList.add('is-dragging');},420);});
-            chip.addEventListener('pointermove',function(e){if(longActive){e.preventDefault();chip.style.setProperty('--drag-x',e.clientX+'px');chip.style.setProperty('--drag-y',e.clientY+'px');}});
-            chip.addEventListener('pointerup',function(e){window.clearTimeout(longTimer);if(!longActive)return;var target=document.elementFromPoint(e.clientX,e.clientY),other=target&&target.closest('[data-guard-chip]'),cell=target&&target.closest('[data-guard-drop-cell]');chip.classList.remove('is-dragging');if(other&&other!==chip)submitSwap(chip.dataset.assignmentId,other.dataset.assignmentId);else if(cell)submitMove(chip.dataset.assignmentId,cell);dragged=null;longActive=false;});
-            chip.addEventListener('pointercancel',function(){window.clearTimeout(longTimer);chip.classList.remove('is-dragging');dragged=null;longActive=false;});
+            chip.addEventListener('pointerdown',function(e){if(e.pointerType==='mouse')return;longActive=false;longTimer=window.setTimeout(function(){longActive=true;dragged=chip;chip.classList.add('is-dragging');dragGhost=chip.cloneNode(true);dragGhost.style.cssText='position:fixed;z-index:6000;pointer-events:none;opacity:.88;transform:scale(1.04);width:'+chip.getBoundingClientRect().width+'px;left:'+e.clientX+'px;top:'+e.clientY+'px';document.body.appendChild(dragGhost);},420);});
+            chip.addEventListener('pointermove',function(e){if(longActive){e.preventDefault();if(dragGhost){dragGhost.style.left=(e.clientX+8)+'px';dragGhost.style.top=(e.clientY+8)+'px';}}});
+            chip.addEventListener('pointerup',function(e){window.clearTimeout(longTimer);if(!longActive)return;if(dragGhost){dragGhost.remove();dragGhost=null;}var target=document.elementFromPoint(e.clientX,e.clientY),other=target&&target.closest('[data-guard-chip]'),cell=target&&target.closest('[data-guard-drop-cell]');chip.classList.remove('is-dragging');if(other&&other!==chip)submitSwap(chip.dataset.assignmentId,other.dataset.assignmentId);else if(cell)submitMove(chip.dataset.assignmentId,cell);dragged=null;longActive=false;});
+            chip.addEventListener('pointercancel',function(){window.clearTimeout(longTimer);chip.classList.remove('is-dragging');if(dragGhost){dragGhost.remove();dragGhost=null;}dragged=null;longActive=false;});
           });
           document.querySelectorAll('[data-guard-drop-cell]').forEach(function(cell){
             cell.addEventListener('dragover',function(e){e.preventDefault();cell.classList.add('is-drop-target');});
@@ -549,7 +570,7 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
         .rt-guard-profile-dialog{width:min(720px,96vw);max-height:88vh;overflow:auto;padding:20px;background:#f7fbff;color:#17334b;border-radius:18px;box-shadow:0 22px 70px #0009}
         .rt-guard-profile-dialog>button{float:right;font-size:24px;background:#8c2d42!important;color:#fff!important}
         .rt-guard-profile-link{cursor:pointer;text-decoration:underline;text-decoration-color:#85d8f4;text-underline-offset:3px}
-        .rt-guard-person{touch-action:pan-y;cursor:grab}
+        .rt-guard-person{touch-action:none;cursor:grab}
         .rt-guard-person.is-dragging{opacity:.5;outline:3px dashed #5de2ed}
         .rt-guard-cell.is-drop-target{outline:3px solid #36d7c4;outline-offset:-3px;background:#15516a}
         .rt-guard-calendar-section .wrap{max-height:calc(100vh - 260px);overflow:auto;overscroll-behavior:contain}
