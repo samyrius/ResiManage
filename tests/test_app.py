@@ -4754,3 +4754,24 @@ def test_quick_access_launcher_has_five_direct_tabs_and_search(tmp_path, monkeyp
     assert 'href="/guards"' in nav
     assert 'rt-launcher-link' in html
     assert 'rt-module-no-results' in html
+
+def test_tools_launcher_shows_one_category_and_searches_all_tools(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.get("/plus")
+    assert response.status_code == 200
+    html = response.data.decode("utf-8")
+
+    assert 'data-category="residents" aria-pressed="true"' in html
+    assert 'data-category="stages" aria-pressed="false"' in html
+    assert 'data-category="formation" aria-pressed="false"' in html
+    assert 'data-category="admin" aria-pressed="false"' in html
+    assert 'data-tool-group="residents"' in html
+    assert 'data-tool-group="stages" hidden' in html
+    assert 'data-tool-group="formation" hidden' in html
+    assert 'data-tool-group="admin" hidden' in html
+    assert 'href="/dems"' in html
+    assert 'href="/backup"' in html
+    assert 'Rechercher un résident, un service ou une fonction' in html
+    assert "toLocaleLowerCase().normalize('NFD')" in html
+    assert "selected='residents'" in html
