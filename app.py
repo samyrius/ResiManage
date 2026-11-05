@@ -1590,6 +1590,17 @@ def rotation_board():
    c.close(); return ("Forbidden — Super Admin only",403)
   action=request.form.get("action","")
   try:
+   if action=="capacity_mode":
+    enabled=request.form.get("enabled")=="1"
+    if enabled:
+     missing=c.execute("SELECT COUNT(*) FROM terrains t CROSS JOIN periods p LEFT JOIN capacities cap ON cap.year_label=p.year_label AND cap.terrain_id=t.id AND cap.period_id=p.id WHERE t.active=1 AND p.year_label=? AND cap.id IS NULL",(y,)).fetchone()[0]
+     over=c.execute("SELECT cap.id FROM capacities cap JOIN assignments a ON a.terrain_id=cap.terrain_id AND a.period_id=cap.period_id AND a.status IN ('confirmed','pending') WHERE cap.year_label=? GROUP BY cap.id HAVING COUNT(a.id)>cap.places",(y,)).fetchall()
+     if missing: raise ValueError(L("Renseignez la capacité de chaque service pour les quatre périodes avant d’activer le contrôle ("+str(missing)+" cellule(s) manquante(s)).","Set a capacity for every department in all four periods before enabling enforcement ("+str(missing)+" missing cell(s)).","حدد سعة كل مصلحة في الفترات الأربع قبل تفعيل الرقابة ("+str(missing)+" خلية ناقصة)."))
+     if over: raise ValueError(L("Certaines capacités sont inférieures aux affectations déjà enregistrées. Corrigez-les avant activation.","Some capacities are below existing assignments. Correct them before enabling enforcement.","بعض السعات أقل من التعيينات المسجلة. صححها قبل التفعيل."))
+    c.execute("INSERT INTO settings(key,value) VALUES('rotation_capacity_enforced',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",("1" if enabled else "0",))
+    audit_event(c,"capacity.enforcement_changed","year="+y+"; enabled="+str(enabled))
+    c.commit(); flash(L("Contrôle des capacités activé." if enabled else "Capacités facultatives : contrôle désactivé.","Capacity enforcement enabled." if enabled else "Capacities are optional; enforcement disabled.","تم تفعيل فرض السعة." if enabled else "السعات اختيارية؛ تم تعطيل الفرض."))
+    c.close(); return redirect("/rotation-board?year="+y.replace("&","%26").replace(" ","%20")+"#capacity-mode")
    if action=="period_dates":
     pid=int(request.form.get("period_id","0"))
     period=c.execute("SELECT id,name FROM periods WHERE id=? AND year_label=?",(pid,y)).fetchone()
@@ -1615,14 +1626,21 @@ def rotation_board():
     audit_event(c,"assignment.cancelled","assignment_id="+str(assignment["id"])+"; resident_id="+str(rid)+"; terrain_id="+str(tid)+"; period_id="+str(pid)+"; year="+y+"; reason=user_removed_from_board; retained_in_trash_for_six_months=true")
     c.commit(); flash(L("Affectation retirée du tableau et conservée dans la corbeille pendant six mois. Vous pouvez la restaurer avant l’échéance.","Assignment removed from the board and kept in the trash for six months. You can restore it before expiry.","تمت إزالة التعيين من الجدول وحفظه في سلة المهملات لمدة ستة أشهر. يمكنك استعادته قبل انتهاء المدة."))
    elif action=="capacity":
-    places=int(request.form.get("places",""))
-    if places<0: raise ValueError(L("La capacité ne peut pas être négative.","Capacity cannot be negative.","لا يمكن أن تكون السعة سالبة."))
+    raw_places=request.form.get("places","").strip()
     used=c.execute("SELECT COUNT(*) FROM assignments WHERE terrain_id=? AND period_id=? AND status IN ('confirmed','pending')",(tid,pid)).fetchone()[0]
-    if places<used:
-     raise ValueError(L("La capacité ne peut pas être inférieure aux affectations actives déjà enregistrées ("+str(used)+").","Capacity cannot be lower than the active assignments already recorded ("+str(used)+").","لا يمكن أن تكون السعة أقل من التعيينات النشطة المسجلة بالفعل ("+str(used)+")."))
-    c.execute("INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,?) ON CONFLICT(year_label,terrain_id,period_id) DO UPDATE SET places=excluded.places",(y,tid,pid,places))
-    audit_event(c,"capacity.updated","year="+y+"; terrain_id="+str(tid)+"; period_id="+str(pid)+"; places="+str(places))
-    c.commit(); flash(L("Capacité enregistrée.","Capacity saved.","تم حفظ السعة."))
+    if not raw_places:
+     if capacity_enforced(c): raise ValueError(L("Une capacité est obligatoire tant que le contrôle des capacités est activé.","A capacity is required while capacity enforcement is enabled.","السعة مطلوبة ما دام فرض السعة مفعلاً."))
+     c.execute("DELETE FROM capacities WHERE year_label=? AND terrain_id=? AND period_id=?",(y,tid,pid))
+     audit_event(c,"capacity.cleared","year="+y+"; terrain_id="+str(tid)+"; period_id="+str(pid))
+     c.commit(); flash(L("Capacité facultative effacée.","Optional capacity cleared.","تم مسح السعة الاختيارية."))
+    else:
+     places=int(raw_places)
+     if places<0: raise ValueError(L("La capacité ne peut pas être négative.","Capacity cannot be negative.","لا يمكن أن تكون السعة سالبة."))
+     if capacity_enforced(c) and places<used:
+      raise ValueError(L("La capacité ne peut pas être inférieure aux affectations actives déjà enregistrées ("+str(used)+").","Capacity cannot be lower than the active assignments already recorded ("+str(used)+").","لا يمكن أن تكون السعة أقل من التعيينات النشطة المسجلة بالفعل ("+str(used)+")."))
+     c.execute("INSERT INTO capacities(year_label,terrain_id,period_id,places) VALUES(?,?,?,?) ON CONFLICT(year_label,terrain_id,period_id) DO UPDATE SET places=excluded.places",(y,tid,pid,places))
+     audit_event(c,"capacity.updated","year="+y+"; terrain_id="+str(tid)+"; period_id="+str(pid)+"; places="+str(places))
+     c.commit(); flash(L("Capacité enregistrée.","Capacity saved.","تم حفظ السعة."))
    elif action=="move":
     if session.get("role")!="super_admin": raise ValueError("Only a Super Admin may move an existing assignment")
     rid=int(request.form.get("resident_id","0"))
