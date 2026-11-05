@@ -4207,10 +4207,11 @@ def test_trash_retention_uses_six_calendar_months(tmp_path, monkeypatch):
              json.dumps({"resident": {}}), "2025-08-31T10:00:00", "admin"),
         )
         trash_id = conn.execute("SELECT id FROM trash_items WHERE label='Month-end test record'").fetchone()[0]
-    assert rotation_app.purge_expired_trash(now=datetime(2026, 2, 27, 10, 0, 0)) == 0
-    with rotation_app.db() as conn:
-        assert conn.execute("SELECT 1 FROM trash_items WHERE id=?", (trash_id,)).fetchone() is not None
-    assert rotation_app.purge_expired_trash(now=datetime(2026, 2, 28, 10, 0, 0)) == 1
+    with rotation_app.app.test_request_context("/"):
+        assert rotation_app.purge_expired_trash(now=datetime(2026, 2, 27, 10, 0, 0)) == 0
+        with rotation_app.db() as conn:
+            assert conn.execute("SELECT 1 FROM trash_items WHERE id=?", (trash_id,)).fetchone() is not None
+        assert rotation_app.purge_expired_trash(now=datetime(2026, 2, 28, 10, 0, 0)) == 1
     with rotation_app.db() as conn:
         assert conn.execute("SELECT 1 FROM trash_items WHERE id=?", (trash_id,)).fetchone() is None
 
