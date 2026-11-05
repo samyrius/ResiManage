@@ -310,3 +310,94 @@ def test_new_fourth_year_can_be_assigned_but_dems_preparation_resident_is_reject
     rows = cdb.execute("SELECT resident_id FROM guard_assignments WHERE active=1 AND roster_date IN ('2026-11-04','2026-11-05')").fetchall()
     assert [row[0] for row in rows] == [ids["NEW4"]]
     cdb.close()
+
+
+def test_guard_assignments_can_move_and_swap_between_month_cells(tmp_path, monkeypatch):
+    from werkzeug.datastructures import MultiDict
+
+    client = _client(tmp_path, monkeypatch)
+    cdb = _db(tmp_path)
+    for surname in ("MOVEONE", "MOVETWO"):
+        cdb.execute(
+            "INSERT INTO residents(surname,firstname,year,status,resident_type) VALUES(?, 'TEST', 2, 'active', 'local')",
+            (surname,),
+        )
+    ids = {row[0]: row[1] for row in cdb.execute(
+        "SELECT surname,id FROM residents WHERE surname IN ('MOVEONE','MOVETWO')"
+    )}
+    cdb.commit()
+    cdb.close()
+
+    for roster_date, sector, resident_id in (
+        ("2026-11-02", "UMC", ids["MOVEONE"]),
+        ("2026-11-03", "Réanimation chirurgicale", ids["MOVETWO"]),
+    ):
+        response = client.post("/guards?month=2026-11", data={
+            "month": "2026-11", "action": "add", "roster_date": roster_date,
+            "sector": sector, "resident_id": str(resident_id),
+        })
+        assert response.status_code == 302
+
+    cdb = _db(tmp_path)
+    first_id = cdb.execute(
+        "SELECT id FROM guard_assignments WHERE resident_id=? AND active=1", (ids["MOVEONE"],)
+    ).fetchone()[0]
+    second_id = cdb.execute(
+        "SELECT id FROM guard_assignments WHERE resident_id=? AND active=1", (ids["MOVETWO"],)
+    ).fetchone()[0]
+    cdb.close()
+
+    moved = client.post("/guards?month=2026-11", data={
+        "month": "2026-11", "action": "move", "assignment_id": str(first_id),
+        "target_date": "2026-11-04", "target_sector": "UMC",
+    })
+    assert moved.status_code == 302
+    cdb = _db(tmp_path)
+    assert cdb.execute(
+        "SELECT roster_date,sector FROM guard_assignments WHERE id=?", (first_id,)
+    ).fetchone() == ("2026-11-04", "UMC")
+    cdb.close()
+
+    swapped = client.post("/guards?month=2026-11", data={
+        "month": "2026-11", "action": "swap", "assignment_id": str(first_id),
+        "target_assignment_id": str(second_id),
+    })
+    assert swapped.status_code == 302
+    cdb = _db(tmp_path)
+    positions = {
+        row[0]: (row[1], row[2]) for row in cdb.execute(
+            "SELECT resident_id,roster_date,sector FROM guard_assignments WHERE id IN (?,?)",
+            (first_id, second_id),
+        )
+    }
+    assert positions[ids["MOVEONE"]] == ("2026-11-03", "Réanimation chirurgicale")
+    assert positions[ids["MOVETWO"]] == ("2026-11-04", "UMC")
+    cdb.close()
+
+
+def test_guard_document_editor_sanitizes_formatting_and_exports_signature_pdf(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    response = client.post("/guards?month=2026-11", data={
+        "month": "2026-11", "action": "save_document",
+        "document_html": '<b><font color="#c02040" size="5" face="Georgia">Consignes importantes</font></b><script>alert(1)</script>',
+        "signature_name": "Dr Exemple",
+        "signature_title": "Responsable des gardes",
+    })
+    assert response.status_code == 302
+    cdb = _db(tmp_path)
+    saved = cdb.execute(
+        "SELECT document_html,signature_name,signature_title FROM guard_document_settings WHERE month='2026-11'"
+    ).fetchone()
+    assert saved[0] == '<b><font color="#c02040" face="Times-Roman" size="5">Consignes importantes</font></b>'
+    assert saved[1:] == ("Dr Exemple", "Responsable des gardes")
+    cdb.close()
+
+    page = client.get("/guards?month=2026-11")
+    assert page.status_code == 200
+    assert b"rt-guard-rich-editor" in page.data
+    assert b"rt-guard-profile-modal" in page.data
+    assert b"data-guard-drop-cell" in page.data
+    pdf = client.get("/guards/export.pdf?month=2026-11")
+    assert pdf.status_code == 200
+    assert pdf.mimetype == "application/pdf"
+    assert pdf.data.startswith(b"%PDF")
