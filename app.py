@@ -3767,51 +3767,52 @@ def cancel_external_rotation(xid):
 def quick_access():
  if guard(): return redirect("/login")
  return page("""<section class="rt-launcher">
- <div class="rt-launcher-head"><div><span class="rt-launcher-kicker">{{L('ACCÈS DIRECT','QUICK ACCESS','وصول مباشر')}}</span><h2>{{L('Tous les outils','All tools','جميع الأدوات')}}</h2></div><div class="rt-launcher-languages"><a href="/lang/ar" title="العربية">🇩🇿</a><a href="/lang/fr" title="Français">🇫🇷</a><a href="/lang/en" title="English">🇬🇧</a></div></div>
- <label class="rt-launcher-search"><span aria-hidden="true">⌕</span><input id="rt-module-search" type="search" aria-label="{{L('Rechercher une fonction','Search functions','ابحث عن وظيفة')}}" placeholder="{{L('Rechercher une fonction…','Find a function…','ابحث عن وظيفة…')}}" autocomplete="off"></label>
- <div class="rt-launcher-groups">
- <section class="rt-launcher-group"><h3>{{L('Résidents','Residents','المقيمون')}}</h3><div class="rt-launcher-grid">
- <a class="rt-launcher-link" data-search="résidents residents مقيمون" href="/residents"><span>👥</span>{{t('manage_residents')}}</a>
- <a class="rt-launcher-link" data-search="importer import استيراد" href="/import"><span>⇧</span>{{t('import_residents')}}</a>
- <a class="rt-launcher-link" data-search="formulaires modèles vierges forms templates" href="/templates"><span>▤</span>{{L('Formulaires vierges','Blank forms','استمارات فارغة')}}</a>
- <a class="rt-launcher-link" data-search="examens promotion notes exams" href="/exams"><span>✎</span>{{t('promotion')}}</a>
- </div></section>
- <section class="rt-launcher-group"><h3>{{L('Stages et organisation','Rotations and organisation','التربصات والتنظيم')}}</h3><div class="rt-launcher-grid">
- <a class="rt-launcher-link" data-search="services terrains stages" href="/terrains"><span>🏥</span>{{t('terrains')}}</a>
- <a class="rt-launcher-link" data-search="capacités places postes capacity" href="/capacities"><span>▥</span>{{t('capacities')}}</a>
- <a class="rt-launcher-link" data-search="tableau répartition planning rotation board" href="/rotation-board"><span>▦</span>{{L('Tableau de répartition','Rotation board','جدول التوزيع')}}</a>
- <a class="rt-launcher-link" data-search="affecter affectations assign" href="/assign"><span>⇄</span>{{t('assign')}}</a>
- <a class="rt-launcher-link" data-search="historique stages history" href="/history"><span>◷</span>{{t('history')}}</a>
- <a class="rt-launcher-link" data-search="congés absence leave" href="/leave"><span>🌿</span>{{L('Congés','Leave','الإجازات')}}</a>
- <a class="rt-launcher-link" data-search="stages externes étranger external" href="/external-rotations"><span>✈</span>{{L('Stages externes','External rotations','التربصات الخارجية')}}</a>
- </div></section>
- <section class="rt-launcher-group"><h3>{{L('Suivi et décisions','Monitoring and decisions','المتابعة والقرارات')}}</h3><div class="rt-launcher-grid">
- <a class="rt-launcher-link" data-search="bilan résumé synthèse summary" href="/summary"><span>▤</span>{{t('summary')}}</a>
- {% if role=='super_admin' %}<a class="rt-launcher-link" data-search="décisions validation approbation decisions" href="/decisions"><span>✓</span>{{t('decisions')}}</a>{% endif %}
- </div></section>
- {% if role=='super_admin' %}<section class="rt-launcher-group"><h3>{{L('Gestion avancée','Advanced management','الإدارة المتقدمة')}}</h3><div class="rt-launcher-grid">
- <a class="rt-launcher-link" data-search="historique importer stages passés import history" href="/import-history"><span>◷</span>{{L('Importer un historique','Import history','استيراد السجل')}}</a>
- <a class="rt-launcher-link" data-search="objectifs goals" href="/objectives"><span>◎</span>{{t('objectives')}}</a>
- <a class="rt-launcher-link" data-search="dems diplômés lauréats" href="/dems"><span>🎓</span>{{t('dems_success')}}</a>
- <a class="rt-launcher-link" data-search="décisions validation approbation decisions" href="/decisions"><span>✓</span>{{t('decisions')}}</a>
- </div></section><section class="rt-launcher-group"><h3>{{L('Administration','Administration','الإدارة')}}</h3><div class="rt-launcher-grid">
- <a class="rt-launcher-link" data-search="paramètres settings configuration" href="/settings"><span>⚙</span>{{t('settings_page')}}</a>
- <a class="rt-launcher-link" data-search="utilisateurs comptes users" href="/users"><span>♙</span>{{t('users')}}</a>
- <a class="rt-launcher-link" data-search="synchronisation sync téléphone appareil" href="/sync"><span>⇄</span>{{L('Synchronisation','Device sync','المزامنة')}}</a>
- <a class="rt-launcher-link" data-search="appareils synchronisés devices" href="/sync-devices"><span>▣</span>{{L('Appareils','Devices','الأجهزة')}}</a>
- <a class="rt-launcher-link" data-search="audit journal actions" href="/audit"><span>≡</span>{{t('audit')}}</a>
- <a class="rt-launcher-link" data-search="sauvegarde backup" href="/backup"><span>⬇</span>{{t('backup')}}</a>
- <a class="rt-launcher-link" data-search="exporter csv export" href="/export"><span>⇧</span>{{t('export')}}</a>
- <a class="rt-launcher-link" data-search="restaurer restauration restore" href="/restore"><span>↶</span>{{t('restore')}}</a>
- <a class="rt-launcher-link" data-search="corbeille supprimer trash" href="/trash"><span>▤</span>{{L('Corbeille','Trash','سلة المهملات')}}</a>
- </div></section>{% endif %}
- <section class="rt-launcher-group"><h3>{{L('Compte','Account','الحساب')}}</h3><div class="rt-launcher-grid"><a class="rt-launcher-link" data-search="déconnexion logout sortir" href="/logout"><span>⇥</span>{{t('logout')}}</a></div></section>
- </div><p id="rt-module-no-results" hidden>{{L('Aucune fonction trouvée.','No matching function.','لم يتم العثور على وظيفة.')}}</p>
- </section>
- <style>
- .rt-launcher{padding:clamp(14px,2.5vw,26px)!important}.rt-launcher-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.rt-launcher-kicker{font-size:10px;letter-spacing:1.5px;font-weight:900;color:#27a99d}.rt-launcher-head h2{margin:2px 0 12px;font-size:clamp(22px,4vw,30px)}.rt-launcher-languages{display:flex;gap:5px}.rt-launcher-languages a{padding:7px 9px;border-radius:10px}.rt-launcher-search{display:flex;align-items:center;gap:10px;padding:4px 12px;border:1px solid #9db9ca;border-radius:14px;background:#fff;box-shadow:0 4px 14px #102e4610}.rt-launcher-search span{font-size:24px;color:#278b9a}.rt-launcher-search input{border:0!important;box-shadow:none!important;margin:0!important;padding:12px 2px!important;background:transparent!important}.rt-launcher-groups{display:grid;gap:14px;margin-top:18px}.rt-launcher-group{margin:0!important;padding:14px!important;border-radius:15px!important}.rt-launcher-group h3{margin:0 0 10px;font-size:15px}.rt-launcher-group h3:after{width:32px;margin-top:4px}.rt-launcher-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr));gap:8px}.rt-launcher-link{display:flex;align-items:center;gap:10px;min-height:48px;padding:10px 12px!important;border:1px solid #ffffff40;border-radius:12px!important;font-size:13px;font-weight:700;box-shadow:0 3px 0 #071a3440,0 7px 14px #071a341c!important}.rt-launcher-link span{display:grid;place-items:center;flex:0 0 28px;width:28px;height:28px;border-radius:9px;background:#ffffff20;font-size:18px}.rt-launcher-link:hover{transform:translateY(-2px)}.rt-launcher-link[hidden]{display:none!important}#rt-module-no-results{padding:18px;text-align:center;color:#718398}@media(max-width:680px){.rt-launcher{padding:12px!important}.rt-launcher-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rt-launcher-link{font-size:12px;min-height:54px;padding:8px!important}.rt-launcher-languages a{padding:6px}.rt-launcher-head h2{font-size:22px}}
- </style>
- <script>(function(){var input=document.getElementById('rt-module-search');if(!input)return;var links=Array.from(document.querySelectorAll('.rt-launcher-link'));var groups=Array.from(document.querySelectorAll('.rt-launcher-group'));var empty=document.getElementById('rt-module-no-results');input.addEventListener('input',function(){var normalize=function(value){return value.toLocaleLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');};var q=normalize(input.value.trim());var count=0;links.forEach(function(link){var hay=normalize(link.textContent+' '+(link.getAttribute('data-search')||''));var show=!q||hay.indexOf(q)!==-1;link.hidden=!show;if(show)count++;});groups.forEach(function(group){group.hidden=!Array.from(group.querySelectorAll('.rt-launcher-link')).some(function(link){return !link.hidden;});});empty.hidden=count!==0;});})();</script>
+  <div class="rt-launcher-head"><div><span class="rt-launcher-kicker">{{L('ACCÈS DIRECT','QUICK ACCESS','وصول مباشر')}}</span><h2>{{L('Outils','Tools','الأدوات')}}</h2></div></div>
+  <label class="rt-launcher-search"><span aria-hidden="true">⌕</span><input id="rt-module-search" type="search" aria-label="{{L('Rechercher une fonction','Search functions','ابحث عن وظيفة')}}" placeholder="{{L('Rechercher un résident, un service ou une fonction…','Search a resident, service or function…','ابحث عن مقيم أو مصلحة أو وظيفة…')}}" autocomplete="off"></label>
+  <nav class="rt-tool-categories" aria-label="{{L('Catégories des outils','Tool categories','فئات الأدوات')}}">
+    <button type="button" class="rt-tool-category is-active" data-category="residents" aria-pressed="true">{{L('Résidents','Residents','المقيمون')}}</button>
+    <button type="button" class="rt-tool-category" data-category="stages" aria-pressed="false">{{L('Stages','Rotations','التربصات')}}</button>
+    <button type="button" class="rt-tool-category" data-category="formation" aria-pressed="false">{{L('Formation','Training','التكوين')}}</button>
+    {% if role=='super_admin' %}<button type="button" class="rt-tool-category" data-category="admin" aria-pressed="false">{{L('Administration','Administration','الإدارة')}}</button>{% endif %}
+  </nav>
+  <div class="rt-launcher-groups">
+    <section class="rt-launcher-group" data-tool-group="residents"><h3>{{L('Résidents','Residents','المقيمون')}}</h3><div class="rt-launcher-grid">
+      <a class="rt-launcher-link" data-search="résidents residents مقيمون dossiers fiches" href="/residents"><span>👥</span>{{t('manage_residents')}}</a>
+      <a class="rt-launcher-link" data-search="importer import listes promotions استيراد" href="/import"><span>⇧</span>{{t('import_residents')}}</a>
+      <a class="rt-launcher-link" data-search="formulaires modèles vierges forms templates" href="/templates"><span>▤</span>{{L('Formulaires vierges','Blank forms','استمارات فارغة')}}</a>
+    </div></section>
+    <section class="rt-launcher-group" data-tool-group="stages" hidden><h3>{{L('Stages et organisation','Rotations and organisation','التربصات والتنظيم')}}</h3><div class="rt-launcher-grid">
+      <a class="rt-launcher-link" data-search="services terrains stages hôpital" href="/terrains"><span>🏥</span>{{t('terrains')}}</a>
+      <a class="rt-launcher-link" data-search="capacités places postes capacity" href="/capacities"><span>▥</span>{{t('capacities')}}</a>
+      <a class="rt-launcher-link" data-search="tableau répartition planning rotation board" href="/rotation-board"><span>▦</span>{{L('Tableau de répartition','Rotation board','جدول التوزيع')}}</a>
+      <a class="rt-launcher-link" data-search="affecter affectations assign résident service" href="/assign"><span>⇄</span>{{t('assign')}}</a>
+      <a class="rt-launcher-link" data-search="historique stages history rotations passées" href="/history"><span>◷</span>{{t('history')}}</a>
+      <a class="rt-launcher-link" data-search="congés absence leave vacances" href="/leave"><span>🌿</span>{{L('Congés','Leave','الإجازات')}}</a>
+      <a class="rt-launcher-link" data-search="stages externes étranger external mobilité" href="/external-rotations"><span>✈</span>{{L('Stages externes','External rotations','التربصات الخارجية')}}</a>
+    </div></section>
+    <section class="rt-launcher-group" data-tool-group="formation" hidden><h3>{{L('Formation et suivi','Training and progress','التكوين والمتابعة')}}</h3><div class="rt-launcher-grid">
+      <a class="rt-launcher-link" data-search="examens notes promotion résultats exams marks" href="/exams"><span>✎</span>{{t('promotion')}}</a>
+      {% if role=='super_admin' %}<a class="rt-launcher-link" data-search="objectifs goals compétences" href="/objectives"><span>◎</span>{{t('objectives')}}</a><a class="rt-launcher-link" data-search="dems diplômés lauréats spécialité" href="/dems"><span>🎓</span>{{t('dems_success')}}</a><a class="rt-launcher-link" data-search="décisions validation approbation decisions vote" href="/decisions"><span>✓</span>{{t('decisions')}}</a>{% endif %}
+      <a class="rt-launcher-link" data-search="bilan résumé synthèse summary rapports" href="/summary"><span>▤</span>{{t('summary')}}</a>
+      {% if role=='super_admin' %}<a class="rt-launcher-link" data-search="historique importer stages passés import history" href="/import-history"><span>◷</span>{{L('Importer un historique','Import history','استيراد السجل')}}</a>{% endif %}
+    </div></section>
+    {% if role=='super_admin' %}<section class="rt-launcher-group" data-tool-group="admin" hidden><h3>{{L('Administration','Administration','الإدارة')}}</h3><div class="rt-launcher-grid">
+      <a class="rt-launcher-link" data-search="paramètres settings configuration année thème" href="/settings"><span>⚙</span>{{t('settings_page')}}</a>
+      <a class="rt-launcher-link" data-search="utilisateurs comptes users accès" href="/users"><span>♙</span>{{t('users')}}</a>
+      <a class="rt-launcher-link" data-search="synchronisation sync téléphone appareil" href="/sync"><span>⇄</span>{{L('Synchronisation','Device sync','المزامنة')}}</a>
+      <a class="rt-launcher-link" data-search="appareils synchronisés devices" href="/sync-devices"><span>▣</span>{{L('Appareils','Devices','الأجهزة')}}</a>
+      <a class="rt-launcher-link" data-search="audit journal actions traçabilité" href="/audit"><span>≡</span>{{t('audit')}}</a>
+      <a class="rt-launcher-link" data-search="sauvegarde backup copie sécurité" href="/backup"><span>⬇</span>{{t('backup')}}</a>
+      <a class="rt-launcher-link" data-search="exporter csv export données" href="/export"><span>⇧</span>{{t('export')}}</a>
+      <a class="rt-launcher-link" data-search="restaurer restauration restore" href="/restore"><span>↶</span>{{t('restore')}}</a>
+      <a class="rt-launcher-link" data-search="corbeille supprimer trash archivage" href="/trash"><span>▤</span>{{L('Corbeille','Trash','سلة المهملات')}}</a>
+    </div></section>{% endif %}
+  </div><p id="rt-module-no-results" hidden>{{L('Aucun outil correspondant.','No matching tool.','لا توجد أداة مطابقة.')}}</p>
+  </section>
+  <style>
+  .rt-launcher{padding:clamp(12px,2.2vw,22px)!important}.rt-launcher-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.rt-launcher-kicker{font-size:10px;letter-spacing:1.3px;font-weight:900;color:#27a99d}.rt-launcher-head h2{margin:2px 0 12px;font-size:clamp(21px,3.5vw,28px)}.rt-launcher-search{display:flex;align-items:center;gap:10px;padding:3px 12px;border:1px solid #9db9ca;border-radius:13px;background:#fff;box-shadow:0 4px 14px #102e4610}.rt-launcher-search span{font-size:24px;color:#278b9a}.rt-launcher-search input{border:0!important;box-shadow:none!important;margin:0!important;padding:11px 2px!important;background:transparent!important}.rt-tool-categories{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:12px 0!important;padding:0!important;background:transparent!important}.rt-tool-category{min-width:0;min-height:42px;padding:8px 6px!important;border:1px solid #ffffff45!important;border-radius:11px!important;font-size:12px;font-weight:800;box-shadow:0 3px 0 #071a3440,0 6px 12px #071a341c!important}.rt-tool-category.is-active{outline:2px solid #26c9bb;outline-offset:1px;filter:brightness(1.13)}.rt-launcher-groups{margin-top:8px}.rt-launcher-group{margin:0!important;padding:13px!important;border-radius:14px!important}.rt-launcher-group h3{margin:0 0 10px;font-size:15px}.rt-launcher-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr));gap:8px}.rt-launcher-link{display:flex;align-items:center;gap:10px;min-height:48px;padding:9px 11px!important;border:1px solid #ffffff40;border-radius:11px!important;font-size:13px;font-weight:700;box-shadow:0 3px 0 #071a3440,0 7px 14px #071a341c!important}.rt-launcher-link span{display:grid;place-items:center;flex:0 0 28px;width:28px;height:28px;border-radius:9px;background:#ffffff20;font-size:18px}.rt-launcher-link:hover{transform:translateY(-2px)}.rt-launcher-link[hidden],.rt-launcher-group[hidden]{display:none!important}#rt-module-no-results{padding:16px;text-align:center;color:#718398}@media(max-width:680px){.rt-launcher{padding:10px!important}.rt-tool-categories{gap:5px}.rt-tool-category{font-size:11px;min-height:40px;padding:7px 3px!important}.rt-launcher-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rt-launcher-link{font-size:12px;min-height:52px;padding:8px!important}}
+  </style>
+  <script>(function(){var root=document.querySelector('.rt-launcher');if(!root)return;var input=root.querySelector('#rt-module-search');var buttons=Array.from(root.querySelectorAll('.rt-tool-category'));var groups=Array.from(root.querySelectorAll('.rt-launcher-group'));var links=Array.from(root.querySelectorAll('.rt-launcher-link'));var empty=root.querySelector('#rt-module-no-results');var selected='residents';var normalize=function(value){return String(value||'').toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');};function render(){var q=normalize(input.value.trim()),count=0;links.forEach(function(link){var group=link.closest('[data-tool-group]');var match=!q||normalize(link.textContent+' '+(link.getAttribute('data-search')||'')).indexOf(q)!==-1;var visible=q?match:group.dataset.toolGroup===selected;link.hidden=!visible;if(visible)count++;});groups.forEach(function(group){var has=Array.from(group.querySelectorAll('.rt-launcher-link')).some(function(link){return !link.hidden;});group.hidden=!has;});empty.hidden=count!==0;}buttons.forEach(function(button){button.addEventListener('click',function(){selected=button.dataset.category;buttons.forEach(function(item){var active=item===button;item.classList.toggle('is-active',active);item.setAttribute('aria-pressed',active?'true':'false');});input.value='';render();});});input.addEventListener('input',render);render();})();</script>
  """)
 
 from guards import register_guard_routes
