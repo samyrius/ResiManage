@@ -12,6 +12,7 @@ import io
 import csv
 import html
 import base64
+from html.parser import HTMLParser
 
 SECTORS = ("UMC", "Réanimation chirurgicale")
 HOURS = ("16H-08H", "08H-08H")
@@ -155,31 +156,94 @@ def _ensure_schema(c, audit_event):
     c.commit()
 
 
-def _safe_rich_html(value):
-    """Keep only ReportLab-safe formatting tags and a small set of font attributes."""
-    value = str(value or "")[:12000]
-    value = re.sub(r"(?is)<(script|style|iframe|object)[^>]*>.*?</\1>", "", value)
-    value = re.sub(r"(?is)<!--.*?-->", "", value)
-    value = re.sub(r"(?i)<(p|div)\b[^>]*>", "", value)
-    value = re.sub(r"(?i)</(p|div)\s*>", "<br/>", value)
-    value = re.sub(r"(?i)<br\s*/?>", "<br/>", value)
-    value = re.sub(r"(?i)<(?!/?(?:b|strong|i|em|u|font|br)\b)[^>]*>", "", value)
-    def clean_font(match):
-        attrs = match.group(1) or ""
+class _GuardRichTextParser(HTMLParser):
+    """Allow a small formatting vocabulary; all text is escaped and active content discarded."""
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+        self.stack = []
+        self.skip_tag = None
+
+    def _font_markup(self, attrs):
+        attrs = dict(attrs or [])
+        style = attrs.get("style", "")
+        color = attrs.get("color", "")
+        face = attrs.get("face", "")
+        size = attrs.get("size", "")
+        style_color = re.search(r"(?i)(?:^|;)\s*color\s*:\s*(#[0-9a-f]{3,6}|[a-z]{3,20})", style)
+        style_face = re.search(r"(?i)(?:^|;)\s*font-family\s*:\s*([^;]+)", style)
+        style_size = re.search(r"(?i)(?:^|;)\s*font-size\s*:\s*(\d{1,2})(?:px|pt)", style)
+        if style_color:
+            color = style_color.group(1)
+        if style_face:
+            face = style_face.group(1).strip(" '\"")
+        if style_size:
+            px = int(style_size.group(1))
+            size = "1" if px <= 10 else "2" if px <= 13 else "3" if px <= 16 else "4" if px <= 20 else "5" if px <= 26 else "6" if px <= 34 else "7"
         safe = []
-        color = re.search(r"(?i)\bcolor\s*=\s*['\"]?(#[0-9a-f]{6}|#[0-9a-f]{3}|[a-z]{3,20})", attrs)
-        face = re.search(r"(?i)\bface\s*=\s*['\"]?([a-z0-9 ,_-]{1,40})", attrs)
-        size = re.search(r"(?i)\bsize\s*=\s*['\"]?([1-7])", attrs)
-        if color: safe.append('color="' + color.group(1) + '"')
+        if re.fullmatch(r"#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?|[a-zA-Z]{3,20}", color or ""):
+            safe.append('color="' + color + '"')
         if face:
-            family = face.group(1).strip().lower()
+            family = face.lower()
             mapped = "Courier" if "courier" in family else "Times-Roman" if "times" in family or "georgia" in family else "Helvetica"
             safe.append('face="' + mapped + '"')
-        if size: safe.append('size="' + size.group(1) + '"')
+        if str(size) in {"1", "2", "3", "4", "5", "6", "7"}:
+            safe.append('size="' + str(size) + '"')
         return "<font " + " ".join(safe) + ">" if safe else "<font>"
-    value = re.sub(r"(?i)<font\b([^>]*)>", clean_font, value)
-    value = re.sub(r"(?i)\s+on[a-z]+\s*=\s*(['\"]).*?\1", "", value)
-    return value
+
+    def handle_starttag(self, tag, attrs):
+        if self.skip_tag:
+            return
+        if tag in {"script", "style", "iframe", "object", "svg", "math"}:
+            self.skip_tag = tag
+            return
+        if tag in {"b", "strong", "i", "em", "u"}:
+            self.parts.append("<" + tag + ">")
+            self.stack.append(tag)
+        elif tag == "font":
+            self.parts.append(self._font_markup(attrs))
+            self.stack.append("font")
+        elif tag == "span":
+            self.parts.append(self._font_markup(attrs))
+            self.stack.append("font")
+        elif tag == "br":
+            self.parts.append("<br/>")
+        elif tag in {"p", "div"} and self.parts and not self.parts[-1].endswith("<br/>"):
+            self.parts.append("<br/>")
+
+    def handle_endtag(self, tag):
+        if self.skip_tag:
+            if tag == self.skip_tag:
+                self.skip_tag = None
+            return
+        if tag in {"p", "div"}:
+            if self.parts and not self.parts[-1].endswith("<br/>"):
+                self.parts.append("<br/>")
+            return
+        target = "font" if tag == "span" else tag
+        if target in self.stack:
+            while self.stack:
+                opened = self.stack.pop()
+                self.parts.append("</" + opened + ">")
+                if opened == target:
+                    break
+
+    def handle_data(self, data):
+        if not self.skip_tag and data:
+            self.parts.append(html.escape(data, quote=False))
+
+    def result(self):
+        while self.stack:
+            self.parts.append("</" + self.stack.pop() + ">")
+        return "".join(self.parts)[:16000]
+
+
+def _safe_rich_html(value):
+    parser = _GuardRichTextParser()
+    parser.feed(str(value or "")[:12000])
+    parser.close()
+    return parser.result()
+
 
 def register_guard_routes(app, db, page, guard, audit_event, L):
     def prepare():
