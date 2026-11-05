@@ -40,3 +40,15 @@ tests/test_guards.py couvre l’import idempotent, les 233 affectations, les 70 
 ## Génération automatique : étape bloquée volontairement
 
 Le générateur mensuel n'est pas activé tant que les règles de composition et de roulement ne sont pas confirmées. Le planning d'octobre contient des libellés non résolus et ambigus ; il ne peut pas être converti sans risque en identités ni servir à inférer les quotas de promotion. La génération devra créer un brouillon cinq jours avant la fin du mois, calculer l'équité séparément par promotion, exclure uniquement les résidents explicitement marqués en préparation DEMS, puis conserver les corrections humaines avec leur motif. Le PDF du brouillon devra rester rééditable pendant tout le mois.
+
+
+## Édition centrale et document signé — novembre 2026
+
+- Le calendrier mensuel conserve la vue d'ensemble des deux secteurs et permet d'ajouter plusieurs résidents dans chaque cellule.
+- Sur ordinateur, un glisser-déposer déplace une affectation vers une autre date ou un autre secteur. Sur écran tactile, un appui long suivi d'un glissement effectue le déplacement à un doigt.
+- Déposer un résident sur un autre résident permute leurs deux affectations. Le serveur vérifie les doublons, la validité des affectations et la cohérence du mois avant l'enregistrement.
+- Un clic sur le nom d'un résident ouvre sa fiche dans une fenêtre superposée, avec ses informations de dossier, l'historique des stages, les affectations, les examens, les congés, les stages externes et les objectifs.
+- L'éditeur de document permet de préparer un texte d'accompagnement avec gras, italique, souligné, taille, police et couleur. Le contenu est filtré côté serveur avant stockage et export.
+- La signature peut être saisie au clavier (nom et fonction) ou dessinée au doigt / à la souris dans une zone dédiée. Elle est ajoutée à la fin du PDF mensuel.
+- L'export PDF paysage A4 contient le calendrier actif, le texte mis en forme, la signature et l'historique des correctifs. Les affectations retirées restent exclues du calendrier actif.
+- Les actions d'édition, de déplacement, de permutation, de suppression et de signature restent réservées au Super Admin. Les suppressions conservent un motif obligatoire et une trace d'audit.
