@@ -305,7 +305,7 @@ def test_bulk_planning_shows_the_single_central_matrix_instead_of_a_second_page(
     assert board.status_code == 200
     assert b'class="rt-central-matrix"' in board.data
     assert board.data.count(b'class="rt-period-head"') == 4
-    assert board.data.count(b'data-drop-cell') == 76
+    assert board.data.count(b'data-drop-cell data-terrain-id=') == 76
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM terrains WHERE active=1").fetchone()[0] == 19
 
@@ -3885,7 +3885,8 @@ def test_rotation_board_updates_occupancy_after_assignment_and_uses_readable_con
     assert assigned.status_code == 200
     assert b"BoardCount Resident" in assigned.data
     assert "Places occupées : <strong>1</strong> / 4".encode("utf-8") in assigned.data
-    assert b".rt-board-table td{color:#10263a!important;background-color:#f8fbff}" in assigned.data
+    assert b'.rt-board-cell{background:#fff;min-height:112px}' in assigned.data
+    assert b'.rt-board-full{background:#ffe4e4}' in assigned.data
     assert b".rt-board-cell-form input,.rt-board-cell-form select{color:#10263a!important;background:#fff!important" in assigned.data
 
 
@@ -4842,7 +4843,13 @@ def test_tools_launcher_shows_one_category_and_searches_all_tools(tmp_path, monk
 def test_central_matrix_shows_four_periods_inline_dates_and_profile_controls(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
-
+    with rotation_app.db() as conn:
+        year = conn.execute("SELECT value FROM settings WHERE key='year'").fetchone()[0]
+        period_id = conn.execute("SELECT id FROM periods WHERE year_label=? ORDER BY id LIMIT 1", (year,)).fetchone()[0]
+        terrain_id = conn.execute("SELECT id FROM terrains WHERE active=1 ORDER BY id LIMIT 1").fetchone()[0]
+        rid = conn.execute("INSERT INTO residents(surname,firstname,year,status) VALUES('Matrix','Resident',2,'active')").lastrowid
+        conn.execute("INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')", (rid, terrain_id, period_id))
+        conn.commit()
     response = client.get("/rotation-board")
     assert response.status_code == 200
     html = response.data.decode("utf-8")
@@ -4853,9 +4860,7 @@ def test_central_matrix_shows_four_periods_inline_dates_and_profile_controls(tmp
     assert 'data-drop-cell' in html
     assert 'class="rt-resident-profile"' in html
     assert 'id="rt-resident-profile-modal"' in html
-    assert 'Long-press a name to move it' in html or 'appui prolongé' in html.lower()
-
-
+    assert 'appui prolongé' in html.lower()
 def test_resident_profile_summary_api_returns_stage_history_and_assignments(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
