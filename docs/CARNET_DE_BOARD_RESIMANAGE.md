@@ -50,3 +50,16 @@ Dépôt : https://github.com/samyrius/ResiManage
 - Fichiers modifiés/ajoutés signalés par la comparaison : workflow Android et Windows, CI, registre, `android/app/build.gradle`, `MainActivity.java`, `app.py` (+531/-43), données de gardes `data/gardes_octobre_2026.json`, `guards.py` (nouveau), tests `test_app.py` et `test_guards.py`, sept CSS de thèmes, sept templates HTML et documents d'audit/fonctionnalité des gardes.
 - Cette comparaison décrit précisément l'écart de la branche candidate par rapport à la branche officielle; elle ne signifie pas que tous les changements ont été testés sur téléphone ni qu'ils sont prêts à fusionner.
 - Le dépôt expose également de nombreuses branches historiques et spécialisées (`backup/`, `baseline/`, `docs/`, `feature/`, `fix/`, `integration/`, `resimanage-2-*`, `ui/`). Leur contenu intégral n'a pas été copié dans ce registre : chaque branche doit être comparée à sa base et ses commits inspectés avant classement. Aucun nettoyage/suppression n'a été effectué.
+
+## Matrice centrale des affectations — 5 novembre 2026
+
+- La matrice unique est implémentée sur la branche candidate : 19 services actifs en lignes, quatre périodes en colonnes.
+- Les dates sont modifiables dans l'en-tête des périodes ; l'interrupteur de gestion des capacités est directement accessible depuis le tableau.
+- Les capacités peuvent être désactivées pour les affectations manuelles ; lorsqu'elles sont activées, les capacités et places restantes sont contrôlées. Les autres règles métier restent actives dans les deux modes.
+- Un clic sur le nom ouvre une fiche superposée avec historique de stages et affectations actuelles.
+- Un appui prolongé permet le déplacement tactile ; le déplacement souris et une solution de repli sont également prévus. Le serveur valide et journalise le déplacement.
+- La position de défilement est conservée après enregistrement. Les messages temporaires disparaissent sans bouton de fermeture.
+- L'affichage est optimisé pour le paysage sur smartphone et s'adapte aux tablettes/ordinateurs.
+- La route historique /planning renvoie vers le tableau central ; il n'y a pas de second écran de planification.
+- Validation automatisée : le premier run a révélé des tests anciens à adapter ; un nouveau run est en cours au moment de cette note. Ne pas annoncer la suite verte avant lecture du résultat.
+- Aucune nouvelle APK n'est encore validée sur émulateur ou téléphone réel. Le contrôle visuel sur appareil reste à faire.
