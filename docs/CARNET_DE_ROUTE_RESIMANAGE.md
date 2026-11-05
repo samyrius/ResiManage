@@ -757,3 +757,72 @@ La première version du module Gardes excluait automatiquement tous les résiden
 - Pour chaque observation future, consigner symptôme, diagnostic et degré de certitude, fichiers/commits, tests, résultats CI et validation physique distinctement.
 - Un correctif est « appliqué » lorsqu'il est dans le code ; « testé » lorsque le test correspondant a été exécuté ; « validé CI » lorsque le workflow exact réussit ; « confirmé sur appareil » uniquement après retour du test physique.
 
+
+
+---
+
+## Correctifs UX et refonte réelle des thèmes — 5 novembre 2026
+
+### Retour utilisateur à l'origine du lot
+
+Après examen de l'APK précédente, l'utilisateur a signalé que les thèmes ne changeaient essentiellement que les couleurs, sans proposer de dispositions réellement distinctes. Il a également précisé les attentes suivantes :
+
+1. Les boutons doivent avoir un relief 3D nettement perceptible et une animation d'enfoncement à l'appui.
+2. Les icônes des raccourcis intérieurs du tableau de bord ne doivent pas avoir de libellé textuel.
+3. Les cinq icônes de la barre fixe inférieure doivent avoir leur libellé sous l'icône, sans déformation ni largeur incohérente.
+4. L'ouverture d'un sous-menu doit fermer automatiquement le sous-menu précédemment ouvert ; un second appui sur le sous-menu actif doit pouvoir le refermer.
+5. Les notifications informatives et les erreurs doivent être compactes, ne pas encombrer l'écran, se fermer avec un bouton ou par appui à l'extérieur et disparaître automatiquement.
+
+### Modifications portées dans la branche candidate
+
+Branche : `integration/resimanage-refonte-themes-2026-11-03`.
+
+- Sept dispositions distinctes ont été ajoutées au niveau du conteneur principal et des feuilles CSS dédiées :
+  - Crystal 3D : espace de travail centré et tableau de bord en grille ;
+  - Futuriste : rail de navigation latéral et espace de travail compact ;
+  - Luxe élégant : présentation éditoriale, navigation horizontale et colonne de lecture aérée ;
+  - Naturel moderne : navigation latérale et raccourcis en liste verticale ;
+  - Émeraude : navigation latérale à droite et grand espace de travail ;
+  - Aurore boréale : rail d'icônes étroit avec panneaux de sous-menu flottants ;
+  - Rubis : barre de commande horizontale et sections fortement hiérarchisées.
+- Les variantes sont ciblées avec l'attribut `data-layout` du conteneur `.rt-app-shell`, afin de conserver la classe historique `rt-app-shell` attendue par les tests et les styles existants.
+- Le changement de thème applique immédiatement l'attribut de disposition correspondant, en plus de la feuille CSS du thème.
+- Les libellés de la navigation inférieure sont rétablis et stylés sous les icônes ; les libellés textuels des raccourcis intérieurs sont masqués visuellement tout en conservant un texte accessible.
+- Les groupes de sous-menus sont rendus exclusifs : l'ouverture d'un groupe ferme les autres ; l'appui sur le groupe déjà ouvert le referme.
+- Les messages flash sont présentés comme notifications compactes en haut de l'écran, avec fermeture explicite, fermeture par clic extérieur et temporisation automatique. Le marqueur caché `rt-action-context` est conservé pour ne pas casser le retour au formulaire et les tests historiques.
+- Un relief plus marqué a été ajouté aux cartes/icônes du tableau de bord et aux contrôles de navigation, avec ombres internes et externes et animation d'enfoncement à l'appui.
+
+### Commits du lot
+
+Les commits suivants portent les ajustements de cette séquence sur la branche candidate :
+
+- `3b141d2c9833f687226f684396df8de59f6989c6` — libellés de navigation et fermeture exclusive des sous-menus ;
+- `f38a2fd2d8b2b72773704782c7fa0be5ec19dcb1` — premières dispositions spécifiques et notifications compactes ;
+- `445547ce7505b393d67ed2f60f87d1d1e5f96b27` — conservation du marqueur de contexte des formulaires ;
+- `15f0d97563b8ff26ca96970a5f921cc7c0dfaa20` — ciblage des feuilles CSS par attribut de disposition en préservant la classe du conteneur ;
+- `9d2de2a0e1448b11970dd8d2d28e7c071baef020` — renforcement du relief 3D des boutons ;
+- `17a8bd787a01d5fe9f7ab9c4cfe67f22365f407c` — application immédiate de la disposition lors du changement de thème ;
+- `a9d3c762dc33480a896762434997b8aa116cd3d8` — conservation de la classe historique du conteneur dans les sept templates et tête candidate soumise aux workflows de validation.
+
+Les modifications sont portées dans la branche candidate. Les noms des commits ne constituent pas à eux seuls une preuve visuelle : le rendu final de chaque thème doit encore être vérifié sur téléphone.
+
+### Vérifications CI sur la tête exacte
+
+- Commit contrôlé : `a9d3c762dc33480a896762434997b8aa116cd3d8`.
+- Workflow Python : https://github.com/samyrius/ResiManage/actions/runs/42058315107 — terminé avec succès ; **193 tests réussis** (74,00 secondes).
+- Workflow Android : https://github.com/samyrius/ResiManage/actions/runs/42058317186 — terminé avec succès :
+  - régression Python : succès ;
+  - compilation de l'APK debug : succès ;
+  - smoke test Android sur émulateur : succès.
+- Artefact APK : `resimanage2-debug-apk`, ID `13430455560`, taille 38 584 272 octets ; SHA-256 `c9efd52a2b8c92600bc246e7bbe9a2c7afbfdf5639daf3e8219ff904766137db`. L'artefact expire le 19 novembre 2026 à 15:49:12 UTC.
+- Preuve émulateur : artefact `resimanage2-android-emulator-evidence`, ID `13431525314`, SHA-256 `510deb5951bcf4836075970150eef3f384ad2bf39fc6ad87a6277a8889b78ffc`.
+- Ces résultats confirment la régression automatisée, la compilation et le smoke test sur émulateur. Ils ne prouvent pas encore que les sept dispositions sont visuellement conformes sur le téléphone physique.
+
+### État Git et validations restantes
+
+- PR #91 : https://github.com/samyrius/ResiManage/pull/91 — ouverte et non fusionnée au moment de cette mise à jour.
+- La branche officielle `resimanage-2-work` n'a pas été modifiée par ce lot.
+- L'APK issue du commit exact `a9d3c762dc33480a896762434997b8aa116cd3d8` doit maintenant être installée sur le téléphone réel.
+- Contrôles à effectuer sur appareil : comparer les sept dispositions (et pas seulement leurs couleurs), vérifier la présence des cinq libellés sous les icônes de la barre inférieure, l'absence de libellés visibles sur les raccourcis intérieurs, le relief et l'animation des boutons, l'exclusivité des sous-menus, ainsi que la fermeture et la disparition automatique des notifications.
+- Si une disposition reste trop proche d'une autre ou si un élément déborde sur petit écran, consigner le thème, la page, l'action et une capture avant le correctif suivant.
+- La validation physique reste en attente du retour utilisateur. Ne pas fusionner PR #91 avant cet accord explicite.
