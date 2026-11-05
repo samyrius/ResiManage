@@ -59,6 +59,25 @@ def read_common_theme_css():
     """Compatibility helper: legacy style assertions now inspect standalone Crystal 3D CSS."""
     return read_theme_css("crystal3d")
 
+def test_concurrent_first_requests_initialize_database_once(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    setup_client(tmp_path, monkeypatch)
+
+    def open_login(_):
+        with rotation_app.app.test_client() as client:
+            return client.get("/login").status_code
+
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        statuses = list(executor.map(open_login, range(6)))
+
+    assert statuses == [200] * 6
+    with rotation_app.db() as conn:
+        columns = [row["name"] for row in conn.execute("PRAGMA table_info(residents)")]
+    assert columns.count("external_start_date") == 1
+    assert columns.count("external_end_date") == 1
+
+
 def test_flash_messages_are_categorized_as_error_or_info():
     from flask import get_flashed_messages
 
