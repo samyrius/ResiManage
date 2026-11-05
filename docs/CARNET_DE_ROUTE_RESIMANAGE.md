@@ -1060,6 +1060,6 @@ L'utilisateur demande de pouvoir déplacer le nom d'un résident d'un service à
 ### Limites de validation
 - Modifications poussées sur la branche candidate uniquement ; branche officielle resimanage-2-work non modifiée et PR #91 non fusionnée.
 - Le premier run Python sur le commit 49cea6e2aa2e8ce68d072fba7fb4dbb9bbd514fb a exécuté 199 tests : 188 réussis, 11 échecs. Les échecs ont révélé principalement des assertions de tests obsolètes par rapport à la matrice unique et au mode de capacité optionnel ; les tests concernés ont été adaptés ensuite.
-- Un nouveau run Python a été lancé sur la suite de corrections ; son résultat doit être relevé avant de déclarer la suite verte.
-- Aucun APK de cette nouvelle matrice n'est annoncé comme compilé, testé sur émulateur ou validé sur téléphone physique. La validation Android doit être contrôlée séparément.
+- Le run Python du commit 4632385ed9b300193c078c0037ee86d5d1c9b0be est terminé avec succès (job python-regression : success).
+- Aucun APK de cette nouvelle matrice n'est encore annoncé comme compilé ou testé sur émulateur ; la CI Android est en cours. La validation sur téléphone physique restera à faire.
 - Le comportement tactile, le rendu des sept thèmes et la lisibilité en paysage doivent encore faire l'objet d'une vérification visuelle sur appareils réels.
