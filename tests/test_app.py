@@ -276,6 +276,101 @@ def test_seed_has_nineteen_terrains_and_four_periods(tmp_path, monkeypatch):
         assert conn.execute("SELECT kind FROM terrains WHERE name='Chirurgie générale'").fetchone()[0] == "mandatory"
 
 
+def test_bulk_planning_shows_all_services_in_one_workbench(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    response = client.get("/planning")
+    assert response.status_code == 200
+    assert b'id="rt-bulk-form"' in response.data
+    assert b'id="rt-resident-options"' in response.data
+    assert b"Enregistrer toutes les modifications".decode().encode() in response.data
+    with rotation_app.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM terrains WHERE active=1").fetchone()[0] == 19
+    assert response.data.count(b'class="rt-bulk-capacity"') == 19
+    assert client.get("/assign").status_code == 302
+    assert "/planning" in client.get("/assign").headers["Location"]
+
+
+def test_bulk_planning_saves_multiple_capacities_and_assignment_atomically(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        resident_id = conn.execute(
+            "INSERT INTO residents(surname, firstname, year, status) VALUES(?,?,?,?)",
+            ("BulkPlan", "Resident", 4, "active"),
+        ).lastrowid
+        terrain_ids = [
+            row[0] for row in conn.execute(
+                "SELECT id FROM terrains WHERE active=1 ORDER BY id LIMIT 2"
+            ).fetchall()
+        ]
+        period = conn.execute("SELECT id,year_label FROM periods ORDER BY id LIMIT 1").fetchone()
+        if period is None:
+            year_label = rotation_app.active_postgrad_year(conn)
+            conn.execute("INSERT INTO periods(year_label,name) VALUES(?,?)", (year_label, "Période 1"))
+            period = conn.execute("SELECT id,year_label FROM periods ORDER BY id LIMIT 1").fetchone()
+        period_id, year_label = period["id"], period["year_label"]
+
+    response = client.post(
+        "/planning",
+        data={
+            "year": year_label,
+            "period_id": str(period_id),
+            f"capacity_{terrain_ids[0]}": "2",
+            f"capacity_{terrain_ids[1]}": "3",
+            f"resident_ids_{terrain_ids[0]}": [str(resident_id)],
+        },
+    )
+    assert response.status_code == 302
+    assert "/planning" in response.headers["Location"]
+    with rotation_app.db() as conn:
+        capacities = {
+            row["terrain_id"]: row["places"]
+            for row in conn.execute(
+                "SELECT terrain_id,places FROM capacities WHERE year_label=? AND period_id=?",
+                (year_label, period_id),
+            ).fetchall()
+        }
+        assignment = conn.execute(
+            "SELECT terrain_id,status FROM assignments WHERE resident_id=? AND period_id=?",
+            (resident_id, period_id),
+        ).fetchone()
+    assert capacities[terrain_ids[0]] == 2
+    assert capacities[terrain_ids[1]] == 3
+    assert assignment is not None
+    assert assignment["terrain_id"] == terrain_ids[0]
+    assert assignment["status"] in ("confirmed", "pending")
+
+
+def test_bulk_planning_rolls_back_capacities_when_assignment_is_invalid(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        terrain_id = conn.execute(
+            "SELECT id FROM terrains WHERE active=1 ORDER BY id LIMIT 1"
+        ).fetchone()[0]
+        period = conn.execute("SELECT id,year_label FROM periods ORDER BY id LIMIT 1").fetchone()
+        period_id, year_label = period["id"], period["year_label"]
+
+    response = client.post(
+        "/planning",
+        data={
+            "year": year_label,
+            "period_id": str(period_id),
+            f"capacity_{terrain_id}": "7",
+            f"resident_ids_{terrain_id}": ["99999999"],
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    with rotation_app.db() as conn:
+        capacity = conn.execute(
+            "SELECT places FROM capacities WHERE year_label=? AND terrain_id=? AND period_id=?",
+            (year_label, terrain_id, period_id),
+        ).fetchone()
+    assert capacity is None
+
+
 def test_assignment_requires_capacity_and_blocks_same_period_duplicate(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     client.get("/lang/ar", headers={"Referer": "http://localhost/"})
