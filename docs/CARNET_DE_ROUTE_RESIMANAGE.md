@@ -885,3 +885,24 @@ L’utilisateur a signalé que la navigation ressemblait à un labyrinthe : trop
 - La branche officielle `resimanage-2-work` et la sauvegarde `resimanage-1-backup` ne sont pas modifiées par ce lot.
 - Installer l’APK du commit exact `9b921ac73d3927db8aa6f3c2c74d7a2b3087f4a1` sur le téléphone physique et vérifier : les cinq destinations fixes, les libellés sous les icônes, l’accès direct au tableau des stages et aux gardes, le répertoire « Plus », la recherche avec/sans accents, le comportement des aides repliables et le défilement.
 - Le smoke test CI ne remplace pas cette validation physique. Ne pas fusionner PR #91 sans accord explicite distinct.
+
+## Refonte de l'accès aux fonctions — 5 novembre 2026
+
+### Constat vérifié sur la branche candidate
+- La navigation des sept thèmes dispose de cinq accès principaux : Accueil, Résidents, Stages, Gardes et Plus.
+- « Plus » ouvrait un long catalogue vertical de fonctions regroupées en blocs, avec une recherche mais sans filtre de catégories. Les utilisateurs devaient parcourir ce catalogue pour trouver les outils moins fréquents.
+- Plusieurs fonctions de suivi, de formation, d'administration et de gestion des stages étaient mélangées dans cette page.
+
+### Modifications réalisées sur la branche candidate
+- Le libellé « Plus » devient « Outils » dans les sept modèles, sans changer les cinq accès principaux ni les destinations.
+- Le lanceur Outils présente une recherche globale et des catégories compactes : Résidents, Stages, Formation et Administration (Administration uniquement pour Super Admin).
+- Une seule catégorie est affichée à la fois. La recherche traverse toutes les catégories, ignore la casse et les accents et masque les groupes sans résultat.
+- Les outils sont reclassés selon les tâches : import et formulaires résidents ; services, capacités, affectations, historique, congés et stages externes ; examens, objectifs, DEMS, synthèse et décisions ; paramètres, utilisateurs, synchronisation, audit, sauvegardes, exports, restauration et corbeille.
+- Les routes métier, les URL, les données et les règles d'autorisation n'ont pas été modifiées.
+- Le plan détaillé et les critères de validation sont consignés dans docs/PLAN_NAVIGATION_2026-11-05.md.
+
+### Vérifications à effectuer
+- Ajouter/maintenir des tests sur la présence des catégories, l'affichage d'une seule catégorie et la recherche inter-catégories.
+- Exécuter la suite Python et le workflow Android/émulateur sur le nouveau commit.
+- Contrôler visuellement les sept thèmes sur ordinateur et téléphone ; la validation CI ne remplace pas ce contrôle d'ergonomie.
+- Ne pas fusionner la PR #91 sans accord explicite distinct.
