@@ -153,18 +153,18 @@ def _ensure_schema(c, audit_event):
 def _safe_rich_html(value):
     """Keep only ReportLab-safe formatting tags and a small set of font attributes."""
     value = str(value or "")[:12000]
-    value = re.sub(r"(?is)<(script|style|iframe|object)[^>]*>.*?</\\1>", "", value)
+    value = re.sub(r"(?is)<(script|style|iframe|object)[^>]*>.*?</\1>", "", value)
     value = re.sub(r"(?is)<!--.*?-->", "", value)
-    value = re.sub(r"(?i)<(p|div)\\b[^>]*>", "", value)
-    value = re.sub(r"(?i)</(p|div)\\s*>", "<br/>", value)
-    value = re.sub(r"(?i)<br\\s*/?>", "<br/>", value)
-    value = re.sub(r"(?i)<(?!/?(?:b|strong|i|em|u|font|br)\\b)[^>]*>", "", value)
+    value = re.sub(r"(?i)<(p|div)\b[^>]*>", "", value)
+    value = re.sub(r"(?i)</(p|div)\s*>", "<br/>", value)
+    value = re.sub(r"(?i)<br\s*/?>", "<br/>", value)
+    value = re.sub(r"(?i)<(?!/?(?:b|strong|i|em|u|font|br)\b)[^>]*>", "", value)
     def clean_font(match):
         attrs = match.group(1) or ""
         safe = []
-        color = re.search(r"(?i)\\bcolor\\s*=\\s*['\"]?(#[0-9a-f]{6}|#[0-9a-f]{3}|[a-z]{3,20})", attrs)
-        face = re.search(r"(?i)\\bface\\s*=\\s*['\"]?([a-z0-9 ,_-]{1,40})", attrs)
-        size = re.search(r"(?i)\\bsize\\s*=\\s*['\"]?([1-7])", attrs)
+        color = re.search(r"(?i)\bcolor\s*=\s*['\"]?(#[0-9a-f]{6}|#[0-9a-f]{3}|[a-z]{3,20})", attrs)
+        face = re.search(r"(?i)\bface\s*=\s*['\"]?([a-z0-9 ,_-]{1,40})", attrs)
+        size = re.search(r"(?i)\bsize\s*=\s*['\"]?([1-7])", attrs)
         if color: safe.append('color="' + color.group(1) + '"')
         if face:
             family = face.group(1).strip().lower()
@@ -172,10 +172,9 @@ def _safe_rich_html(value):
             safe.append('face="' + mapped + '"')
         if size: safe.append('size="' + size.group(1) + '"')
         return "<font " + " ".join(safe) + ">" if safe else "<font>"
-    value = re.sub(r"(?i)<font\\b([^>]*)>", clean_font, value)
-    value = re.sub(r"(?i)\\s+on[a-z]+\\s*=\\s*(['\"]).*?\\1", "", value)
+    value = re.sub(r"(?i)<font\b([^>]*)>", clean_font, value)
+    value = re.sub(r"(?i)\s+on[a-z]+\s*=\s*(['\"]).*?\1", "", value)
     return value
-
 
 def register_guard_routes(app, db, page, guard, audit_event, L):
     def prepare():
@@ -248,6 +247,20 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
                         raise ValueError("Une des deux affectations n’est plus active.")
                     if first["roster_date"][:7] != month or second["roster_date"][:7] != month:
                         raise ValueError("La permutation doit rester dans le mois affiché.")
+                    for moving, target_date, target_sector, excluded_id in (
+                        (first, second["roster_date"], second["sector"], second["id"]),
+                        (second, first["roster_date"], first["sector"], first["id"]),
+                    ):
+                        duplicate = c.execute("""
+                          SELECT 1 FROM guard_assignments
+                          WHERE active=1 AND id NOT IN (?,?) AND roster_date=? AND sector=?
+                            AND ((? IS NOT NULL AND resident_id=?) OR
+                                 (? IS NULL AND resident_id IS NULL AND raw_label=?))
+                        """, (first["id"], second["id"], target_date, target_sector,
+                              moving["resident_id"], moving["resident_id"],
+                              moving["resident_id"], moving["raw_label"])).fetchone()
+                        if duplicate:
+                            raise ValueError("La permutation créerait un doublon dans une cellule.")
                     c.execute("UPDATE guard_assignments SET roster_date=?,sector=?,hours=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
                               (second["roster_date"], second["sector"], second["hours"], first["id"]))
                     c.execute("UPDATE guard_assignments SET roster_date=?,sector=?,hours=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
