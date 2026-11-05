@@ -637,3 +637,7 @@ html[data-theme-template] #rt-flash-messages.rt-local-flash .msg{
  display:block!important;width:100%!important;max-width:100%!important;margin:8px 0!important;
  transform:none!important;animation:none!important;
 }
+
+/* CRYSTAL 3D: centered command deck and three-column icon dashboard. */
+@media(min-width:681px){html[data-theme-template="crystal3d"] body .rt-shell-crystal3d{display:block!important;max-width:1120px!important;margin:0 auto!important}html[data-theme-template="crystal3d"] body .rt-shell-crystal3d>.main-nav{display:flex!important;flex-direction:row!important;justify-content:center!important;flex-wrap:wrap!important}html[data-theme-template="crystal3d"] body .rt-shell-crystal3d>main{max-width:1050px!important;margin:0 auto!important}}
+@media(max-width:680px){html[data-theme-template="crystal3d"] body .rt-shell-crystal3d .rt-icon-dashboard{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:12px!important}html[data-theme-template="crystal3d"] body .rt-shell-crystal3d .rt-icon-dashboard .rt-action-card{min-height:126px!important;border-radius:22px!important}}
