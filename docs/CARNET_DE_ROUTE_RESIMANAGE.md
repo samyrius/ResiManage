@@ -991,3 +991,22 @@ Ajouter un interrupteur global « Gestion des capacités » directement sur le t
 - Conserver les routes historiques et les données existantes pendant la phase de prototype ; aucune suppression de données ni migration destructive.
 - Première étape : inspecter le modèle de données et les règles actuelles, puis construire un prototype de la matrice unique et le faire évaluer avant d'engager les changements métier et de produire une nouvelle APK.
 - Travail sur la branche candidate uniquement. La branche officielle `resimanage-2-work` ne doit pas être modifiée et la PR #91 ne doit pas être fusionnée sans autorisation explicite.
+
+
+## Fiche résident accessible depuis le tableau central — 5 novembre 2026
+
+### Décision UX confirmée
+- Chaque nom de résident affiché dans une cellule service/période est un élément cliquable.
+- Le clic ouvre la fiche détaillée du résident sans quitter le tableau central et sans perdre la position ou les filtres en cours.
+- Préférer un panneau latéral ou une fenêtre superposée, refermable pour revenir exactement à la matrice.
+
+### Contenu de la fiche
+- Mettre l'historique des stages au premier plan, organisé chronologiquement.
+- Pour chaque stage, afficher les données réellement disponibles : service/terrain, période, dates de début et de fin si enregistrées, année/promotion et statut (effectué, en cours ou autre statut existant).
+- Présenter également les informations générales du dossier résident et les autres éléments déjà enregistrés qui sont utiles à la consultation, sans inventer ni recalculer des données non présentes.
+- Respecter les droits d'accès existants et réutiliser les données métier de la fiche résident actuelle plutôt que créer une seconde source de vérité.
+
+### Vérifications avant réalisation
+- Identifier la route et le template existants de consultation du profil résident, ainsi que la source de vérité de l'historique des stages.
+- Vérifier que l'ouverture depuis la matrice ne déclenche aucune modification et que la fermeture conserve l'état du tableau.
+- Tester les résidents avec historique complet, historique vide et données anciennes/partielles.
