@@ -401,3 +401,28 @@ html[dir="rtl"] .rt-back-link{left:auto!important;right:10px!important}
     gap:4px!important;padding:4px!important;
   }
 }
+
+
+/* Compact vertical navigation: keep the icon rail clear of long labels. */
+@media(min-width:681px){
+  html[data-theme-template="crystal3d"] .main-nav>a .nav-label,
+  html[data-theme-template="futuriste"] .main-nav>a>span:not(.nav-icon),
+  html[data-theme-template="futuriste"] .main-nav .nav-group>summary>span:not(.nav-icon),
+  html[data-theme-template="naturel-moderne"] .main-nav>a>span:not(.nav-icon),
+  html[data-theme-template="naturel-moderne"] .main-nav .nav-group>summary>span:not(.nav-icon),
+  html[data-theme-template="emeraude"] .main-nav>a>span:not(.nav-icon),
+  html[data-theme-template="emeraude"] .main-nav .nav-group>summary>span:not(.nav-icon){
+    display:none!important;
+  }
+  html[data-theme-template="crystal3d"] .main-nav>a,
+  html[data-theme-template="futuriste"] .main-nav>a,
+  html[data-theme-template="futuriste"] .main-nav .nav-group>summary,
+  html[data-theme-template="naturel-moderne"] .main-nav>a,
+  html[data-theme-template="naturel-moderne"] .main-nav .nav-group>summary,
+  html[data-theme-template="emeraude"] .main-nav>a,
+  html[data-theme-template="emeraude"] .main-nav .nav-group>summary{
+    justify-content:center!important;
+    min-width:52px!important;
+    padding-inline:8px!important;
+  }
+}
