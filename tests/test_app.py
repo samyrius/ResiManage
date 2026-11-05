@@ -4772,6 +4772,6 @@ def test_tools_launcher_shows_one_category_and_searches_all_tools(tmp_path, monk
     assert 'data-tool-group="admin" hidden' in html
     assert 'href="/dems"' in html
     assert 'href="/backup"' in html
-    assert 'Rechercher un résident, un service ou une fonction' in html
+    assert 'Rechercher une fonction ou un service' in html
     assert "toLocaleLowerCase().normalize('NFD')" in html
     assert "selected='residents'" in html
