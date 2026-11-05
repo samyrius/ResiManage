@@ -1010,3 +1010,26 @@ Ajouter un interrupteur global « Gestion des capacités » directement sur le t
 - Identifier la route et le template existants de consultation du profil résident, ainsi que la source de vérité de l'historique des stages.
 - Vérifier que l'ouverture depuis la matrice ne déclenche aucune modification et que la fermeture conserve l'état du tableau.
 - Tester les résidents avec historique complet, historique vide et données anciennes/partielles.
+
+
+## Déplacement tactile des résidents dans la matrice — 5 novembre 2026
+
+### Décision UX confirmée
+L'utilisateur demande de pouvoir déplacer le nom d'un résident d'un service à un autre avec un seul doigt, afin de rendre la répartition encore plus simple.
+
+### Interaction attendue
+- Sur écran tactile, saisir le résident par un appui prolongé sur son nom, puis le faire glisser directement vers la cellule de destination (service et période).
+- La cellule cible doit être clairement mise en évidence pendant le glissement ; le dépôt déclenche le déplacement.
+- Fournir un retour visuel immédiat en cas de réussite.
+- Si le déplacement est invalide (capacité active et atteinte, conflit, indisponibilité, doublon ou autre règle métier), refuser l'opération sans perdre l'affectation initiale et expliquer la raison.
+- Prévoir aussi une interaction accessible au clavier/souris et une solution de repli simple (action « Déplacer vers… ») si le glisser-déposer n'est pas disponible ou difficile sur certains appareils.
+- Éviter qu'un appui destiné au glissement ouvre accidentellement la fiche résident ; un clic/tap simple continue d'ouvrir la fiche, tandis que l'appui prolongé démarre le déplacement.
+- Le déplacement doit conserver l'intégrité des règles métier et être enregistré de façon cohérente ; ne pas contourner les validations serveur.
+
+### Critères de validation
+- Déplacer un résident entre deux services dans la même période avec un seul doigt.
+- Déplacer un résident vers un autre service et une autre période.
+- Vérifier l'état visuel de la cellule cible et le retour de réussite/refus.
+- Vérifier les cas de capacité activée/désactivée, conflit, doublon et indisponibilité.
+- Vérifier que l'affectation initiale reste intacte en cas de refus ou d'erreur réseau.
+- Vérifier la coexistence sans ambiguïté du tap simple (fiche résident) et de l'appui prolongé (glisser-déposer).
