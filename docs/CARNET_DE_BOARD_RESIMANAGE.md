@@ -61,5 +61,5 @@ Dépôt : https://github.com/samyrius/ResiManage
 - La position de défilement est conservée après enregistrement. Les messages temporaires disparaissent sans bouton de fermeture.
 - L'affichage est optimisé pour le paysage sur smartphone et s'adapte aux tablettes/ordinateurs.
 - La route historique /planning renvoie vers le tableau central ; il n'y a pas de second écran de planification.
-- Validation automatisée : le premier run a révélé des tests anciens à adapter ; un nouveau run est en cours au moment de cette note. Ne pas annoncer la suite verte avant lecture du résultat.
+- Validation automatisée : le job Python du commit 4632385ed9b300193c078c0037ee86d5d1c9b0be est terminé avec succès. La construction APK Android est encore en cours ; le test émulateur reste conditionné à sa réussite.
 - Aucune nouvelle APK n'est encore validée sur émulateur ou téléphone réel. Le contrôle visuel sur appareil reste à faire.
