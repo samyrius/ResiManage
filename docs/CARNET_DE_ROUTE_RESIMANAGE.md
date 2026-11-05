@@ -935,3 +935,26 @@ Le parcours antérieur obligeait à répéter une saisie de capacité puis une a
 - Redirection de l'entrée Affectations vers /planning.
 - Enregistrement de plusieurs capacités et d'une affectation dans un seul POST.
 - Vérification du rollback atomique en cas de résident invalide.
+
+## Retour utilisateur après essai de la planification groupée — 5 novembre 2026
+
+### Nouveau retour d'expérience
+Après essai de l'APK de planification groupée, l'utilisateur indique que le parcours n'est toujours pas pratique :
+- Les informations nécessaires ne sont pas toutes visibles et accessibles au même endroit.
+- La présentation en deux tableaux est jugée peu pratique.
+- Le besoin principal est une vue générale centralisée, permettant de comprendre l'ensemble de la répartition sans naviguer entre plusieurs tableaux ou listes.
+
+### Orientation UX retenue pour la prochaine conception
+Ne pas poursuivre avec deux tableaux séparés (liste des résidents d'un côté, services de l'autre). Repenser l'écran autour d'un tableau matriciel unique qui sert à la fois de vue d'ensemble et d'espace d'édition.
+
+Piste de conception à valider par prototype :
+- Lignes : services actifs (les 19 services).
+- Colonnes : les quatre périodes.
+- Chaque cellule présente au minimum la capacité prévue, le nombre de résidents affectés, les places disponibles et les résidents affectés (nom et promotion).
+- Ajout, retrait et déplacement de résidents directement depuis la cellule concernée, sans basculer vers un second tableau.
+- Recherche globale et filtres promotion/période conservés dans une barre d'outils compacte.
+- Alertes directement dans les cellules : capacité dépassée, résident déjà affecté, indisponibilité ou conflit.
+- Sur tablette, conserver les en-têtes visibles, limiter les défilements inutiles et permettre l'ouverture/édition d'une cellule sans perdre la vue d'ensemble.
+
+### Décision de méthode
+Cette orientation est une proposition de conception issue du retour utilisateur, pas encore une implémentation validée. Préparer d'abord une maquette/prototype centré sur le tableau unique et le faire évaluer avant de modifier davantage les règles métier ou de lancer une nouvelle APK. Ne pas fusionner la branche candidate dans la branche officielle sans autorisation explicite.
