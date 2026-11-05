@@ -3773,11 +3773,8 @@ def quick_access():
  <section class="rt-launcher-group"><h3>{{L('Résidents','Residents','المقيمون')}}</h3><div class="rt-launcher-grid">
  <a class="rt-launcher-link" data-search="résidents residents مقيمون" href="/residents"><span>👥</span>{{t('manage_residents')}}</a>
  <a class="rt-launcher-link" data-search="importer import استيراد" href="/import"><span>⇧</span>{{t('import_residents')}}</a>
- <a class="rt-launcher-link" data-search="historique importer stages passés import history" href="/import-history"><span>◷</span>{{L('Importer un historique','Import history','استيراد السجل')}}</a>
  <a class="rt-launcher-link" data-search="formulaires modèles vierges forms templates" href="/templates"><span>▤</span>{{L('Formulaires vierges','Blank forms','استمارات فارغة')}}</a>
- <a class="rt-launcher-link" data-search="objectifs objectifs objectifs objectifs" href="/objectives"><span>◎</span>{{t('objectives')}}</a>
  <a class="rt-launcher-link" data-search="examens promotion notes exams" href="/exams"><span>✎</span>{{t('promotion')}}</a>
- <a class="rt-launcher-link" data-search="dems diplômés lauréats" href="/dems"><span>🎓</span>{{t('dems_success')}}</a>
  </div></section>
  <section class="rt-launcher-group"><h3>{{L('Stages et organisation','Rotations and organisation','التربصات والتنظيم')}}</h3><div class="rt-launcher-grid">
  <a class="rt-launcher-link" data-search="services terrains stages" href="/terrains"><span>🏥</span>{{t('terrains')}}</a>
@@ -3792,7 +3789,12 @@ def quick_access():
  <a class="rt-launcher-link" data-search="bilan résumé synthèse summary" href="/summary"><span>▤</span>{{t('summary')}}</a>
  {% if role=='super_admin' %}<a class="rt-launcher-link" data-search="décisions validation approbation decisions" href="/decisions"><span>✓</span>{{t('decisions')}}</a>{% endif %}
  </div></section>
- {% if role=='super_admin' %}<section class="rt-launcher-group"><h3>{{L('Administration','Administration','الإدارة')}}</h3><div class="rt-launcher-grid">
+ {% if role=='super_admin' %}<section class="rt-launcher-group"><h3>{{L('Gestion avancée','Advanced management','الإدارة المتقدمة')}}</h3><div class="rt-launcher-grid">
+ <a class="rt-launcher-link" data-search="historique importer stages passés import history" href="/import-history"><span>◷</span>{{L('Importer un historique','Import history','استيراد السجل')}}</a>
+ <a class="rt-launcher-link" data-search="objectifs goals" href="/objectives"><span>◎</span>{{t('objectives')}}</a>
+ <a class="rt-launcher-link" data-search="dems diplômés lauréats" href="/dems"><span>🎓</span>{{t('dems_success')}}</a>
+ <a class="rt-launcher-link" data-search="décisions validation approbation decisions" href="/decisions"><span>✓</span>{{t('decisions')}}</a>
+ </div></section><section class="rt-launcher-group"><h3>{{L('Administration','Administration','الإدارة')}}</h3><div class="rt-launcher-grid">
  <a class="rt-launcher-link" data-search="paramètres settings configuration" href="/settings"><span>⚙</span>{{t('settings_page')}}</a>
  <a class="rt-launcher-link" data-search="utilisateurs comptes users" href="/users"><span>♙</span>{{t('users')}}</a>
  <a class="rt-launcher-link" data-search="synchronisation sync téléphone appareil" href="/sync"><span>⇄</span>{{L('Synchronisation','Device sync','المزامنة')}}</a>
