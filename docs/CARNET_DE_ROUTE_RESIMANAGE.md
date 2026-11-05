@@ -703,3 +703,57 @@ La première version du module Gardes excluait automatiquement tous les résiden
 - Modifications appliquées sur la branche candidate `integration/resimanage-refonte-themes-2026-11-03`.
 - PR #91 reste ouverte et non fusionnée ; aucune fusion automatique n'a été effectuée.
 - `main`, `resimanage-2-work` et `resimanage-1-backup` n'ont pas été modifiées par ce lot.
+
+
+---
+
+## Mise au point générale du projet — 5 novembre 2026
+
+### Référence technique vérifiée
+
+- Dépôt : `samyrius/ResiManage`.
+- Branche candidate active pour les travaux examinés : `integration/resimanage-refonte-themes-2026-11-03`.
+- HEAD vérifié : `5eabfdff499dc536c98bdf09207e9c63bfff0259`.
+- Dernier commit : `Consigner la correction DEMS par cohorte et les preuves de test` (mise à jour documentaire de la correction déjà portée au commit `74560794c42243c03bf3d3bccede5e4294bcad6e`).
+- PR #91 vers `resimanage-2-work` : ouverte, non fusionnée. Aucune fusion autorisée implicitement.
+- Branche officielle `resimanage-2-work` et sauvegarde `resimanage-1-backup` : non modifiées par le travail candidat contrôlé ici.
+
+### Dernière APK effectivement produite et vérifiée
+
+- Workflow Android : https://github.com/samyrius/ResiManage/actions/runs/41919570043
+- Commit compilé : `5eabfdff499dc536c98bdf09207e9c63bfff0259`.
+- Artefact `resimanage2-debug-apk`, ID `13367056402`, généré le 4 novembre 2026 à 21:52:47 UTC (22:52:47 heure algérienne), taille 38 570 751 octets ; expiration annoncée le 18 novembre 2026.
+- Régression Python : **193 tests réussis** en 73,58 secondes (job `126888557252`).
+- Build debug APK : succès (job `126889365587`).
+- Smoke test Android émulateur : succès (job `126890237958`). Les logs montrent l'installation/démarrage, la vérification de la page de connexion, la recherche d'erreurs fatales ciblées dans logcat et la capture d'écran. Preuve disponible dans l'artefact `resimanage2-android-emulator-evidence`, ID `13365658882`.
+- Cela valide le build et le parcours de démarrage contrôlé sur l'émulateur CI. **Cela ne constitue pas une validation sur le téléphone physique de l'utilisateur**, ni une vérification exhaustive de toutes les pages et interactions.
+
+### Fonctionnalités et corrections présentes dans la candidate
+
+- Gestion des résidents, services, capacités, périodes, affectations, progression, examens, objectifs, DEMS, congés, stages externes, corbeille, audit et sauvegarde/restauration.
+- Import explicite par Super Admin du fichier HTML des promotions 2025–2026 : 73 résidents dans les quatre promotions actives (26, 12, 24, 11), cinq résidents classés en médecine d'urgence, et 18 diplômés archivés DEMS. Aucune date DEMS ni aucun historique de stage n'est inventé.
+- Trois catégories de résidents : anesthésie-réanimation locale, médecine d'urgence au CHU, établissements externes.
+- Correction DEMS par résident : les nouveaux 4e années ne sont plus exclus automatiquement des gardes ; seuls les résidents explicitement marqués `preparing` ou déjà archivés DEMS sont dispensés. Le marquage individuel reste à effectuer par le Super Admin pour les membres de l'ancienne cohorte préparant effectivement le DEMS.
+- Module Gardes : historique d'octobre importé, sélection multiple par journée/secteur, retrait motivé et audité, exports CSV et PDF, règles serveur cohérentes avec le statut DEMS.
+- Sept thèmes disposent de templates et feuilles CSS séparés ; les corrections de navigation, sous-menus, notifications, barre mobile et défilement ont été portées dans la candidate.
+- Le carnet décrit aussi le retour au formulaire après sauvegarde, les catégories des notifications (erreur rouge / information verte) et les raccourcis du tableau de bord.
+
+### Limites et travaux encore ouverts
+
+1. **Validation sur téléphone réel :** installer l'APK du commit exact ci-dessus et vérifier à froid le démarrage, la barre d'icônes, le scroll, les menus, les notifications, les formulaires et les sept thèmes. Ne pas confondre le smoke test émulateur avec cette validation.
+2. **Génération automatique des gardes :** non implémentée/activée. Le planning d'octobre conserve des libellés historiques à rapprocher ; les quotas, règles UMC/Réanimation chirurgicale, pondérations et jours fériés algériens doivent être définis avant toute génération nominative. La nouvelle cohorte de 1re année est attendue pour décembre 2026.
+3. **Synchronisation :** implémentation partielle, pas une réplication complète de toutes les entités ; synchronisation hors ligne, conflits et validation physique restent incomplets. Ne pas utiliser avec des données réelles avant validation de bout en bout et sécurité.
+4. **Thèmes :** les sept modèles et CSS sont isolés et ont des variations de navigation/layout, mais le rendu comparatif réel sur téléphone reste à confirmer. L'audit antérieur note que les squelettes HTML conservent une structure commune ; ne pas prétendre que chaque écran a été entièrement redessiné indépendamment sans revue visuelle.
+5. **Android / diagnostic :** les nouveaux workflows démontrent le démarrage sur émulateur et le rendu du login. L'ancien signalement utilisateur `System exit 1` n'est donc pas une preuve que le dernier APK échoue ; il n'est pas non plus considéré comme résolu sur l'appareil réel avant essai de cette dernière APK.
+6. **Sécurité et gouvernance :** la branche officielle n'est pas protégée selon l'audit précédent ; les règles GitHub de protection et les contrôles obligatoires restent à mettre en place. La revue de sécurité est statique, pas un audit d'intrusion.
+7. **Historique Git :** l'inventaire des branches a été réalisé et des branches représentatives comparées, mais la revue exhaustive de chaque commit unique et de chaque diff des branches historiques n'est pas terminée. Aucune branche ne doit être supprimée ou fusionnée en masse.
+8. **Documentation :** le README de la candidate affirme encore que `resimanage-2-work` est la source active où appliquer les corrections, alors que le travail courant et la PR #91 utilisent la branche candidate. Cette contradiction documentaire doit être clarifiée dans une tâche séparée avant toute modification de branche ou fusion.
+9. **Carnet de route :** plusieurs paragraphes historiques conservent leur statut au moment où ils ont été écrits (par exemple « smoke test en attente » ou « incident bloquant »). La présente mise au point constitue le statut consolidé le plus récent ; les anciennes entrées restent conservées comme historique et ne doivent pas être lues comme le statut actuel.
+
+### Décisions de gouvernance conservées
+
+- Continuer les changements sur la branche candidate tant qu'aucune nouvelle instruction explicite n'est donnée.
+- Ne pas pousser sur `resimanage-2-work`, ne pas fusionner PR #91, ne pas supprimer ni réécrire de branche.
+- Pour chaque observation future, consigner symptôme, diagnostic et degré de certitude, fichiers/commits, tests, résultats CI et validation physique distinctement.
+- Un correctif est « appliqué » lorsqu'il est dans le code ; « testé » lorsque le test correspondant a été exécuté ; « validé CI » lorsque le workflow exact réussit ; « confirmé sur appareil » uniquement après retour du test physique.
+
