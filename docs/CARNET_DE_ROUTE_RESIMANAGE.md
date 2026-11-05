@@ -906,3 +906,32 @@ L’utilisateur a signalé que la navigation ressemblait à un labyrinthe : trop
 - Exécuter la suite Python et le workflow Android/émulateur sur le nouveau commit.
 - Contrôler visuellement les sept thèmes sur ordinateur et téléphone ; la validation CI ne remplace pas ce contrôle d'ergonomie.
 - Ne pas fusionner la PR #91 sans accord explicite distinct.
+
+## Planification groupée des capacités et affectations — 5 novembre 2026
+
+### Problème constaté
+Le parcours antérieur obligeait à répéter une saisie de capacité puis une affectation résident par résident et service par service. La vue générale affichait déjà les 19 services et les quatre périodes, mais les modifications restaient réparties dans des formulaires unitaires.
+
+### Première évolution livrée sur la branche de travail
+- Nouvelle page /planning, accessible depuis l’entrée Affectations (/assign redirige désormais les consultations GET vers cette page ; le POST historique reste pris en charge).
+- Vue unique des 19 services actifs pour une période sélectionnée.
+- Saisie des capacités service par service dans une seule grille, avec effectif utilisé et places restantes.
+- Recherche de résidents via une liste de suggestions commune, ajout sous forme de pastilles, plusieurs résidents pouvant être préparés dans une même ligne.
+- Enregistrement groupé unique pour les capacités et les nouvelles affectations.
+- Contrôle serveur conservé via check() : résident actif, capacité définie et disponible, affectation déjà existante, stages externes, historique et règles d'année obligatoire.
+- Transaction atomique : si une capacité ou une affectation du lot est invalide, le lot entier est annulé ; aucune partie n'est enregistrée.
+- Événements d'audit conservés pour chaque capacité et affectation modifiée.
+- Les opérations avancées de déplacement/retrait et l'aperçu PDF restent dans le tableau général /rotation-board.
+- La page Capacités propose un accès direct à la planification groupée.
+
+### Limites connues à traiter ensuite
+- Première version organisée par période : l'utilisateur sélectionne une période, prépare tous les services, puis enregistre. La préparation simultanée des quatre périodes dans une seule grille reste une amélioration distincte.
+- En cas de validation serveur négative, les modifications du lot sont annulées et un message est affiché ; les saisies préparées ne sont pas encore restaurées automatiquement dans le formulaire. À améliorer avant de considérer le parcours finalisé.
+- Le sélecteur de résident utilise une liste de suggestions partagée. Une recherche plus riche (filtre par promotion, disponibilité en temps réel et conflits visibles avant validation) reste à concevoir.
+- Les tests CI doivent confirmer le comportement Flask et Android sur le SHA de cette évolution ; aucune APK ne doit être annoncée comme validée avant la fin des workflows correspondants.
+
+### Validation ajoutée
+- Affichage des 19 services dans la grille.
+- Redirection de l'entrée Affectations vers /planning.
+- Enregistrement de plusieurs capacités et d'une affectation dans un seul POST.
+- Vérification du rollback atomique en cas de résident invalide.
