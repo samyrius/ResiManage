@@ -826,3 +826,62 @@ Les modifications sont portées dans la branche candidate. Les noms des commits 
 - Contrôles à effectuer sur appareil : comparer les sept dispositions (et pas seulement leurs couleurs), vérifier la présence des cinq libellés sous les icônes de la barre inférieure, l'absence de libellés visibles sur les raccourcis intérieurs, le relief et l'animation des boutons, l'exclusivité des sous-menus, ainsi que la fermeture et la disparition automatique des notifications.
 - Si une disposition reste trop proche d'une autre ou si un élément déborde sur petit écran, consigner le thème, la page, l'action et une capture avant le correctif suivant.
 - La validation physique reste en attente du retour utilisateur. Ne pas fusionner PR #91 avant cet accord explicite.
+
+
+---
+
+## Refonte de l’architecture de navigation intérieure — 5 novembre 2026
+
+### Diagnostic utilisateur
+
+L’utilisateur a signalé que la navigation ressemblait à un labyrinthe : trop de rubriques, menus et sous-menus, textes explicatifs qui prennent de la place, défilement pour retrouver les fonctions et trop d’appuis successifs. La priorité de ce lot est donc l’orientation et l’accès rapide aux fonctions, avant toute nouvelle modification purement esthétique.
+
+### Architecture appliquée
+
+- Remplacement des anciens groupes déroulants par cinq destinations principales directement visibles dans les sept modèles de thème :
+  1. Accueil ;
+  2. Résidents ;
+  3. Stages ;
+  4. Gardes ;
+  5. Plus.
+- Les cinq destinations sont des liens directs, sans sous-menu intermédiaire. Sur mobile, elles conservent cinq colonnes égales et un libellé court sous chaque pictogramme ; sur ordinateur, elles gardent la présentation propre au thème.
+- La destination « Plus » ouvre la page `/plus`, qui sert de répertoire de toutes les fonctions secondaires. Les fonctions sont regroupées par activité et présentées sous forme de raccourcis visibles, sans menus imbriqués.
+- Une recherche instantanée filtre les raccourcis du répertoire. Elle recherche dans les libellés et synonymes français, anglais et arabes, et neutralise les accents français pour éviter qu’une recherche sans accent ne manque un résultat.
+- Les fonctions avancées et d’administration ne sont affichées dans le répertoire que pour le rôle `super_admin`. Les contrôles d’autorisation côté serveur restent inchangés et continuent de faire autorité.
+- Retrait de l’ancien gestionnaire JavaScript de sous-menus et de la flèche de retour navigateur qui pouvait créer un repère de navigation ambigu.
+- Les longs paragraphes explicatifs non critiques (190 caractères ou plus) sont repliés dans une aide consultable. Les paragraphes de formulaire, les messages, les avertissements identifiés comme importants, les contenus avec liens ou mise en évidence forte restent visibles.
+- Suppression du court texte de priorité devenu inutile sur le tableau de bord. Les routes métier et les données ne sont pas modifiées par cette refonte.
+
+### Fichiers concernés
+
+- `templates/themes/crystal3d.html`
+- `templates/themes/futuriste.html`
+- `templates/themes/luxe-elegant.html`
+- `templates/themes/naturel-moderne.html`
+- `templates/themes/emeraude.html`
+- `templates/themes/aurore-boreale.html`
+- `templates/themes/rubis.html`
+- `app.py` : nouvelle route `/plus`, répertoire filtrable, suppression du texte d’introduction inutile sur l’accueil.
+- `tests/test_app.py` : mise à jour des tests de navigation et ajout d’un test du répertoire à cinq accès directs et de la recherche.
+
+### Vérifications et compilation
+
+- Commit exact compilé : `9b921ac73d3927db8aa6f3c2c74d7a2b3087f4a1`.
+- Workflow Python : https://github.com/samyrius/ResiManage/actions/runs/42074391086 — succès, **194 tests réussis**.
+- Workflow Android : https://github.com/samyrius/ResiManage/actions/runs/42074391563 — succès :
+  - régression Python Android : **194 tests réussis** ;
+  - compilation APK debug : succès ;
+  - smoke test sur émulateur Android : succès.
+- Le smoke test confirme l’installation et le démarrage de l’application, l’accès HTTP à la page de connexion, la présence des libellés de connexion et l’absence des erreurs fatales ciblées dans logcat. Il ne teste pas visuellement l’ensemble des pages ni l’ergonomie de la nouvelle navigation sur téléphone physique.
+- Artefact APK GitHub Actions : `resimanage2-debug-apk`, ID `13438215858`, taille de l’archive 38 583 926 octets ; SHA-256 de l’archive `6454f7826f183725bf28c3e07b8837e6f7924f7a62aa0a99134b4c13cbde25e1`.
+- APK extraite pour test manuel : 59 039 297 octets ; SHA-256 `2021d1b0cd122cb0b486782edab69d1629c09af8c45f21463ba7bb1bae5cbacc`.
+- Preuve émulateur : artefact `resimanage2-android-emulator-evidence`, ID `13438560570`, SHA-256 `aee2f38556708e9b5630d35619d7b5fcad3dee61e2f60760c91ad0319dc7586d`.
+- Les deux artefacts expirent le 19 novembre 2026. L’APK issue du commit ci-dessus a été récupérée et extraite dans l’environnement de travail pour installation manuelle.
+
+### Gouvernance et validation restante
+
+- Branche candidate : `integration/resimanage-refonte-themes-2026-11-03`.
+- PR #91 vers `resimanage-2-work` : ouverte, non fusionnée.
+- La branche officielle `resimanage-2-work` et la sauvegarde `resimanage-1-backup` ne sont pas modifiées par ce lot.
+- Installer l’APK du commit exact `9b921ac73d3927db8aa6f3c2c74d7a2b3087f4a1` sur le téléphone physique et vérifier : les cinq destinations fixes, les libellés sous les icônes, l’accès direct au tableau des stages et aux gardes, le répertoire « Plus », la recherche avec/sans accents, le comportement des aides repliables et le défilement.
+- Le smoke test CI ne remplace pas cette validation physique. Ne pas fusionner PR #91 sans accord explicite distinct.
