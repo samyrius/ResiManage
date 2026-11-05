@@ -287,8 +287,9 @@ def test_bulk_planning_shows_all_services_in_one_workbench(tmp_path, monkeypatch
     with rotation_app.db() as conn:
         assert conn.execute("SELECT COUNT(*) FROM terrains WHERE active=1").fetchone()[0] == 19
     assert response.data.count(b'class="rt-bulk-capacity"') == 19
-    assert client.get("/assign").status_code == 302
-    assert "/planning" in client.get("/assign").headers["Location"]
+    assignment_page = client.get("/assign")
+    assert assignment_page.status_code == 200
+    assert b'href="/planning"' in assignment_page.data
 
 
 def test_bulk_planning_saves_multiple_capacities_and_assignment_atomically(tmp_path, monkeypatch):
