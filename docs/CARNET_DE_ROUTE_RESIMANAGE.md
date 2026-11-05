@@ -1033,3 +1033,33 @@ L'utilisateur demande de pouvoir déplacer le nom d'un résident d'un service à
 - Vérifier les cas de capacité activée/désactivée, conflit, doublon et indisponibilité.
 - Vérifier que l'affectation initiale reste intacte en cas de refus ou d'erreur réseau.
 - Vérifier la coexistence sans ambiguïté du tap simple (fiche résident) et de l'appui prolongé (glisser-déposer).
+
+
+## Implémentation de la matrice centrale des affectations — 5 novembre 2026
+
+### Changements sur la branche candidate
+- Le tableau /rotation-board devient la surface unique de planification : les 19 services actifs sont présentés en lignes et les quatre périodes en colonnes.
+- Les dates de début et de fin sont éditables directement dans l'en-tête de chaque période ; les anciens formulaires de dates séparés disparaissent de l'interface.
+- L'interrupteur global de gestion des capacités est intégré au tableau. Le mode désactivé autorise les affectations manuelles sans capacité renseignée ; le mode activé conserve l'obligation de renseigner les capacités et le contrôle des places.
+- Les validations indépendantes de la capacité restent exécutées côté serveur : statut actif, doublons, historique des stages, année obligatoire, dates des stages externes et indisponibilités détectées.
+- Les noms des résidents sont cliquables. Un panneau superposé charge le dossier via l'API existante, avec les stages historiques, les périodes/dates réellement enregistrées et les affectations actuelles.
+- Le glisser-déposer souris et l'appui prolongé tactile utilisent /api/rotation-board/move. Le déplacement est validé côté serveur par check(), journalisé et refusé sans déplacer l'affectation initiale si une règle échoue.
+- Une action de déplacement de repli reste accessible dans les outils de cellule et applique désormais les mêmes validations serveur au lieu d'un contournement.
+- Les enregistrements mémorisent et restaurent la position de défilement de la page et de la matrice.
+- Les notifications flash n'ont plus de bouton de fermeture ni de fermeture au clic extérieur ; elles disparaissent automatiquement après environ 4,2 secondes.
+- Le tableau privilégie le paysage sur smartphone, avec les quatre périodes côte à côte autant que la largeur le permet, et reste adaptatif sur tablette/ordinateur.
+- La route historique /planning redirige vers le tableau central ; aucun second tableau permanent n'est conservé.
+
+### Tests ajoutés/adaptés
+- Présence des quatre colonnes de période et des cellules de la matrice.
+- Consultation API de l'historique de stage et des affectations d'un résident.
+- Déplacement API entre deux services, avec validation et journalisation.
+- Affectation manuelle sans capacité lorsque le mode de capacité est désactivé.
+- Les tests historiques qui supposaient l'ancienne page /planning ou un contrôle de capacité toujours activé ont été adaptés à la nouvelle décision produit.
+
+### Limites de validation
+- Modifications poussées sur la branche candidate uniquement ; branche officielle resimanage-2-work non modifiée et PR #91 non fusionnée.
+- Le premier run Python sur le commit 49cea6e2aa2e8ce68d072fba7fb4dbb9bbd514fb a exécuté 199 tests : 188 réussis, 11 échecs. Les échecs ont révélé principalement des assertions de tests obsolètes par rapport à la matrice unique et au mode de capacité optionnel ; les tests concernés ont été adaptés ensuite.
+- Un nouveau run Python a été lancé sur la suite de corrections ; son résultat doit être relevé avant de déclarer la suite verte.
+- Aucun APK de cette nouvelle matrice n'est annoncé comme compilé, testé sur émulateur ou validé sur téléphone physique. La validation Android doit être contrôlée séparément.
+- Le comportement tactile, le rendu des sept thèmes et la lisibilité en paysage doivent encore faire l'objet d'une vérification visuelle sur appareils réels.
