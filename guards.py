@@ -10,6 +10,7 @@ from datetime import date
 from flask import request, redirect, flash, session, send_file
 import io
 import csv
+import html
 
 SECTORS = ("UMC", "Réanimation chirurgicale")
 HOURS = ("16H-08H", "08H-08H")
@@ -87,6 +88,14 @@ def _ensure_schema(c, audit_event):
         ON guard_assignments(roster_date,sector);
       CREATE INDEX IF NOT EXISTS idx_guard_label
         ON guard_assignments(raw_label);
+      CREATE TABLE IF NOT EXISTS guard_document_settings(
+        month TEXT PRIMARY KEY,
+        document_html TEXT NOT NULL DEFAULT '',
+        signature_name TEXT NOT NULL DEFAULT '',
+        signature_title TEXT NOT NULL DEFAULT '',
+        updated_by TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
     """)
     # Additive migration: removed residents stay in the audit trail instead of disappearing.
     columns = {row["name"] for row in c.execute("PRAGMA table_info(guard_assignments)").fetchall()}
@@ -141,6 +150,33 @@ def _ensure_schema(c, audit_event):
     c.commit()
 
 
+def _safe_rich_html(value):
+    """Keep only ReportLab-safe formatting tags and a small set of font attributes."""
+    value = str(value or "")[:12000]
+    value = re.sub(r"(?is)<(script|style|iframe|object)[^>]*>.*?</\\1>", "", value)
+    value = re.sub(r"(?is)<!--.*?-->", "", value)
+    value = re.sub(r"(?i)<(p|div)\\b[^>]*>", "", value)
+    value = re.sub(r"(?i)</(p|div)\\s*>", "<br/>", value)
+    value = re.sub(r"(?i)<br\\s*/?>", "<br/>", value)
+    value = re.sub(r"(?i)<(?!/?(?:b|strong|i|em|u|font|br)\\b)[^>]*>", "", value)
+    def clean_font(match):
+        attrs = match.group(1) or ""
+        safe = []
+        color = re.search(r"(?i)\\bcolor\\s*=\\s*['\"]?(#[0-9a-f]{6}|#[0-9a-f]{3}|[a-z]{3,20})", attrs)
+        face = re.search(r"(?i)\\bface\\s*=\\s*['\"]?([a-z0-9 ,_-]{1,40})", attrs)
+        size = re.search(r"(?i)\\bsize\\s*=\\s*['\"]?([1-7])", attrs)
+        if color: safe.append('color="' + color.group(1) + '"')
+        if face:
+            family = face.group(1).strip().lower()
+            mapped = "Courier" if "courier" in family else "Times-Roman" if "times" in family or "georgia" in family else "Helvetica"
+            safe.append('face="' + mapped + '"')
+        if size: safe.append('size="' + size.group(1) + '"')
+        return "<font " + " ".join(safe) + ">" if safe else "<font>"
+    value = re.sub(r"(?i)<font\\b([^>]*)>", clean_font, value)
+    value = re.sub(r"(?i)\\s+on[a-z]+\\s*=\\s*(['\"]).*?\\1", "", value)
+    return value
+
+
 def register_guard_routes(app, db, page, guard, audit_event, L):
     def prepare():
         c = db()
@@ -165,7 +201,60 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
                 return ("Forbidden — Super Admin only", 403)
             action = request.form.get("action", "add")
             try:
-                if action == "delete":
+                if action == "save_document":
+                    document_html = _safe_rich_html(request.form.get("document_html", ""))
+                    signature_name = request.form.get("signature_name", "").strip()[:120]
+                    signature_title = request.form.get("signature_title", "").strip()[:160]
+                    c.execute("""
+                      INSERT INTO guard_document_settings(month,document_html,signature_name,signature_title,updated_by,updated_at)
+                      VALUES(?,?,?,?,?,CURRENT_TIMESTAMP)
+                      ON CONFLICT(month) DO UPDATE SET document_html=excluded.document_html,
+                        signature_name=excluded.signature_name,signature_title=excluded.signature_title,
+                        updated_by=excluded.updated_by,updated_at=CURRENT_TIMESTAMP
+                    """, (month, document_html, signature_name, signature_title, str(session.get("user", ""))))
+                    audit_event(c, "guards.document_edited",
+                                f"month={month}; signature={signature_name}")
+                elif action == "move":
+                    assignment_id = int(request.form.get("assignment_id", "0"))
+                    target_date = request.form.get("target_date", "").strip()
+                    target_sector = request.form.get("target_sector", "").strip()
+                    target = date.fromisoformat(target_date)
+                    if target.strftime("%Y-%m") != month or target_sector not in SECTORS:
+                        raise ValueError("Destination invalide : choisissez une cellule du mois affiché.")
+                    row = c.execute("SELECT * FROM guard_assignments WHERE id=? AND active=1", (assignment_id,)).fetchone()
+                    if not row:
+                        raise ValueError("Affectation introuvable ou inactive.")
+                    duplicate = c.execute("""
+                      SELECT 1 FROM guard_assignments
+                      WHERE active=1 AND id<>? AND roster_date=? AND sector=?
+                        AND ((resident_id IS NOT NULL AND resident_id=?) OR
+                             (resident_id IS NULL AND raw_label=?))
+                    """, (assignment_id, target_date, target_sector, row["resident_id"], row["raw_label"])).fetchone()
+                    if duplicate:
+                        raise ValueError("Ce résident figure déjà dans la cellule de destination.")
+                    target_hours = "08H-08H" if target.weekday() in (4, 5) else "16H-08H"
+                    c.execute("UPDATE guard_assignments SET roster_date=?,sector=?,hours=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                              (target_date, target_sector, target_hours, assignment_id))
+                    audit_event(c, "guards.assignment_moved",
+                                f"id={assignment_id}; from={row['roster_date']}|{row['sector']}; to={target_date}|{target_sector}")
+                elif action == "swap":
+                    assignment_id = int(request.form.get("assignment_id", "0"))
+                    target_id = int(request.form.get("target_assignment_id", "0"))
+                    if assignment_id == target_id:
+                        raise ValueError("Choisissez deux résidents différents pour la permutation.")
+                    first = c.execute("SELECT * FROM guard_assignments WHERE id=? AND active=1", (assignment_id,)).fetchone()
+                    second = c.execute("SELECT * FROM guard_assignments WHERE id=? AND active=1", (target_id,)).fetchone()
+                    if not first or not second:
+                        raise ValueError("Une des deux affectations n’est plus active.")
+                    if first["roster_date"][:7] != month or second["roster_date"][:7] != month:
+                        raise ValueError("La permutation doit rester dans le mois affiché.")
+                    c.execute("UPDATE guard_assignments SET roster_date=?,sector=?,hours=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                              (second["roster_date"], second["sector"], second["hours"], first["id"]))
+                    c.execute("UPDATE guard_assignments SET roster_date=?,sector=?,hours=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                              (first["roster_date"], first["sector"], first["hours"], second["id"]))
+                    audit_event(c, "guards.assignments_swapped",
+                                f"first={first['id']}:{first['roster_date']}|{first['sector']}; second={second['id']}:{second['roster_date']}|{second['sector']}")
+                elif action == "delete":
                     assignment_id = int(request.form.get("assignment_id", "0"))
                     reason = request.form.get("reason", "").strip()
                     if len(reason) < 5:
@@ -324,6 +413,9 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
           ORDER BY created_at DESC,id DESC
         """, (month,)).fetchall()
         source = c.execute("SELECT * FROM guard_sources WHERE month=?", (month,)).fetchone()
+        document_settings = c.execute("SELECT * FROM guard_document_settings WHERE month=?", (month,)).fetchone()
+        if not document_settings:
+            document_settings = {"document_html": "", "signature_name": "", "signature_title": ""}
         c.close()
         return page("""<section class="rt-guards-hero">
           <div class="rt-guards-heading"><div><p class="rt-kicker">RESIMANAGE · PLANNING</p>
@@ -336,11 +428,28 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
         </section>
         {% if role=='super_admin' %}<section class="rt-guard-editor"><h2>{{L('Règle de sélection','Selection rule','قاعدة الاختيار')}}</h2>
           <p>{{L('Chaque journée possède son propre sélecteur. Les résidents actifs des années 1 à 4 sont admissibles ; seuls ceux explicitement marqués en préparation DEMS sont dispensés.','Each day has its own selector. Active residents in years 1–4 are eligible; only those explicitly marked as preparing for DEMS are exempt.','لكل يوم قائمة اختيار خاصة. المقيمون النشطون من السنة 1 إلى 4 مؤهلون؛ ويُعفى فقط من تم تحديدهم صراحة للتحضير لـ DEMS.')}}</p></section>{% endif %}
+        <section class="rt-guard-editor">
+          <div class="rt-guard-editor-heading"><h2>📝 {{L('Mise en forme du document','Document formatting','تنسيق المستند')}}</h2><span>{{L('Outils de texte type Word','Word-style text tools','أدوات نص شبيهة بـ Word')}}</span></div>
+          {% if role=='super_admin' %}
+          <form method="post" id="rt-guard-document-form"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="action" value="save_document">
+            <div class="rt-guard-toolbar" role="toolbar" aria-label="Mise en forme du texte">
+              <button type="button" data-cmd="bold" title="Gras"><strong>G</strong></button><button type="button" data-cmd="italic" title="Italique"><em>I</em></button><button type="button" data-cmd="underline" title="Souligné"><u>U</u></button>
+              <label>{{L('Taille','Size','الحجم')}} <select id="rt-guard-font-size"><option value="2">Petite</option><option value="3" selected>Normale</option><option value="4">Grande</option><option value="5">Très grande</option><option value="6">Titre</option><option value="7">Très grand titre</option></select></label>
+              <label>{{L('Police','Font','الخط')}} <select id="rt-guard-font-family"><option>Arial</option><option>Georgia</option><option>Times New Roman</option><option>Courier New</option><option>Verdana</option></select></label>
+              <label>{{L('Couleur','Color','اللون')}} <input id="rt-guard-font-color" type="color" value="#163b5c" aria-label="Couleur du texte"></label>
+              <button type="button" data-cmd="removeFormat" title="Effacer la mise en forme">Tx</button>
+            </div>
+            <div id="rt-guard-rich-editor" class="rt-guard-rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="{{L('Ajouter un titre, une note ou des consignes à la liste…','Add a title, note or instructions to the roster…','أضف عنوانًا أو ملاحظة أو تعليمات إلى القائمة…')}}">{{document_settings.document_html|safe}}</div>
+            <textarea name="document_html" id="rt-guard-document-html" hidden></textarea>
+            <div class="rt-guard-signature-fields"><label>{{L('Nom du signataire','Signatory name','اسم الموقّع')}}<input name="signature_name" value="{{document_settings.signature_name}}" maxlength="120" placeholder="{{L('Nom et prénom','Full name','الاسم واللقب')}}"></label><label>{{L('Fonction / qualité','Role / title','الصفة')}}<input name="signature_title" value="{{document_settings.signature_title}}" maxlength="160" placeholder="{{L('Chef de service, responsable…','Department head, supervisor…','رئيس المصلحة، المسؤول…')}}"></label><button type="submit">💾 {{L('Enregistrer le document','Save document','حفظ المستند')}}</button></div>
+          </form>
+          {% else %}{% if document_settings.document_html %}<div class="rt-guard-rich-preview">{{document_settings.document_html|safe}}</div>{% endif %}{% if document_settings.signature_name %}<p class="rt-guard-signature-preview">{{document_settings.signature_name}} · {{document_settings.signature_title}}</p>{% endif %}{% endif %}
+        </section>
         <section class="rt-guard-calendar-section"><div class="rt-guard-calendar-title"><h2>{{month_label}}</h2><a class="button" href="/guards/mapping?month={{month}}">👤 {{L('Identifier les résidents','Identify residents','تحديد المقيمين')}}</a><a class="button" href="/guards/export.csv?month={{month}}">⬇ CSV</a><button type="button" onclick="window.print()">🖨 {{L('Imprimer','Print','طباعة')}}</button></div>
           <div class="wrap"><table class="rt-guard-calendar"><thead><tr><th>{{L('Jour','Day','اليوم')}}</th><th>{{L('UMC','Emergency','الاستعجالات')}}</th><th>{{L('Réanimation chirurgicale','Surgical ICU','الإنعاش الجراحي')}}</th></tr></thead><tbody>
           {% for day in days %}<tr class="{% if day.weekend %}rt-weekend{% endif %}"><th><strong>{{day.day}}</strong><span>{{day.weekday}}</span><small>{{day.date[8:10]}}/{{day.date[5:7]}}/{{day.date[:4]}}</small></th>
-            {% for sector,items in [('UMC',day.umc),('Réanimation chirurgicale',day.surgical)] %}<td><div class="rt-guard-cell"><div class="rt-guard-hours">{{items[0].hours if items else day.hours}}</div>
-              {% for item in items %}<div class="rt-guard-person {% if item.mapping_status!='validated' %}is-unresolved{% endif %}"><span>{{(item.surname~' '~item.firstname) if item.resident_id else item.raw_label}}</span>{% if item.resident_id %}<small>{{item.year}}{{L('e année','th year',' سنة')}}</small>{% else %}<small>{{L('À identifier','Unresolved','غير محدد')}}</small>{% endif %}
+            {% for sector,items in [('UMC',day.umc),('Réanimation chirurgicale',day.surgical)] %}<td><div class="rt-guard-cell" data-guard-drop-cell data-date="{{day.date}}" data-sector="{{sector}}"><div class="rt-guard-hours">{{items[0].hours if items else day.hours}}</div>
+              {% for item in items %}<div class="rt-guard-person {% if item.mapping_status!='validated' %}is-unresolved{% endif %}" data-guard-chip data-assignment-id="{{item.id}}" data-rid="{{item.resident_id or ''}}" draggable="true"><span class="{% if item.resident_id %}rt-guard-profile-link{% endif %}" {% if item.resident_id %}data-guard-profile="{{item.resident_id}}" role="button" tabindex="0"{% endif %}>{{(item.surname~' '~item.firstname) if item.resident_id else item.raw_label}}</span>{% if item.resident_id %}<small>{{item.year}}{{L('e année','th year',' سنة')}}</small>{% else %}<small>{{L('À identifier','Unresolved','غير محدد')}}</small>{% endif %}
                 {% if role=='super_admin' %}<details class="rt-guard-remove"><summary title="{{L('Corriger cette affectation','Correct this assignment','تصحيح هذا التعيين')}}">×</summary><form method="post"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="action" value="delete"><input type="hidden" name="assignment_id" value="{{item.id}}"><input name="reason" required minlength="5" maxlength="300" placeholder="{{L('Motif obligatoire du retrait','Required reason for removal','سبب الإزالة إلزامي')}}" aria-label="{{L('Motif du retrait','Removal reason','سبب الإزالة')}}"><button type="submit">{{L('Confirmer','Confirm','تأكيد')}}</button></form></details>{% endif %}</div>{% endfor %}
               {% if not items %}<span class="rt-guard-empty">{{L('Aucune affectation','No assignment','لا يوجد تعيين')}}</span>{% endif %}
               {% if role=='super_admin' %}<form method="post" class="rt-guard-day-selector"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="action" value="add_many"><input type="hidden" name="roster_date" value="{{day.date}}"><input type="hidden" name="sector" value="{{sector}}"><label>{{L('Ajouter des résidents','Add residents','إضافة مقيمين')}}<select name="resident_ids" multiple size="1" required aria-label="{{L('Sélectionner les résidents de cette journée','Select residents for this day','اختيار مقيمي هذا اليوم')}}">{% for r in residents %}<option value="{{r.id}}">{{r.surname}} {{r.firstname}} · {{r.year}}{{L('e année','th year',' سنة')}}</option>{% endfor %}{% for r in released_residents %}<option value="" disabled>{{r.surname}} {{r.firstname}} · 4{{L('e année · dispensé DEMS','th year · DEMS leave',' سنة · إعفاء DEMS')}}</option>{% endfor %}</select></label><button type="submit">＋ {{L('Ajouter la sélection','Add selection','إضافة المحددين')}}</button></form>{% endif %}</div></td>{% endfor %}
@@ -349,8 +458,67 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
           <p><a class="button" href="/guards/export.pdf?month={{month}}">⬇ {{L('Télécharger le PDF','Download PDF','تنزيل PDF')}}</a></p>
         </section>
         {% if changes %}<section class="rt-guard-changes"><h2>{{L('Historique des correctifs','Correction history','سجل التصحيحات')}}</h2><div class="wrap"><table><tr><th>{{L('Date','Date','التاريخ')}}</th><th>{{L('Service','Sector','القسم')}}</th><th>{{L('Résident retiré','Removed resident','المقيم المحذوف')}}</th><th>{{L('Motif','Reason','السبب')}}</th><th>{{L('Auteur','By','بواسطة')}}</th><th>{{L('Horodatage','Timestamp','الوقت')}}</th></tr>{% for change in changes %}<tr><td>{{change.roster_date}}</td><td>{{change.sector}}</td><td>{{change.resident_label}}</td><td>{{change.reason}}</td><td>{{change.actor}}</td><td>{{change.created_at}}</td></tr>{% endfor %}</table></div></section>{% endif %}
+        <div class="rt-guard-profile-backdrop" id="rt-guard-profile-modal" hidden><section class="rt-guard-profile-dialog" role="dialog" aria-modal="true" aria-label="Fiche résident"><button type="button" id="rt-guard-profile-close" aria-label="Fermer">×</button><div id="rt-guard-profile-content"></div></section></div>
+        <script>
+        (function(){
+          var editor=document.getElementById('rt-guard-rich-editor'),form=document.getElementById('rt-guard-document-form');
+          if(editor&&form){
+            form.addEventListener('submit',function(){document.getElementById('rt-guard-document-html').value=editor.innerHTML;});
+            document.querySelectorAll('.rt-guard-toolbar [data-cmd]').forEach(function(button){button.addEventListener('click',function(){editor.focus();document.execCommand(button.dataset.cmd,false,null);});});
+            var size=document.getElementById('rt-guard-font-size'),family=document.getElementById('rt-guard-font-family'),color=document.getElementById('rt-guard-font-color');
+            size.addEventListener('change',function(){editor.focus();document.execCommand('fontSize',false,size.value);});
+            family.addEventListener('change',function(){editor.focus();document.execCommand('fontName',false,family.value);});
+            color.addEventListener('input',function(){editor.focus();document.execCommand('foreColor',false,color.value);});
+          }
+          var modal=document.getElementById('rt-guard-profile-modal'),profileContent=document.getElementById('rt-guard-profile-content');
+          function addLine(parent,label,value){if(value===null||value===undefined||String(value).trim()==='')return;var p=document.createElement('p'),b=document.createElement('strong');b.textContent=label+': ';p.appendChild(b);p.appendChild(document.createTextNode(String(value)));parent.appendChild(p);}
+          function openProfile(id){modal.hidden=false;profileContent.textContent='Chargement…';fetch('/api/residents/'+encodeURIComponent(id)+'/profile',{credentials:'same-origin',headers:{Accept:'application/json'}}).then(function(r){if(!r.ok)throw new Error('Fiche indisponible');return r.json();}).then(function(data){profileContent.textContent='';var r=data.resident||{},h=document.createElement('h2');h.textContent=((r.surname||'')+' '+(r.firstname||'')).trim();profileContent.appendChild(h);addLine(profileContent,'Année','A'+(r.year||'—'));addLine(profileContent,'Statut',r.status);addLine(profileContent,'Téléphone',r.phone);addLine(profileContent,'E-mail',r.email);addLine(profileContent,'Adresse',r.address);var title=document.createElement('h3');title.textContent='Historique des stages';profileContent.appendChild(title);(data.history||[]).forEach(function(item){addLine(profileContent,(item.year_label||'')+' · '+(item.period||''),item.terrain+' · '+(item.start_date||'')+' → '+(item.end_date||''));});}).catch(function(e){profileContent.textContent=e.message;});}
+          document.querySelectorAll('[data-guard-profile]').forEach(function(el){el.addEventListener('click',function(){openProfile(el.dataset.guardProfile);});el.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();openProfile(el.dataset.guardProfile);}});});
+          document.getElementById('rt-guard-profile-close').addEventListener('click',function(){modal.hidden=true;});
+          modal.addEventListener('click',function(e){if(e.target===modal)modal.hidden=true;});
+          var dragged=null,longTimer=null,longActive=false;
+          function submitMove(id,cell){var data=new FormData();data.set('month','{{month}}');data.set('action','move');data.set('assignment_id',id);data.set('target_date',cell.dataset.date);data.set('target_sector',cell.dataset.sector);post(data);}
+          function submitSwap(id,target){var data=new FormData();data.set('month','{{month}}');data.set('action','swap');data.set('assignment_id',id);data.set('target_assignment_id',target);post(data);}
+          function post(data){var form=document.createElement('form');form.method='post';form.action='/guards?month={{month}}';data.forEach(function(v,k){var input=document.createElement('input');input.type='hidden';input.name=k;input.value=v;form.appendChild(input);});document.body.appendChild(form);form.submit();}
+          document.querySelectorAll('[data-guard-chip]').forEach(function(chip){
+            chip.addEventListener('dragstart',function(e){dragged=chip; e.dataTransfer.setData('text/plain',chip.dataset.assignmentId);e.dataTransfer.effectAllowed='move';});
+            chip.addEventListener('dragend',function(){dragged=null;});
+            chip.addEventListener('pointerdown',function(e){if(e.pointerType==='mouse')return;longActive=false;longTimer=window.setTimeout(function(){longActive=true;dragged=chip;chip.classList.add('is-dragging');},420);});
+            chip.addEventListener('pointermove',function(e){if(longActive){e.preventDefault();chip.style.setProperty('--drag-x',e.clientX+'px');chip.style.setProperty('--drag-y',e.clientY+'px');}});
+            chip.addEventListener('pointerup',function(e){window.clearTimeout(longTimer);if(!longActive)return;var target=document.elementFromPoint(e.clientX,e.clientY),other=target&&target.closest('[data-guard-chip]'),cell=target&&target.closest('[data-guard-drop-cell]');chip.classList.remove('is-dragging');if(other&&other!==chip)submitSwap(chip.dataset.assignmentId,other.dataset.assignmentId);else if(cell)submitMove(chip.dataset.assignmentId,cell);dragged=null;longActive=false;});
+            chip.addEventListener('pointercancel',function(){window.clearTimeout(longTimer);chip.classList.remove('is-dragging');dragged=null;longActive=false;});
+          });
+          document.querySelectorAll('[data-guard-drop-cell]').forEach(function(cell){
+            cell.addEventListener('dragover',function(e){e.preventDefault();cell.classList.add('is-drop-target');});
+            cell.addEventListener('dragleave',function(){cell.classList.remove('is-drop-target');});
+            cell.addEventListener('drop',function(e){e.preventDefault();cell.classList.remove('is-drop-target');var target=e.target.closest('[data-guard-chip]');var id=e.dataTransfer.getData('text/plain');if(!id||!dragged)return;if(target&&target.dataset.assignmentId!==id)submitSwap(id,target.dataset.assignmentId);else submitMove(id,cell);});
+          });
+        })();
+        </script>
         <style>
         .rt-guards-hero{background:linear-gradient(130deg,#092b50,#135b83 58%,#126c70)!important;color:#effaff!important;border:1px solid #65d8ef!important}
+        .rt-guard-editor{border:1px solid #70b5d3!important;background:linear-gradient(145deg,#0c2b49,#132c4d)!important;color:#eefaff!important}
+        .rt-guard-editor h2,.rt-guard-editor label{color:#eefaff!important}
+        .rt-guard-editor-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+        .rt-guard-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px;background:#061a2d;border:1px solid #4b819d;border-radius:10px}
+        .rt-guard-toolbar button{min-width:34px;min-height:34px;padding:5px 9px;background:#174c70!important;color:#fff!important;border:1px solid #75b8d8!important;border-radius:7px}
+        .rt-guard-toolbar label{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:800}
+        .rt-guard-toolbar select{min-height:32px;background:#fff!important;color:#16334b!important}
+        .rt-guard-toolbar input[type=color]{width:38px;height:32px;padding:2px}
+        .rt-guard-rich-editor,.rt-guard-rich-preview{min-height:82px;margin-top:9px;padding:12px;background:#fff;color:#172b3c;border:1px solid #8fb6c9;border-radius:9px;outline:none}
+        .rt-guard-rich-editor:empty:before{content:attr(data-placeholder);color:#738696}
+        .rt-guard-signature-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px;align-items:end}
+        .rt-guard-signature-fields button{grid-column:1/-1}
+        .rt-guard-signature-preview{text-align:end;font-weight:800}
+        .rt-guard-profile-backdrop{position:fixed;inset:0;z-index:5000;display:grid;place-items:center;padding:14px;background:#020b16c9}
+        .rt-guard-profile-backdrop[hidden]{display:none}
+        .rt-guard-profile-dialog{width:min(720px,96vw);max-height:88vh;overflow:auto;padding:20px;background:#f7fbff;color:#17334b;border-radius:18px;box-shadow:0 22px 70px #0009}
+        .rt-guard-profile-dialog>button{float:right;font-size:24px;background:#8c2d42!important;color:#fff!important}
+        .rt-guard-profile-link{cursor:pointer;text-decoration:underline;text-decoration-color:#85d8f4;text-underline-offset:3px}
+        .rt-guard-person{touch-action:pan-y;cursor:grab}
+        .rt-guard-person.is-dragging{opacity:.5;outline:3px dashed #5de2ed}
+        .rt-guard-cell.is-drop-target{outline:3px solid #36d7c4;outline-offset:-3px;background:#15516a}
+        @media(max-width:680px){.rt-guard-signature-fields{grid-template-columns:1fr}.rt-guard-toolbar{position:sticky;top:0;z-index:3}}
         .rt-guards-hero h1,.rt-guards-hero p,.rt-guards-hero label{color:#effaff!important}
         .rt-guards-heading{display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap}.rt-kicker{font-size:11px;letter-spacing:.16em;font-weight:900;opacity:.8}
         .rt-guards-month{min-width:190px;max-width:260px}.rt-guards-month select{background:#061d35!important;color:#fff!important}
@@ -382,7 +550,7 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
         @media(max-width:680px){.rt-guard-add-form{grid-template-columns:1fr}.rt-guard-add-form button{grid-column:1}.rt-guards-stats strong{font-size:21px}.rt-guards-stats span{font-size:10px}.rt-guard-calendar-title{align-items:stretch}.rt-guard-calendar-title a{flex:1;text-align:center}}
         @media print{body{background:#fff!important;color:#111!important}header,.main-nav,.rt-back-link,.rt-footer,.rt-guards-hero,.rt-guard-editor,.rt-guard-calendar-title>a,.rt-guard-calendar-title>button,.rt-guard-person form{display:none!important}.rt-app-shell{display:block!important;padding:0!important}main{max-width:none!important;padding:0!important}section{margin:0!important;padding:0!important;border:0!important;box-shadow:none!important;background:#fff!important}.rt-guard-calendar{min-width:0!important;font-size:9px!important}.rt-guard-calendar th,.rt-guard-calendar td{color:#111!important;background:#fff!important;border:1px solid #555!important}.rt-guard-person{background:#fff!important;color:#111!important;border:1px solid #555!important}.rt-guard-person small,.rt-guard-hours{color:#333!important}.rt-guard-calendar tbody th span,.rt-guard-calendar tbody th small{color:#333!important}}
         </style>""", month=month, month_label=_month_label(month), month_options=month_options,
-                    days=days, counts=counts, source_record=source, residents=residents, released_residents=released_residents, changes=changes)
+                    days=days, counts=counts, source_record=source, residents=residents, released_residents=released_residents, changes=changes, document_settings=document_settings)
 
     @app.route("/guards/mapping", methods=["GET", "POST"])
     def guards_mapping():
@@ -482,6 +650,7 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
           FROM guard_changes WHERE substr(roster_date,1,7)=?
           ORDER BY created_at,id
         """, (month,)).fetchall()
+        document_settings = c.execute("SELECT * FROM guard_document_settings WHERE month=?", (month,)).fetchone()
         c.close()
         from reportlab.lib import colors
         from reportlab.lib.enums import TA_CENTER
@@ -509,6 +678,8 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
         _, day_count = calendar.monthrange(year, month_number)
         story = [Paragraph("LISTE DE GARDE DES RÉSIDENTS — " + escape(_month_label(month).upper()), title_style),
                  Spacer(1, 5*mm)]
+        if document_settings and document_settings["document_html"]:
+            story += [Paragraph(_safe_rich_html(document_settings["document_html"]), styles["BodyText"]), Spacer(1, 3*mm)]
         data = [[Paragraph("<b>DATE</b>", small_style), Paragraph("<b>HORAIRES</b>", small_style),
                  Paragraph("<b>UMC</b>", small_style), Paragraph("<b>RÉANIMATION CHIRURGICALE</b>", small_style)]]
         for day_number in range(1, day_count + 1):
@@ -531,6 +702,10 @@ def register_guard_routes(app, db, page, guard, audit_event, L):
             ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
         ]))
         story.append(table)
+        if document_settings and (document_settings["signature_name"] or document_settings["signature_title"]):
+            story += [Spacer(1, 12*mm), Paragraph("Signature et cachet", heading_style),
+                      Paragraph(escape(document_settings["signature_name"]) + (" — " + escape(document_settings["signature_title"]) if document_settings["signature_title"] else ""), small_style),
+                      Spacer(1, 14*mm), Paragraph("Signature : __________________________________________", small_style)]
         if changes:
             story += [Spacer(1,5*mm),Paragraph("HISTORIQUE DES CORRECTIFS",heading_style)]
             change_data = [[Paragraph("<b>Date</b>",small_style),Paragraph("<b>Secteur</b>",small_style),
