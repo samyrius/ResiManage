@@ -1681,7 +1681,8 @@ def rotation_board():
   except Exception as exc:
    c.rollback(); flash("Modification impossible : "+str(exc)[:180])
   c.close()
-  return redirect("/rotation-board?year="+y.replace("&","%26").replace(" ","%20")+"#board-cell-"+str(tid)+"-"+str(pid))
+  anchor = "#capacity-mode" if action=="capacity_mode" else "#board-cell-"+str(tid)+"-"+str(pid)
+  return redirect("/rotation-board?year="+y.replace("&","%26").replace(" ","%20")+anchor)
  periods=c.execute("SELECT * FROM periods WHERE year_label=? ORDER BY id",(y,)).fetchall()
  terrains=c.execute("SELECT * FROM terrains WHERE active=1 ORDER BY CASE WHEN kind='optional' THEN 1 ELSE 0 END,name").fetchall()
  assignments=c.execute("""SELECT a.resident_id,a.terrain_id,a.period_id,a.status,r.surname,r.firstname,r.year,r.resident_type,r.origin_hospital,t.name AS assigned_terrain
