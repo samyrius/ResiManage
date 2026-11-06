@@ -3864,6 +3864,40 @@ def test_rotation_board_bulk_save_rolls_back_duplicate_resident_selection(tmp_pa
         ).fetchone()[0] == 0
 
 
+def test_rotation_board_has_global_assigned_resident_filters_and_quick_links(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        year = conn.execute("SELECT value FROM settings WHERE key='year'").fetchone()[0]
+        period_id = conn.execute(
+            "SELECT id FROM periods WHERE year_label=? ORDER BY id LIMIT 1", (year,)
+        ).fetchone()[0]
+        terrain_id = conn.execute(
+            "SELECT id FROM terrains WHERE active=1 ORDER BY id LIMIT 1"
+        ).fetchone()[0]
+        resident_id = conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)",
+            ("Searchable", "Resident", 3),
+        ).lastrowid
+        conn.execute(
+            "INSERT INTO assignments(resident_id,terrain_id,period_id,status) VALUES(?,?,?,'confirmed')",
+            (resident_id, terrain_id, period_id),
+        )
+        conn.commit()
+
+    response = client.get("/rotation-board")
+    assert response.status_code == 200
+    html = response.data.decode("utf-8")
+    assert 'id="rt-board-search"' in html
+    assert 'id="rt-board-year-filter"' in html
+    assert 'id="rt-board-filter-clear"' in html
+    assert 'data-year="3"' in html
+    assert 'href="/terrains"' in html
+    assert 'href="/residents"' in html
+    assert 'href="/history"' in html
+    assert 'href="/external-rotations"' in html
+
+
 def test_emergency_resident_category_is_saved_and_dashboard_counts_are_separate(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
