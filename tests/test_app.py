@@ -3753,11 +3753,11 @@ def test_rotation_board_embeds_bulk_tools_with_period_and_promotion_filters(tmp_
     with rotation_app.db() as conn:
         year = conn.execute("SELECT value FROM settings WHERE key='year'").fetchone()[0]
         conn.execute(
-            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)",
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,'active')",
             ("Bulk", "ThirdYear", 3),
         )
         conn.execute(
-            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)",
+            "INSERT INTO residents(surname,firstname,year,status) VALUES(?,?,?,'active')",
             ("Bulk", "FirstYear", 1),
         )
         conn.commit()
