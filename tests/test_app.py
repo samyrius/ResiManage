@@ -5001,3 +5001,30 @@ def test_capacity_disabled_allows_manual_assignment_without_capacity(tmp_path, m
             "SELECT COUNT(*) FROM assignments WHERE resident_id=? AND period_id=? AND status IN ('confirmed','pending')",
             (rid, period["id"]),
         ).fetchone()[0] == 1
+
+
+def test_capacity_mode_missing_cells_shows_validation_message_without_server_error(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        year = conn.execute("SELECT value FROM settings WHERE key='year'").fetchone()[0]
+        missing = conn.execute(
+            "SELECT COUNT(*) FROM terrains t CROSS JOIN periods p "
+            "LEFT JOIN capacities cap ON cap.year_label=p.year_label "
+            "AND cap.terrain_id=t.id AND cap.period_id=p.id "
+            "WHERE t.active=1 AND p.year_label=? AND cap.id IS NULL",
+            (year,),
+        ).fetchone()[0]
+        assert missing > 0
+
+    response = client.post("/rotation-board", data={
+        "action": "capacity_mode", "year": year, "enabled": "1",
+    }, follow_redirects=True)
+
+    assert response.status_code == 200
+    html = response.data.decode("utf-8")
+    assert "cellule(s) manquante(s)" in html
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT value FROM settings WHERE key='rotation_capacity_enforced'"
+        ).fetchone()[0] == "0"
