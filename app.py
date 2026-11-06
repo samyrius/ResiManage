@@ -646,7 +646,7 @@ th{box-shadow:inset 0 1px #ffffff1e}
   background:linear-gradient(155deg,#174a6a,#08243b 70%)!important;
   box-shadow:inset 0 1px 1px #ffffff35,0 3px 0 #020b14,0 5px 9px #0006!important;
  }
- .main-nav>a>span:not(.nav-icon),.main-nav .nav-group>summary>span:not(.nav-icon){display:block!important;flex:0 1 auto!important;max-width:100%!important;font-size:10px!important;line-height:1.1!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;text-align:center!important}
+ .main-nav>a>span:not(.nav-icon),.main-nav .nav-group>summary>span:not(.nav-icon){display:none!important}
  .main-nav .nav-icon{
   display:flex!important;flex:0 0 auto!important;align-items:center!important;justify-content:center!important;
   min-width:0!important;width:30px!important;height:30px!important;margin:0!important;
