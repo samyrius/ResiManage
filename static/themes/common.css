@@ -426,3 +426,13 @@ html[dir="rtl"] .rt-back-link{left:auto!important;right:10px!important}
     padding-inline:8px!important;
   }
 }
+
+/* Final mobile navigation contract: icon-only controls, no text labels under icons. */
+@media(max-width:680px){
+  html[data-theme-template] .main-nav>a>span:not(.nav-icon),
+  html[data-theme-template] .main-nav .nav-group>summary>span:not(.nav-icon){
+    display:none!important;visibility:hidden!important;width:0!important;height:0!important;
+    min-width:0!important;max-width:0!important;margin:0!important;padding:0!important;
+    font-size:0!important;line-height:0!important;
+  }
+}
