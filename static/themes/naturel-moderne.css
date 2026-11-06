@@ -578,3 +578,6 @@ html[data-theme-template] #rt-flash-messages.rt-local-flash .msg{
     font-size:0!important;line-height:0!important;
   }
 }
+
+/* Final icon-only navigation: remove all navigation captions in every viewport. */
+.main-nav .nav-label,.main-nav>a>span:not(.nav-icon),.main-nav .nav-group>summary>span:not(.nav-icon){display:none!important;visibility:hidden!important;width:0!important;height:0!important;min-width:0!important;max-width:0!important;margin:0!important;padding:0!important;font-size:0!important;line-height:0!important}.main-nav>a,.main-nav .nav-group>summary{justify-content:center!important;text-align:center!important}
