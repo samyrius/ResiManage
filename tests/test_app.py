@@ -3747,6 +3747,123 @@ def test_rotation_board_post_keeps_the_edited_cell_in_view(tmp_path, monkeypatch
     )
 
 
+def test_rotation_board_embeds_bulk_tools_with_period_and_promotion_filters(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        year = conn.execute("SELECT value FROM settings WHERE key='year'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)",
+            ("Bulk", "ThirdYear", 3),
+        )
+        conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)",
+            ("Bulk", "FirstYear", 1),
+        )
+        conn.commit()
+
+    response = client.get("/rotation-board?bulk_year=3")
+    assert response.status_code == 200
+    html = response.data.decode("utf-8")
+    assert 'id="bulk-tools"' in html
+    assert 'id="rt-board-bulk-form"' in html
+    assert 'name="bulk_period_id"' in html
+    assert 'name="bulk_year"' in html
+    assert "Bulk ThirdYear" in html
+    assert "Bulk FirstYear" not in html
+
+
+def test_rotation_board_bulk_save_assigns_multiple_residents_atomically(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        year = conn.execute("SELECT value FROM settings WHERE key='year'").fetchone()[0]
+        period_id = conn.execute(
+            "SELECT id FROM periods WHERE year_label=? ORDER BY id LIMIT 1", (year,)
+        ).fetchone()[0]
+        terrain_ids = [
+            row["id"] for row in conn.execute(
+                "SELECT id FROM terrains WHERE active=1 ORDER BY id LIMIT 2"
+            ).fetchall()
+        ]
+        resident_ids = []
+        for surname in ("BulkOne", "BulkTwo"):
+            resident_ids.append(conn.execute(
+                "INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)",
+                (surname, "Resident", 2),
+            ).lastrowid)
+        conn.commit()
+
+    response = client.post("/rotation-board", data={
+        "action": "bulk_save",
+        "year": year,
+        "period_id": str(period_id),
+        f"bulk_residents_{terrain_ids[0]}": [str(resident_ids[0])],
+        f"bulk_residents_{terrain_ids[1]}": [str(resident_ids[1])],
+        f"bulk_capacity_{terrain_ids[0]}": "2",
+        f"bulk_capacity_{terrain_ids[1]}": "3",
+    })
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith(
+        f"&bulk_period_id={period_id}#bulk-tools"
+    )
+    with rotation_app.db() as conn:
+        rows = conn.execute(
+            "SELECT resident_id,terrain_id,status FROM assignments WHERE period_id=? AND resident_id IN (?,?) ORDER BY resident_id",
+            (period_id, *resident_ids),
+        ).fetchall()
+        assert len(rows) == 2
+        assert {row["resident_id"] for row in rows} == set(resident_ids)
+        assert {row["terrain_id"] for row in rows} == set(terrain_ids)
+        capacities = conn.execute(
+            "SELECT terrain_id,places FROM capacities WHERE year_label=? AND period_id=? AND terrain_id IN (?,?)",
+            (year, period_id, *terrain_ids),
+        ).fetchall()
+        assert {row["terrain_id"]: row["places"] for row in capacities} == {
+            terrain_ids[0]: 2, terrain_ids[1]: 3
+        }
+
+
+def test_rotation_board_bulk_save_rolls_back_duplicate_resident_selection(tmp_path, monkeypatch):
+    client = setup_client(tmp_path, monkeypatch)
+    login(client)
+    with rotation_app.db() as conn:
+        year = conn.execute("SELECT value FROM settings WHERE key='year'").fetchone()[0]
+        period_id = conn.execute(
+            "SELECT id FROM periods WHERE year_label=? ORDER BY id LIMIT 1", (year,)
+        ).fetchone()[0]
+        terrain_ids = [
+            row["id"] for row in conn.execute(
+                "SELECT id FROM terrains WHERE active=1 ORDER BY id LIMIT 2"
+            ).fetchall()
+        ]
+        resident_id = conn.execute(
+            "INSERT INTO residents(surname,firstname,year) VALUES(?,?,?)",
+            ("BulkDuplicate", "Resident", 2),
+        ).lastrowid
+        conn.commit()
+
+    response = client.post("/rotation-board", data={
+        "action": "bulk_save",
+        "year": year,
+        "period_id": str(period_id),
+        f"bulk_residents_{terrain_ids[0]}": [str(resident_id)],
+        f"bulk_residents_{terrain_ids[1]}": [str(resident_id)],
+        f"bulk_capacity_{terrain_ids[0]}": "2",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert "Un même résident ne peut être affecté à deux services".encode("utf-8") in response.data
+    with rotation_app.db() as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM assignments WHERE resident_id=? AND period_id=?",
+            (resident_id, period_id),
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM capacities WHERE year_label=? AND period_id=? AND terrain_id=?",
+            (year, period_id, terrain_ids[0]),
+        ).fetchone()[0] == 0
+
+
 def test_emergency_resident_category_is_saved_and_dashboard_counts_are_separate(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     login(client)
