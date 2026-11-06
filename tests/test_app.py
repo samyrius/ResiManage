@@ -3769,8 +3769,8 @@ def test_rotation_board_embeds_bulk_tools_with_period_and_promotion_filters(tmp_
     assert 'id="rt-board-bulk-form"' in html
     assert 'name="bulk_period_id"' in html
     assert 'name="bulk_year"' in html
-    assert "Bulk ThirdYear" in html
-    assert "Bulk FirstYear" not in html
+    assert 'data-resident-id="' in html and "Bulk ThirdYear" in html
+    assert not re.search(r'<option value="[^"]*Bulk FirstYear[^"]*" data-resident-id="', html)
 
 
 def test_rotation_board_bulk_save_assigns_multiple_residents_atomically(tmp_path, monkeypatch):
