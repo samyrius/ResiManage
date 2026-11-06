@@ -567,3 +567,14 @@ html[data-theme-template] #rt-flash-messages.rt-local-flash .msg{
 /* NATUREL MODERNE: vertical garden navigation and airy workspace. */
 @media(min-width:681px){html[data-theme-template="naturel-moderne"] body .rt-app-shell[data-layout="naturel-moderne"]{display:grid!important;grid-template-columns:220px minmax(0,1fr)!important;gap:22px!important;max-width:1480px!important;margin:0 auto!important;align-items:start!important}html[data-theme-template="naturel-moderne"] body .rt-app-shell[data-layout="naturel-moderne"]>.main-nav{grid-column:1!important;grid-row:1!important;position:sticky!important;top:18px!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;margin:18px 0 18px 18px!important;padding:16px!important;border-radius:22px!important}html[data-theme-template="naturel-moderne"] body .rt-app-shell[data-layout="naturel-moderne"]>.main-nav>.nav-group{width:100%!important}html[data-theme-template="naturel-moderne"] body .rt-app-shell[data-layout="naturel-moderne"]>main{grid-column:2!important;grid-row:1!important;max-width:none!important;margin:0!important;padding:28px!important}html[data-theme-template="naturel-moderne"] body .rt-app-shell[data-layout="naturel-moderne"]>main section{border-radius:24px!important;margin:16px 0!important}}
 @media(max-width:680px){html[data-theme-template="naturel-moderne"] body .rt-app-shell[data-layout="naturel-moderne"] .rt-icon-dashboard{display:flex!important;flex-direction:column!important;gap:8px!important}html[data-theme-template="naturel-moderne"] body .rt-app-shell[data-layout="naturel-moderne"] .rt-icon-dashboard .rt-action-card{min-height:82px!important;flex-direction:row!important;justify-content:flex-start!important;border-radius:18px!important;padding:10px 14px!important;border-inline-start:5px solid #5d9b70!important}html[data-theme-template="naturel-moderne"] body .rt-app-shell[data-layout="naturel-moderne"] .rt-icon-dashboard .rt-action-icon{width:56px!important;height:56px!important;min-width:56px!important}}
+
+
+/* Final mobile navigation contract: icon-only controls, no text labels under icons. */
+@media(max-width:680px){
+  html[data-theme-template] .main-nav>a>span:not(.nav-icon),
+  html[data-theme-template] .main-nav .nav-group>summary>span:not(.nav-icon){
+    display:none!important;visibility:hidden!important;width:0!important;height:0!important;
+    min-width:0!important;max-width:0!important;margin:0!important;padding:0!important;
+    font-size:0!important;line-height:0!important;
+  }
+}
