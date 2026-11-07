@@ -5,6 +5,11 @@ on:
   push:
     branches:
       - resimanage-2-work
+      - work/**
+      - integration/**
+  pull_request:
+    branches:
+      - resimanage-2-work
   workflow_dispatch:
 
 permissions:
@@ -76,6 +81,15 @@ jobs:
         with:
           name: resimanage2-debug-apk
           path: test-apk
+      - name: Enable KVM access for the emulator
+        run: |
+          if [ ! -e /dev/kvm ]; then
+            echo "KVM device /dev/kvm is unavailable on this runner."
+            exit 1
+          fi
+          sudo chmod 666 /dev/kvm
+          ls -l /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
       - name: Run app on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -87,19 +101,24 @@ jobs:
             set -eu
             mkdir -p emulator-evidence
             trap 'adb logcat -d -t 5000 > emulator-evidence/emulator-logcat.txt 2>&1 || true; adb exec-out screencap -p > emulator-evidence/emulator-screenshot.png 2>/dev/null || true' EXIT
-            APK="$(find test-apk -type f -name "*.apk" -print -quit)"
-            test -n "$APK"
-            test -s "$APK"
-            echo "Installing APK: $APK"
-            adb install -r "$APK"
+            echo "Workspace: $GITHUB_WORKSPACE"
+            echo "Downloaded files:"
+            find "$GITHUB_WORKSPACE" -maxdepth 4 -type f \( -name "*.apk" -o -name "*.zip" \) -print
+            test -n "$(find "$PWD/test-apk" -type f -name "*.apk" -print -quit)"
+            test -s "$(find "$PWD/test-apk" -type f -name "*.apk" -print -quit)"
+            adb install -r "$(find "$PWD/test-apk" -type f -name "*.apk" -print -quit)"
+            adb logcat -c
             adb shell am force-stop com.samyrius.rotationapp
             adb shell monkey -p com.samyrius.rotationapp 1
             sleep 25
-            adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | grep "com.samyrius.rotationapp"
-            if adb logcat -d -t 5000 | grep -A 12 "FATAL EXCEPTION" | grep -q "com.samyrius.rotationapp"; then
-              echo "Fatal exception associated with ResiManage detected."
-              exit 1
-            fi
+            adb shell dumpsys activity activities > emulator-evidence/activity-state.txt
+            grep -E "mResumedActivity|topResumedActivity" emulator-evidence/activity-state.txt | grep "com.samyrius.rotationapp"
+            adb forward tcp:5000 tcp:5000
+            curl --retry 10 --retry-delay 1 --retry-connrefused --fail --silent --show-error http://127.0.0.1:5000/login --output emulator-evidence/login-page.html
+            grep -Eq "Connexion|Identifiant|Mot de passe" emulator-evidence/login-page.html
+            adb logcat -d > emulator-evidence/emulator-logcat.txt
+            if grep -Eq "FATAL EXCEPTION.*com.samyrius.rotationapp|TemplateNotFound:|Exception on /login" emulator-evidence/emulator-logcat.txt; then echo "ResiManage startup or login rendering error detected."; exit 1; fi
+            adb exec-out screencap -p > emulator-evidence/emulator-screenshot.png
       - name: Upload emulator evidence (logs and screenshot)
         if: always()
         uses: actions/upload-artifact@v4

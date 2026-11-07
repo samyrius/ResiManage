@@ -4,10 +4,14 @@ on:
   push:
     branches:
       - "resimanage-2-work"
+      - "work/**"
     paths:
       - ".github/workflows/build-resimanage-windows.yml"
       - ".github/workflows/android-apk.yml"
       - "app.py"
+      - "guards.py"
+      - "data/**"
+      - "android/app/build.gradle"
       - "requirements.txt"
       - "windows_launcher.py"
       - "windows/ResiManage-Setup.iss"
@@ -26,7 +30,7 @@ jobs:
       - name: Checkout ResiManage 2
         uses: actions/checkout@v4
         with:
-          ref: resimanage-2-work
+          ref: ${{ github.ref_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -46,7 +50,7 @@ jobs:
 
       - name: Build GUI executable (no console)
         run: |
-          pyinstaller --noconfirm --clean --onefile --noconsole --name ResiManage --collect-all webview --collect-all flask --collect-all werkzeug --collect-all openpyxl --collect-all xlrd --collect-all docx --collect-all pypdf --collect-all PIL --add-data "static;static" windows_launcher.py
+          pyinstaller --noconfirm --clean --onefile --noconsole --name ResiManage --collect-all webview --collect-all flask --collect-all werkzeug --collect-all openpyxl --collect-all xlrd --collect-all docx --collect-all pypdf --collect-all PIL --add-data "static;static" --add-data "data/gardes_octobre_2026.json;data" windows_launcher.py
 
       - name: Install Inno Setup
         shell: pwsh
